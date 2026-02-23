@@ -118,6 +118,18 @@ export async function assinarLote(ids: string[]): Promise<Result<Portaria[]>> {
     }
 }
 
+export async function assinarPortaria(id: string): Promise<Result<Portaria>> {
+    try {
+        const response = await api.post(`/api/portarias/${id}/assinar`)
+        if (response.data.success) {
+            return ok(response.data.data as Portaria)
+        }
+        return err(response.data.error || 'Erro ao assinar portaria')
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro técnico na assinatura do documento')
+    }
+}
+
 export const portariaService = {
     listarPortarias,
     buscarPortaria,
@@ -125,6 +137,7 @@ export const portariaService = {
     criarPortaria,
     submeterPortaria,
     assinarLote,
+    assinarPortaria,
     aprovarPortaria,
     rejeitarPortaria,
     publicarPortaria,

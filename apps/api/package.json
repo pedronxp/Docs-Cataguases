@@ -18,6 +18,7 @@
     "@types/pg": "^8.16.0",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
+    "cloudconvert": "^3.0.0",
     "dotenv": "^17.3.1",
     "jose": "^6.1.3",
     "next": "16.1.6",

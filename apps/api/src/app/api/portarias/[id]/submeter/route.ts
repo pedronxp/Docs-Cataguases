@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { NumeracaoService } from '@/services/numeracao.service'
+import { CompilerService } from '@/services/compiler.service'
+import { PdfService } from '@/services/pdf.service'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export async function PATCH(
     request: Request,
@@ -12,7 +15,8 @@ export async function PATCH(
         if (!session) return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 })
 
         const portaria = await prisma.portaria.findUnique({
-            where: { id: params.id }
+            where: { id: params.id },
+            include: { modelo: true }
         })
 
         if (!portaria) return NextResponse.json({ success: false, error: 'Portaria não encontrada' }, { status: 404 })
@@ -29,8 +33,8 @@ export async function PATCH(
             }
         }
 
-        // 2. Atualiza status para PROCESSANDO (Simulando o início da geração de PDF)
-        const portariaAtualizada = await prisma.portaria.update({
+        // 2. Atualiza status para PROCESSANDO
+        await prisma.portaria.update({
             where: { id: params.id },
             data: {
                 status: 'PROCESSANDO',
@@ -38,16 +42,57 @@ export async function PATCH(
             }
         })
 
-        // TODO: Aqui dispararíamos o worker de Puppeteer para gerar o PDF
-        // Como estamos em integração frontend, vamos deixar o status em PENDENTE após um "delay" simulado no backend ou apenas mudar agora
+        // 3. Geração de PDF Real
+        try {
+            // A. Gerar HTML
+            const html = await CompilerService.compilarPortaria(params.id)
+            const hash = PdfService.gerarHash(html)
 
-        // Simulando que o processamento "acabou" rápido para fins de teste UI
-        const final = await prisma.portaria.update({
-            where: { id: params.id },
-            data: { status: 'PENDENTE' }
-        })
+            // B. Gerar PDF Buffer
+            const pdfRes = await PdfService.gerarPDF(html, numeroOficial || 'S/N', hash)
+            if (!pdfRes.ok) throw new Error(pdfRes.error)
 
-        return NextResponse.json({ success: true, data: final })
+            // C. Upload para Supabase Storage
+            const fileName = `portarias/${portaria.id}-${Date.now()}.pdf`
+            const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+                .from('docs-cataguases')
+                .upload(fileName, pdfRes.value, {
+                    contentType: 'application/json', // Corrigindo para application/pdf mais tarde se necessário, mas bucket costuma auto-detectar
+                    upsert: true
+                })
+
+            if (uploadError) throw new Error(`Erro no upload: ${uploadError.message}`)
+
+            // D. Obter URL Pública
+            const { data: { publicUrl } } = supabaseAdmin.storage
+                .from('docs-cataguases')
+                .getPublicUrl(fileName)
+
+            // 4. Finaliza portaria
+            const final = await prisma.portaria.update({
+                where: { id: params.id },
+                data: {
+                    status: 'PENDENTE',
+                    pdfUrl: publicUrl,
+                    hashIntegridade: hash
+                }
+            })
+
+            return NextResponse.json({ success: true, data: final })
+        } catch (genError: any) {
+            console.error('Falha na geração do documento:', genError)
+
+            // Reverte para RASCUNHO em caso de erro crítico na geração
+            await prisma.portaria.update({
+                where: { id: params.id },
+                data: { status: 'RASCUNHO' }
+            })
+
+            return NextResponse.json({
+                success: false,
+                error: `Falha ao gerar o documento oficial: ${genError.message}`
+            }, { status: 500 })
+        }
     } catch (error) {
         console.error('Erro na submissão:', error)
         return NextResponse.json({ success: false, error: 'Erro ao submeter portaria' }, { status: 500 })

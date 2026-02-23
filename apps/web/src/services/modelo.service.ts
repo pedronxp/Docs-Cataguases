@@ -27,7 +27,88 @@ export async function buscarModelo(id: string): Promise<Result<ModeloDocumento>>
     }
 }
 
+export async function listarModelosAdmin(): Promise<Result<ModeloDocumento[]>> {
+    try {
+        const response = await api.get('/api/admin/modelos')
+        if (response.data.success) {
+            return ok(response.data.data as ModeloDocumento[])
+        }
+        return err(response.data.error || 'Erro ao carregar modelos administrativos')
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Falha na conexão com o admin de modelos')
+    }
+}
+
+export async function criarModelo(payload: any): Promise<Result<ModeloDocumento>> {
+    try {
+        const response = await api.post('/api/admin/modelos', payload)
+        if (response.data.success) return ok(response.data.data as ModeloDocumento)
+        return err(response.data.error || 'Erro ao criar modelo')
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro técnico na criação do modelo')
+    }
+}
+
+export async function atualizarModelo(id: string, payload: any): Promise<Result<ModeloDocumento>> {
+    try {
+        const response = await api.patch(`/api/admin/modelos/${id}`, payload)
+        if (response.data.success) return ok(response.data.data as ModeloDocumento)
+        return err(response.data.error || 'Erro ao atualizar modelo')
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro técnico na atualização do modelo')
+    }
+}
+
+export async function uploadTemplate(file: File): Promise<Result<string>> {
+    try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const response = await api.post('/api/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        return ok(response.data.url)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro no upload do arquivo')
+    }
+}
+
+export async function analisarModelo(url: string): Promise<Result<{ html: string, variaveis: any[] }>> {
+    try {
+        const response = await api.post('/api/admin/modelos/analisar', { url })
+        return ok(response.data.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao analisar variáveis do documento')
+    }
+}
+
+export async function desativarModelo(id: string): Promise<Result<void>> {
+    try {
+        const response = await api.delete(`/api/admin/modelos/${id}`)
+        if (response.data.success) return ok(undefined)
+        return err(response.data.error || 'Erro ao desativar modelo')
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro técnico ao desativar modelo')
+    }
+}
+
+export async function sincronizarVariaveis(id: string, variaveis: any[]): Promise<Result<ModeloDocumento>> {
+    try {
+        const response = await api.post(`/api/admin/modelos/${id}/variaveis`, { variaveis })
+        if (response.data.success) return ok(response.data.data as ModeloDocumento)
+        return err(response.data.error || 'Erro ao sincronizar variáveis')
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro técnico na sincronização de variáveis')
+    }
+}
+
 export const modeloService = {
     listarModelos,
     buscarModelo,
+    listarModelosAdmin,
+    criarModelo,
+    atualizarModelo,
+    desativarModelo,
+    sincronizarVariaveis,
+    uploadTemplate,
+    analisarModelo,
 }
