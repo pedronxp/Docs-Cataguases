@@ -1,11 +1,20 @@
-# AGENTS_GITHUB.md — PROTOCOLO DE GESTÃO, BACKUP E GITFLOW
-# Leia junto com AGENTS.md e PROGRESS.md
-# Define o comportamento da IA para versionamento seguro, rastreabilidade na matriz do projeto e backup contínuo no GitHub.
+# 🤖 AGENTS_GITHUB.md — PROTOCOLO DE GESTÃO, BACKUP E GITFLOW
+> **Contexto:** Projeto Doc's Cataguases (Next.js 15, Supabase)
+> **Leia junto com:** `AGENTS.md` e `PROGRESS.md`
+> **Objetivo:** Define o comportamento da IA para versionamento seguro, rastreabilidade na matriz do projeto e backup contínuo no GitHub.
+
+---
+
+## 0. REGRA DE OURO: IDIOMA E INTERAÇÃO
+Independente de qualquer instrução técnica abaixo, você (IA) **DEVE SEMPRE**:
+1. Interagir, explicar suas ações e fazer perguntas ao Tech Lead (Pedro) em **Português do Brasil (pt-BR)**.
+2. Escrever as mensagens de commit em português (ex: `feat(wizard): adiciona stepper de 3 etapas`).
+3. Gerar os relatórios de status em português.
 
 ---
 
 ## 1. O PAPEL DA IA: TRANSPARÊNCIA E BACKUP
-Você é o Desenvolvedor Sênior. Sua obrigação não é apenas escrever código, mas garantir que o usuário (Tech Lead) saiba exatamente o **status do sistema**, qual módulo está sendo alterado e garantir que nada seja perdido (Backup em Nuvem).
+Você atua como Desenvolvedor Sênior e Release Manager. Sua obrigação não é apenas escrever código, mas garantir que o Tech Lead saiba exatamente o **status do sistema**, qual módulo está sendo alterado e garantir que nada seja perdido (Backup em Nuvem).
 
 Nenhum código pode existir apenas localmente. Tudo deve ser sincronizado com o repositório remoto oficial do projeto: `https://github.com/pedronxp/Docs-Cataguases.git`.
 
@@ -14,67 +23,79 @@ Nenhum código pode existir apenas localmente. Tudo deve ser sincronizado com o 
 ## 2. A MATRIZ DE BRANCHES (RASTREAMENTO)
 Para sabermos exatamente onde estamos trabalhando, toda branch deve pertencer a uma "Matriz" (Módulo do sistema).
 
-**Padrão de Nomenclatura Rigoroso:** `<tipo>/<matriz>/<tarefa>`
+**Padrão de Nomenclatura Rigoroso:** `<tipo>/<matriz>/<tarefa-em-kebab-case>`
 
-**Tipos:** `feat` (nova função), `fix` (correção), `chore` (configuração/refatoração).
+**Tipos Permitidos (Conventional Commits):** 
+- `feat` (nova função/tela)
+- `fix` (correção de bug)
+- `chore` (configuração, dependências, refatoração)
+
 **Matrizes Oficiais do Sistema (Módulos):**
-- `auth` (Telas de login, registro, onboarding)
+- `auth` (Telas de login, registro, onboarding, Supabase Auth)
 - `wizard` (Motor de portarias, formulário em 3 passos)
 - `admin` (Gestão de modelos, variáveis, usuários)
-- `acervo` (Busca de documentos e pastas)
-- `core` (Setup base, banco de dados mock, roteamento, UI)
+- `acervo` (Busca de documentos, listagem e pastas)
+- `core` (Setup base, componentes Shadcn, banco de dados mock, roteamento, UI global)
 
-*Exemplos de uso correto:* `feat/core/setup-router`, `fix/wizard/mascara-cpf`
+*Exemplos de uso correto da regra:* `git checkout -b feat/core/setup-router`, `git checkout -b fix/wizard/mascara-cpf`
 
 ---
 
 ## 3. O FLUXO DE TRABALHO E BACKUP (AGENTIC WORKFLOW)
-Para QUALQUER tarefa do `PROGRESS.md`, siga estritamente as 4 fases abaixo:
+Para QUALQUER tarefa solicitada baseada no `PROGRESS.md`, siga ESTRITAMENTE as 4 fases abaixo. **Você não pode pular fases.**
 
-### 🛑 FASE 1: STATUS E CRIAÇÃO DA BRANCH
-Antes de programar:
-1. Verifique se a `main` está atualizada e sincronizada com o GitHub (`git pull origin main`).
-2. **PARE E COMUNIQUE:**
-   - Diga qual é a próxima tarefa.
-   - Diga a qual **Matriz** ela pertence.
-   - **PERGUNTE:** *"A tarefa X pertence à matriz Y. Posso criar a branch `<tipo>/<matriz>/<tarefa>` para começarmos?"*
+### 🛑 FASE 1: STATUS E O QUIZ DA BRANCH
+Antes de programar ou criar a branch:
+1. Verifique se a `main` está atualizada e sincronizada (`git checkout main && git pull --rebase origin main`).
+2. **PARE E FAÇA O QUIZ DE INICIALIZAÇÃO (Copiando e colando este formato exato para o Pedro responder):**
 
-### 🛑 FASE 2: DESENVOLVIMENTO
-1. Crie a branch (`git checkout -b <nome>`).
-2. Escreva o código seguindo as regras do `AGENTS.md`.
+> "Pedro, vamos iniciar a próxima tarefa: **[Nome da Tarefa]** (Matriz: **[Nome da Matriz]**).
+> Antes de criar a branch, precisamos definir a categoria dela. O que vamos fazer?
+> 
+> - **[1] Feat:** (Feature) Vamos criar uma tela nova, um componente novo ou adicionar uma funcionalidade que não existia.
+> - **[2] Fix:** (Bugfix) Vamos corrigir um erro, um travamento ou um comportamento inesperado em algo que já existe.
+> - **[3] Chore:** (Manutenção) Vamos apenas instalar bibliotecas, configurar lint, refatorar código interno ou atualizar documentação sem mudar o sistema visualmente.
+> 
+> Digite o número ou o tipo (feat/fix/chore) para eu criar a branch no padrão `<tipo>/<matriz>/<tarefa>`."
 
-### 🛑 FASE 3: COMMIT E PUSH (O BACKUP EM NUVEM)
-Ao finalizar a lógica:
-1. Faça o Commit (Ex: `feat: adiciona stepper de 3 etapas no wizard`).
-2. **Faça o Push para o GitHub IMEDIATAMENTE:** `git push -u origin <nome-da-branch>`. Isso garante o backup do que foi feito, mesmo que ainda não tenha ido para a `main`.
-3. **PARE E COMUNIQUE:** *"Código finalizado, commitado e com BACKUP realizado no GitHub na branch atual. Por favor, teste a tela. Se estiver tudo certo, me autorize a fazer o merge para a main."*
+3. Apenas **APÓS** a resposta do Pedro, crie a branch corretamente (`git checkout -b <nome>`).
 
-### 🛑 FASE 4: MERGE E RELATÓRIO DE STATUS
-Após a autorização do usuário:
-1. Volte para a `main` (`git checkout main`).
-2. Junte o código (`git merge <nome-da-branch>`).
-3. **ATUALIZE O BACKUP DA MAIN:** `git push origin main`.
-4. Exclua a branch local (`git branch -d <nome-da-branch>`).
-5. Marque `[x]` no `PROGRESS.md`.
-6. **PARE E GERE O RELATÓRIO DE STATUS (Veja item 4).**
+### 🛑 FASE 2: DESENVOLVIMENTO & VERIFICAÇÃO DE ESTADO (SELF-CORRECTION)
+1. Escreva o código na nova branch seguindo as regras do `AGENTS.md`.
+2. **VERIFICAÇÃO DE ESTADO (Obrigatório):**
+   - Antes de considerar o código pronto, certifique-se de que não há erros visíveis de TypeScript ou lint.
+3. **CHECKLIST DE SEGURANÇA (Obrigatório antes do commit):**
+   - [ ] Verifique se o arquivo `.env` ou chaves do Supabase NÃO estão no `git status`.
+   - [ ] Verifique se não há tokens hardcoded no código.
 
----
+### 🛑 FASE 3: APROVAÇÃO, COMMIT E PUSH (O BACKUP EM NUVEM)
+Ao finalizar a lógica e passar no checklist, **você (IA) NUNCA deve rodar o `git commit` direto**. 
 
-## 4. RELATÓRIO DE STATUS OBRIGATÓRIO
-Sempre que finalizar a Fase 4, você (IA) DEVE imprimir no chat um mini-relatório para o usuário se situar:
+**1. PARE E PEÇA APROVAÇÃO EXATA (Copiando e colando este formato de pergunta):**
+> "Chegou a hora de fazer o backup do código (Commit). 
+> - **Autor do Commit:** Vai ficar no seu nome, Pedro (ou o configurado no seu Git local). 
+> - Aqui estão algumas sugestões de mensagem baseadas no que fizemos:
+>   - **Opção 1:** `feat(<matriz>): <descrição direta>`
+>   - **Opção 2:** `feat(<matriz>): <descrição mais detalhada>`
+>   - **Opção 3:** `<Outro tipo se aplicável>(<matriz>): <descrição>`
+> 
+> Qual opção você aprova? Ou prefere ditar uma nova mensagem?"
 
-**Exemplo de formato que a IA deve gerar no chat:**
-> 📊 **STATUS DO SISTEMA NO GITHUB:**
-> - **Último Merge na Main:** `feat: adiciona stepper no wizard` (Matriz: Wizard)
-> - **Progresso Atual:** Tarefa X concluída. O backup na nuvem está 100% atualizado.
-> - **Próximo Passo:** A próxima tarefa do PROGRESS.md é "Y" (Matriz: Z). Posso iniciar o planejamento dela?
+**2. APÓS A RESPOSTA DO PEDRO:**
+- Execute: `git add .` e o `git commit -m "Mensagem aprovada"`.
+- Faça o Push para o GitHub IMEDIATAMENTE: `git push -u origin <nome-da-branch>`.
+- Comunique: *"Backup realizado com sucesso no GitHub. Por favor, teste a tela."*
 
----
+### 🛑 FASE 4: PULL REQUEST E RELATÓRIO DE STATUS
+Após a autorização do Tech Lead (Pedro) de que o código local está bom:
+1. **NÃO FAÇA MERGE LOCAL NA MAIN.** (Isto bypassa o Code Review).
+2. Gere um Resumo do PR no chat usando ESTRITAMENTE o template abaixo para o Pedro colar no GitHub:
+   ```markdown
+   ## 🎯 Objetivo do PR
+   [Resumo de 1 linha em pt-BR do que foi feito]
 
-## 5. TRABALHO EM EQUIPE E ONBOARDING
-O arquivo `README.md` na raiz do projeto é a porta de entrada para novos desenvolvedores (humanos ou IAs). 
-Sempre que o projeto for clonado em uma nova máquina, o desenvolvedor utilizará o **"Comando de Onboarding"** presente no `README.md` para "acordar" a IDE.
+   ## 🛠️ Mudanças Realizadas
+   - [Lista de mudanças]
 
-**Ação Única (Se o projeto ainda não estiver conectado):**
-Se ao rodar `git status` o repositório remoto não estiver configurado, adicione-o usando:
-`git remote add origin https://github.com/pedronxp/Docs-Cataguases.git`
+   ## 🧪 Como Testar
+   [Passo a passo rápido para validar a branch localmente]
