@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              String   @id @default(cuid())
+  name            String
+  email           String   @unique
+  password        String
+  role            String   @default("OPERADOR")
+  ativo           Boolean  @default(true)
+  permissoesExtra String[] @default([])
+  secretariaId    String?
+  setorId         String?
+}
+
+model LivroNumeracao {
+  id            String  @id @default(cuid())
+  secretariaId  String
+  setorId       String?
+  ano           Int
+  proximoNumero Int     @default(1)
+  formato       String
+
+  @@unique([secretariaId, setorId, ano])
+}
+
+model Portaria {
+  id              String   @id @default(cuid())
+  titulo          String
+  numeroOficial   String?
+  status          String   @default("RASCUNHO")
+  autorId         String
+  secretariaId    String
+  setorId         String?
+  modeloId        String
+  pdfUrl          String?
+  docxRascunhoUrl String?
+  hashAssinatura  String?
+  dadosFormulario Json     @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model FeedAtividade {
+  id           String   @id @default(cuid())
+  tipoEvento   String
+  mensagem     String   @db.Text
+  portariaId   String
+  autorId      String
+  secretariaId String
+  setorId      String?
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now())
+}
+
+model ModeloDocumento {
+  id              String           @id @default(cuid())
+  nome            String
+  descricao       String
+  secretariaId    String?
+  docxTemplateUrl String
+  ativo           Boolean          @default(true)
+  variaveis       ModeloVariavel[]
+}
+
+model ModeloVariavel {
+  id          String          @id @default(cuid())
+  modeloId    String
+  modelo      ModeloDocumento @relation(fields: [modeloId], references: [id])
+  chave       String
+  label       String
+  tipo        String          @default("texto")
+  opcoes      String[]        @default([])
+  obrigatorio Boolean         @default(true)
+  ordem       Int             @default(0)
+}
+
+model VariavelSistema {
+  id                       String  @id @default(cuid())
+  chave                    String  @unique
+  valor                    String
+  descricao                String
+  resolvidaAutomaticamente Boolean @default(false)
+}
