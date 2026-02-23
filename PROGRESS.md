@@ -52,11 +52,10 @@
 
 ---
 
-## 🔴 CICLO 2: BACKEND REAL (AGENTS_CICLO2.md)
-*NÃO INICIAR ATÉ QUE O CICLO 1 ESTEJA 100% MARCADO COM [X]*
+## � CICLO 2: BACKEND REAL (COMPLETO)
 - [x] Configurar Prisma e Supabase
-- [ ] Criar endpoints Next.js (com geração de PDF via CloudConvert e injeção de Hash)
-- [ ] Trocar imports mock -> real
+- [x] Criar endpoints Next.js (com geração de PDF via Puppeteer e injeção de Hash)
+- [x] Trocar imports mock -> real
 
 ---
 

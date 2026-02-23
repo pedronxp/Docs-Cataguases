@@ -1,7 +1,7 @@
 import type { Portaria } from '../types/domain'
 import type { PaginatedResponse } from '../types/api'
-import { ok, type Result } from '../lib/result'
-import { mockDelay, mockDB } from './_mock.helpers'
+import { ok, err, type Result } from '../lib/result'
+import api from '../lib/api'
 
 export interface AcervoQueryParams {
     secretariaId?: string
@@ -16,64 +16,25 @@ export interface AcervoQueryParams {
 export async function buscarAcervo(
     params: AcervoQueryParams
 ): Promise<Result<PaginatedResponse<Portaria>>> {
-    await mockDelay(500)
-
-    let lista = [...mockDB.portarias]
-
-    // Filtro de status (padrão: apenas PUBLICADA)
-    const statusFiltro = params.statusFiltro ?? ['PUBLICADA']
-    lista = lista.filter((p) => statusFiltro.includes(p.status))
-
-    // Filtro ABAC por secretaria
-    if (params.secretariaId) {
-        lista = lista.filter((p) => p.secretariaId === params.secretariaId)
+    try {
+        const response = await api.get('/api/acervo', { params })
+        return ok(response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao buscar no acervo')
     }
-
-    // Filtro por setor
-    if (params.setorId) {
-        lista = lista.filter((p) => p.setorId === params.setorId)
-    }
-
-    // Filtro por ano (extrai do numeroOficial ou updatedAt)
-    if (params.ano) {
-        lista = lista.filter((p) => {
-            const ano = p.numeroOficial?.split('/')[1] ??
-                new Date(p.updatedAt).getFullYear().toString()
-            return ano === String(params.ano)
-        })
-    }
-
-    // Busca por texto (número, título ou valor em dadosFormulario)
-    if (params.busca) {
-        const termo = params.busca.toLowerCase()
-        lista = lista.filter((p) =>
-            p.titulo.toLowerCase().includes(termo) ||
-            (p.numeroOficial ?? '').toLowerCase().includes(termo) ||
-            Object.values(p.dadosFormulario).some((v) => v.toLowerCase().includes(termo))
-        )
-    }
-
-    // Ordena por data de publicação (mais recente primeiro)
-    lista.sort((a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    )
-
-    const page = params.page ?? 1
-    const pageSize = params.pageSize ?? 15
-    const total = lista.length
-    const data = lista.slice((page - 1) * pageSize, page * pageSize)
-
-    return ok({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) })
 }
 
-// Retorna contagem de docs publicados por secretaria (para os badges das pastas)
+// Retorna contagem de docs publicados por secretaria
 export async function contarPorSecretaria(): Promise<Result<Record<string, number>>> {
-    await mockDelay(200)
-    const contadores: Record<string, number> = {}
-    mockDB.portarias
-        .filter((p) => p.status === 'PUBLICADA')
-        .forEach((p) => {
-            contadores[p.secretariaId] = (contadores[p.secretariaId] ?? 0) + 1
-        })
-    return ok(contadores)
+    try {
+        const response = await api.get('/api/acervo/estatisticas')
+        return ok(response.data.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao obter estatísticas do acervo')
+    }
+}
+
+export const acervoService = {
+    buscarAcervo,
+    contarPorSecretaria
 }

@@ -1,26 +1,32 @@
 import type { Secretaria } from '../types/domain'
 export type { Secretaria }
 
-import { ok, type Result } from '../lib/result'
-import { mockDelay, mockDB } from './_mock.helpers'
+import { ok, err, type Result } from '../lib/result'
+import api from '../lib/api'
 
 export async function listarSecretarias(): Promise<Result<Secretaria[]>> {
-    await mockDelay(300)
-    return ok([...mockDB.secretarias])
+    try {
+        const response = await api.get('/api/admin/config/secretarias')
+        return ok(response.data.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao listar secretarias')
+    }
 }
 
 export async function criarSecretaria(dados: Omit<Secretaria, 'id'>): Promise<Result<Secretaria>> {
-    await mockDelay(400)
-    const nova: Secretaria = {
-        ...dados,
-        id: Math.random().toString(36).substring(7)
+    try {
+        const response = await api.post('/api/admin/config/secretarias', dados)
+        return ok(response.data.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao criar secretaria')
     }
-    mockDB.secretarias.push(nova)
-    return ok(nova)
 }
 
 export async function deletarSecretaria(id: string): Promise<Result<void>> {
-    await mockDelay(400)
-    mockDB.secretarias = mockDB.secretarias.filter(s => s.id !== id)
-    return ok(undefined)
+    try {
+        await api.delete(`/api/admin/config/secretarias/${id}`)
+        return ok(undefined)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao deletar secretaria')
+    }
 }
