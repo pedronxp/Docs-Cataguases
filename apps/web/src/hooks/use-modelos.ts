@@ -7,18 +7,19 @@ export function useModelos() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
+    const fetchModelos = async () => {
+        setLoading(true)
+        const result = await listarModelos()
+        if (result.success) setModelos(result.data)
+        else setError(result.error)
+        setLoading(false)
+    }
+
     useEffect(() => {
-        let cancelled = false
-        listarModelos().then((result) => {
-            if (cancelled) return
-            if (result.success) setModelos(result.data)
-            else setError(result.error)
-            setLoading(false)
-        })
-        return () => { cancelled = true }
+        fetchModelos()
     }, [])
 
-    return { modelos, loading, error }
+    return { modelos, loading, error, refresh: fetchModelos }
 }
 
 export function useModelo(id: string) {

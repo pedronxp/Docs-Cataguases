@@ -22,9 +22,11 @@ import { Route as AuthLoginRouteImport } from './routes/_auth.login'
 import { Route as AuthAguardandoRouteImport } from './routes/_auth.aguardando'
 import { Route as SistemaAdminVariaveisRouteImport } from './routes/_sistema.admin.variaveis'
 import { Route as SistemaAdminUsuariosRouteImport } from './routes/_sistema.admin.usuarios'
+import { Route as SistemaAdminStatusRouteImport } from './routes/_sistema.admin.status'
 import { Route as SistemaAdminModelosRouteImport } from './routes/_sistema.admin.modelos'
 import { Route as SistemaAdminLivrosRouteImport } from './routes/_sistema.admin.livros'
 import { Route as SistemaAdminGestaoRouteImport } from './routes/_sistema.admin.gestao'
+import { Route as SistemaAdminAuditoriaRouteImport } from './routes/_sistema.admin.auditoria'
 import { Route as SistemaAdminAnalyticsRouteImport } from './routes/_sistema.admin.analytics'
 import { Route as SistemaAdministrativoPortariasIndexRouteImport } from './routes/_sistema.administrativo.portarias.index'
 import { Route as SistemaAdministrativoPortariasNovoRouteImport } from './routes/_sistema.administrativo.portarias.novo'
@@ -94,6 +96,11 @@ const SistemaAdminUsuariosRoute = SistemaAdminUsuariosRouteImport.update({
   path: '/admin/usuarios',
   getParentRoute: () => SistemaRoute,
 } as any)
+const SistemaAdminStatusRoute = SistemaAdminStatusRouteImport.update({
+  id: '/admin/status',
+  path: '/admin/status',
+  getParentRoute: () => SistemaRoute,
+} as any)
 const SistemaAdminModelosRoute = SistemaAdminModelosRouteImport.update({
   id: '/admin/modelos',
   path: '/admin/modelos',
@@ -107,6 +114,11 @@ const SistemaAdminLivrosRoute = SistemaAdminLivrosRouteImport.update({
 const SistemaAdminGestaoRoute = SistemaAdminGestaoRouteImport.update({
   id: '/admin/gestao',
   path: '/admin/gestao',
+  getParentRoute: () => SistemaRoute,
+} as any)
+const SistemaAdminAuditoriaRoute = SistemaAdminAuditoriaRouteImport.update({
+  id: '/admin/auditoria',
+  path: '/admin/auditoria',
   getParentRoute: () => SistemaRoute,
 } as any)
 const SistemaAdminAnalyticsRoute = SistemaAdminAnalyticsRouteImport.update({
@@ -151,9 +163,11 @@ export interface FileRoutesByFullPath {
   '/status-documentos': typeof SistemaStatusDocumentosRoute
   '/tutorial': typeof SistemaTutorialRoute
   '/admin/analytics': typeof SistemaAdminAnalyticsRoute
+  '/admin/auditoria': typeof SistemaAdminAuditoriaRoute
   '/admin/gestao': typeof SistemaAdminGestaoRoute
   '/admin/livros': typeof SistemaAdminLivrosRoute
   '/admin/modelos': typeof SistemaAdminModelosRoute
+  '/admin/status': typeof SistemaAdminStatusRoute
   '/admin/usuarios': typeof SistemaAdminUsuariosRoute
   '/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
@@ -173,9 +187,11 @@ export interface FileRoutesByTo {
   '/status-documentos': typeof SistemaStatusDocumentosRoute
   '/tutorial': typeof SistemaTutorialRoute
   '/admin/analytics': typeof SistemaAdminAnalyticsRoute
+  '/admin/auditoria': typeof SistemaAdminAuditoriaRoute
   '/admin/gestao': typeof SistemaAdminGestaoRoute
   '/admin/livros': typeof SistemaAdminLivrosRoute
   '/admin/modelos': typeof SistemaAdminModelosRoute
+  '/admin/status': typeof SistemaAdminStatusRoute
   '/admin/usuarios': typeof SistemaAdminUsuariosRoute
   '/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
@@ -197,9 +213,11 @@ export interface FileRoutesById {
   '/_sistema/status-documentos': typeof SistemaStatusDocumentosRoute
   '/_sistema/tutorial': typeof SistemaTutorialRoute
   '/_sistema/admin/analytics': typeof SistemaAdminAnalyticsRoute
+  '/_sistema/admin/auditoria': typeof SistemaAdminAuditoriaRoute
   '/_sistema/admin/gestao': typeof SistemaAdminGestaoRoute
   '/_sistema/admin/livros': typeof SistemaAdminLivrosRoute
   '/_sistema/admin/modelos': typeof SistemaAdminModelosRoute
+  '/_sistema/admin/status': typeof SistemaAdminStatusRoute
   '/_sistema/admin/usuarios': typeof SistemaAdminUsuariosRoute
   '/_sistema/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/_sistema/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
@@ -221,9 +239,11 @@ export interface FileRouteTypes {
     | '/status-documentos'
     | '/tutorial'
     | '/admin/analytics'
+    | '/admin/auditoria'
     | '/admin/gestao'
     | '/admin/livros'
     | '/admin/modelos'
+    | '/admin/status'
     | '/admin/usuarios'
     | '/admin/variaveis'
     | '/administrativo/portarias/$id'
@@ -243,9 +263,11 @@ export interface FileRouteTypes {
     | '/status-documentos'
     | '/tutorial'
     | '/admin/analytics'
+    | '/admin/auditoria'
     | '/admin/gestao'
     | '/admin/livros'
     | '/admin/modelos'
+    | '/admin/status'
     | '/admin/usuarios'
     | '/admin/variaveis'
     | '/administrativo/portarias/$id'
@@ -266,9 +288,11 @@ export interface FileRouteTypes {
     | '/_sistema/status-documentos'
     | '/_sistema/tutorial'
     | '/_sistema/admin/analytics'
+    | '/_sistema/admin/auditoria'
     | '/_sistema/admin/gestao'
     | '/_sistema/admin/livros'
     | '/_sistema/admin/modelos'
+    | '/_sistema/admin/status'
     | '/_sistema/admin/usuarios'
     | '/_sistema/admin/variaveis'
     | '/_sistema/administrativo/portarias/$id'
@@ -376,6 +400,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SistemaAdminUsuariosRouteImport
       parentRoute: typeof SistemaRoute
     }
+    '/_sistema/admin/status': {
+      id: '/_sistema/admin/status'
+      path: '/admin/status'
+      fullPath: '/admin/status'
+      preLoaderRoute: typeof SistemaAdminStatusRouteImport
+      parentRoute: typeof SistemaRoute
+    }
     '/_sistema/admin/modelos': {
       id: '/_sistema/admin/modelos'
       path: '/admin/modelos'
@@ -395,6 +426,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/gestao'
       fullPath: '/admin/gestao'
       preLoaderRoute: typeof SistemaAdminGestaoRouteImport
+      parentRoute: typeof SistemaRoute
+    }
+    '/_sistema/admin/auditoria': {
+      id: '/_sistema/admin/auditoria'
+      path: '/admin/auditoria'
+      fullPath: '/admin/auditoria'
+      preLoaderRoute: typeof SistemaAdminAuditoriaRouteImport
       parentRoute: typeof SistemaRoute
     }
     '/_sistema/admin/analytics': {
@@ -457,9 +495,11 @@ interface SistemaRouteChildren {
   SistemaStatusDocumentosRoute: typeof SistemaStatusDocumentosRoute
   SistemaTutorialRoute: typeof SistemaTutorialRoute
   SistemaAdminAnalyticsRoute: typeof SistemaAdminAnalyticsRoute
+  SistemaAdminAuditoriaRoute: typeof SistemaAdminAuditoriaRoute
   SistemaAdminGestaoRoute: typeof SistemaAdminGestaoRoute
   SistemaAdminLivrosRoute: typeof SistemaAdminLivrosRoute
   SistemaAdminModelosRoute: typeof SistemaAdminModelosRoute
+  SistemaAdminStatusRoute: typeof SistemaAdminStatusRoute
   SistemaAdminUsuariosRoute: typeof SistemaAdminUsuariosRoute
   SistemaAdminVariaveisRoute: typeof SistemaAdminVariaveisRoute
   SistemaAdministrativoPortariasIdRoute: typeof SistemaAdministrativoPortariasIdRoute
@@ -474,9 +514,11 @@ const SistemaRouteChildren: SistemaRouteChildren = {
   SistemaStatusDocumentosRoute: SistemaStatusDocumentosRoute,
   SistemaTutorialRoute: SistemaTutorialRoute,
   SistemaAdminAnalyticsRoute: SistemaAdminAnalyticsRoute,
+  SistemaAdminAuditoriaRoute: SistemaAdminAuditoriaRoute,
   SistemaAdminGestaoRoute: SistemaAdminGestaoRoute,
   SistemaAdminLivrosRoute: SistemaAdminLivrosRoute,
   SistemaAdminModelosRoute: SistemaAdminModelosRoute,
+  SistemaAdminStatusRoute: SistemaAdminStatusRoute,
   SistemaAdminUsuariosRoute: SistemaAdminUsuariosRoute,
   SistemaAdminVariaveisRoute: SistemaAdminVariaveisRoute,
   SistemaAdministrativoPortariasIdRoute: SistemaAdministrativoPortariasIdRoute,

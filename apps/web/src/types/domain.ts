@@ -78,3 +78,16 @@ export interface FeedAtividade {
     portaria?: Pick<Portaria, 'id' | 'titulo' | 'numeroOficial'>
     createdAt: string
 }
+
+export interface LogAuditoria {
+    id: string
+    usuarioId: string
+    usuarioNome: string
+    acao: string
+    modulo: 'PORTARIAS' | 'MODELOS' | 'USUARIOS' | 'SISTEMA' | 'AUTH'
+    severidade: 'INFO' | 'AVISO' | 'CRITICO'
+    detalhes: string
+    ip?: string
+    metadata?: Record<string, any>
+    createdAt: string
+}

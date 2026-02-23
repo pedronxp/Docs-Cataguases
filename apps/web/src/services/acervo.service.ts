@@ -25,6 +25,9 @@ export async function buscarAcervo(
     lista = lista.filter((p) => statusFiltro.includes(p.status))
 
     // Filtro ABAC por secretaria
+    // Se secretariaId for fornecido, filtra por ela. 
+    // No frontend, se o usuário não tiver 'visualizar:PortariaGlobal', 
+    // ele só pode passar a sua própria secretariaId.
     if (params.secretariaId) {
         lista = lista.filter((p) => p.secretariaId === params.secretariaId)
     }

@@ -54,14 +54,53 @@ const MOCK_MODELOS: ModeloDocumento[] = [
 ]
 
 
+const MOCK_DB_MODELOS = [...MOCK_MODELOS]
+
 export async function listarModelos(): Promise<Result<ModeloDocumento[]>> {
     await mockDelay(400)
-    return ok(MOCK_MODELOS.filter((m) => m.ativo))
+    return ok(MOCK_DB_MODELOS.filter((m) => m.ativo))
 }
 
 export async function buscarModelo(id: string): Promise<Result<ModeloDocumento>> {
     await mockDelay(200)
-    const modelo = MOCK_MODELOS.find((m) => m.id === id)
+    const modelo = MOCK_DB_MODELOS.find((m) => m.id === id)
     if (!modelo) return err(`Modelo "${id}" não encontrado.`)
     return ok(modelo)
+}
+
+export async function criarModelo(modelo: Omit<ModeloDocumento, 'id'>): Promise<Result<ModeloDocumento>> {
+    await mockDelay(800)
+    const novoModelo: ModeloDocumento = {
+        ...modelo,
+        id: `modelo-${Math.random().toString(36).substring(2, 9)}`,
+    }
+    MOCK_DB_MODELOS.push(novoModelo)
+    return ok(novoModelo)
+}
+
+export async function atualizarModelo(id: string, dados: Partial<ModeloDocumento>): Promise<Result<ModeloDocumento>> {
+    await mockDelay(600)
+    const index = MOCK_DB_MODELOS.findIndex((m) => m.id === id)
+    if (index === -1) return err(`Modelo "${id}" não encontrado para atualização.`)
+
+    MOCK_DB_MODELOS[index] = { ...MOCK_DB_MODELOS[index], ...dados }
+    return ok(MOCK_DB_MODELOS[index])
+}
+
+export async function excluirModelo(id: string): Promise<Result<void>> {
+    await mockDelay(500)
+    const index = MOCK_DB_MODELOS.findIndex((m) => m.id === id)
+    if (index === -1) return err(`Modelo "${id}" não encontrado para exclusão.`)
+
+    // Deletar logicamente para o mock
+    MOCK_DB_MODELOS[index].ativo = false
+    return ok(undefined)
+}
+
+export const modeloService = {
+    listarModelos,
+    buscarModelo,
+    criarModelo,
+    atualizarModelo,
+    excluirModelo,
 }

@@ -1,7 +1,7 @@
 import { useAbility } from '@casl/react'
 import { AbilityContext } from '@/lib/ability'
 import { Link, useRouterState } from '@tanstack/react-router'
-import { LayoutDashboard, FileText, Users, Settings, BookOpen, Braces, Archive, Building2, BarChart2 } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, Settings, BookOpen, Braces, Archive, Building2, BarChart2, History, Activity } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 type NavItem = {
@@ -22,6 +22,8 @@ const NAV_ITEMS: NavItem[] = [
     { to: '/admin/variaveis', label: 'Variáveis Globais', icon: Braces, action: 'gerenciar', subject: 'VariavelSistema' },
     { to: '/admin/livros', label: 'Numeração', icon: Settings, action: 'gerenciar', subject: 'LivroNumeracao' },
     { to: '/admin/analytics', label: 'Painel Analytics', icon: BarChart2, action: 'gerenciar', subject: 'Usuario' },
+    { to: '/admin/auditoria', label: 'Auditoria', icon: History, action: 'gerenciar', subject: 'all' },
+    { to: '/admin/status', label: 'Status do Sistema', icon: Activity, action: 'gerenciar', subject: 'all' },
     { to: '/admin/usuarios', label: 'Usuários', icon: Users, action: 'gerenciar', subject: 'Usuario' },
     { to: '/tutorial', label: 'Tutorial', icon: BookOpen, action: 'ler', subject: 'Portaria' },
 ]

@@ -1,4 +1,4 @@
-import type { Portaria, Usuario, FeedAtividade, Secretaria } from '../types/domain'
+import type { Portaria, Usuario, FeedAtividade, Secretaria, VariavelSistema } from '../types/domain'
 
 export const mockDelay = (ms = 600) =>
     new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -45,4 +45,8 @@ export const mockDB = {
         { id: 'sec-edu', nome: 'Secretaria de Educação', sigla: 'SME', cor: 'amber' },
         { id: 'sec-admin', nome: 'Secretaria de Administração', sigla: 'SMA', cor: 'purple' },
     ] as Secretaria[],
+    variaveisSistema: [
+        { id: 'v-1', chave: 'NUMERO_PORTARIA', valor: 'Autogerado via Livro', descricao: 'Retorna o número oficial da portaria no padrão XXX/ANO.', resolvidaAutomaticamente: true },
+        { id: 'v-2', chave: 'NOME_PREFEITO', valor: 'José da Silva Pereira', descricao: 'Nome completo do atual gestor do executivo.', resolvidaAutomaticamente: false },
+    ] as VariavelSistema[],
 }
