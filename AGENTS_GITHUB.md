@@ -7,11 +7,26 @@
 ---
 
 ## 0. PROTOCOLO DE COMUNICAÇÃO E SEGURANÇA (CRÍTICO)
-- **Idioma:** Interaja, explique ações, faça perguntas e redija commits **exclusivamente em Português do Brasil (pt-BR)**.
-- **Autonomia Restrita:** Você (IA) NUNCA tem permissão para alterar o histórico remoto (`git push`, `git commit`, `git checkout -b`, `git rebase`, `git merge`) sem a prévia e explícita aprovação do Tech Lead.
-- **Transparência de Comandos:** Antes de executar qualquer comando Git que altere o estado local ou remoto, informe ao usuário qual comando exato pretende rodar.
+- **Idioma:** Interaja, explique ações, faça perguntas e redija commits
+  **exclusivamente em Português do Brasil (pt-BR)**.
+- **Autonomia Restrita:** Você (IA) NUNCA tem permissão para alterar o
+  histórico remoto (`git push`, `git commit`, `git checkout -b`,
+  `git rebase`, `git merge`) sem a prévia e explícita aprovação do Tech Lead.
+- **Transparência de Comandos:** Antes de executar qualquer comando Git
+  que altere o estado local ou remoto, informe ao usuário qual comando
+  exato pretende rodar.
 
----
+### 🚫 REGRA ANTI-MAIN (OBRIGATÓRIA)
+- É **proibido** desenvolver (editar arquivos) estando na branch `main`.
+- A branch `main` só pode ser usada para: `git checkout main` +
+  `git pull origin main` (sincronizar), e mais nada.
+- Se eu (IA) detectar que estou na `main` e o pedido envolver
+  codar/alterar arquivos, devo parar e pedir autorização para:
+  1. Criar uma branch no padrão `<tipo>/<matriz>/<tarefa>`, e
+  2. Só então continuar.
+- **Check obrigatório antes de codar:** `git branch --show-current`.
+  Se retornar `main`, não avance.
+
 
 ## 1. O MAPA DE MATRIZES E NOMENCLATURA
 Para garantir a rastreabilidade, toda nova branch deve usar rigorosamente o padrão:
