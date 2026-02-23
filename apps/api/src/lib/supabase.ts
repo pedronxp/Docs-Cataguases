@@ -1,0 +1,19 @@
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+    console.warn('Supabase URL ou Service Role Key não configurados no .env. O Storage poderá falhar.')
+}
+
+/**
+ * Cliente admin do Supabase (Service Role)
+ * Usado para operações de Storage em nível de servidor.
+ */
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+    },
+})
