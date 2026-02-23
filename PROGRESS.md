@@ -36,19 +36,19 @@
 
 ### 5. ACERVO DOCUMENTAL
 - [x] Tela: Acervo Documental (`/_sistema/acervo`) com painel de pastas
-- [ ] Mock: Função `buscarAcervo` com filtros ABAC (`visualizar:PortariaGlobal`)
+- [x] Mock: Função `buscarAcervo` com filtros ABAC (`visualizar:PortariaGlobal`)
 
 ### 6. TELAS ADMINISTRATIVAS
 - [x] Tela: Gestão de Usuários (com Abas "Ativos" e "Fila de Aprovação")
-- [ ] Tela: Modelos de Documento (Upload de DOCX com papel timbrado/tags e tipos de variáveis CPF/Moeda)
+- [x] Tela: Modelos de Documento (Upload de DOCX com papel timbrado/tags e tipos de variáveis CPF/Moeda)
 - [x] Tela: Fluxo de Numeração
 - [x] Tela: Variáveis de Sistema
 - [x] Tela: Gestão Municipal (com painel lateral/Drawer de Setores)
-- [ ] Tela: Log de Auditoria / Trilha Oculta (`/_sistema/admin/auditoria`)
+- [x] Tela: Log de Auditoria / Trilha Oculta (`/_sistema/admin/auditoria`)
 
 ### 7. ANALYTICS E MONITORAMENTO
 - [x] Tela: Analytics (`/_sistema/admin/analytics`) usando Recharts
-- [ ] Tela: Status do Sistema (`/_sistema/admin/status`)
+- [x] Tela: Status do Sistema (`/_sistema/admin/status`)
 
 ---
 
