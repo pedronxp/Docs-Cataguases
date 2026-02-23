@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { PdfService } from '@/services/pdf.service'
+import { StorageService } from '@/services/storage.service'
 
 export async function POST(
     request: Request,
@@ -53,20 +54,32 @@ export async function POST(
         const pdfResult = await PdfService.gerarPDF(htmlFinal, portaria.numeroOficial, hash)
 
         if (pdfResult.ok) {
-            // 5. Salva o Hash e o status no banco (em uma implementação real, o PDF seria enviado para o Supabase Storage)
+            // 5. Upload para o Supabase Storage
+            const nomeArquivo = `portaria-${portaria.numeroOficial.replace('/', '-')}-${Date.now()}.pdf`
+            const caminhoStorage = `${portaria.secretariaId}/${nomeArquivo}`
+
+            const uploadResult = await StorageService.uploadDocumento(
+                caminhoStorage,
+                pdfResult.value
+            )
+
+            const pdfUrl = uploadResult.ok ? uploadResult.value : null
+
+            // 6. Salva o Hash e o link do PDF no banco
             await prisma.portaria.update({
                 where: { id },
                 data: {
                     hashIntegridade: hash,
-                    // Aqui poderíamos salvar a URL do storage: arquivoUrl: ...
+                    pdfUrl: pdfUrl,
+                    status: 'PROCESSANDO'
                 }
             })
 
-            // Retorna o PDF como stream
-            return new Response(pdfResult.value, {
+            // Retorna o PDF para download imediato
+            return new Response(new Uint8Array(pdfResult.value), {
                 headers: {
-                    'Content-Type': 'application/json', // Por enquanto retornamos o hash confirmação ou podemos mudar para application/pdf
-                    'Content-Disposition': `attachment; filename="portaria-${portaria.numeroOficial.replace('/', '-')}.pdf"`
+                    'Content-Type': 'application/pdf',
+                    'Content-Disposition': `attachment; filename="${nomeArquivo}"`
                 }
             })
         } else {
