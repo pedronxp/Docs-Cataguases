@@ -6,17 +6,7 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id              String   @id @default(cuid())
-  name            String
-  email           String   @unique
-  password        String
-  role            String   @default("OPERADOR")
-  ativo           Boolean  @default(true)
-  permissoesExtra String[] @default([])
-  secretariaId    String?
-  setorId         String?
-}
+// O modelo User foi movido para baixo para manter as relações próximas
 
 model LivroNumeracao {
   id            String  @id @default(cuid())
@@ -32,18 +22,37 @@ model LivroNumeracao {
 model Portaria {
   id              String   @id @default(cuid())
   titulo          String
+  descricao       String?
   numeroOficial   String?
-  status          String   @default("RASCUNHO")
-  autorId         String
+  status          String   @default("RASCUNHO") // RASCUNHO, PROCESSANDO, ASSINADO, PUBLICADO, ARQUIVADO
+  criadoPorId     String
   secretariaId    String
   setorId         String?
   modeloId        String
+  modelo          ModeloDocumento @relation(fields: [modeloId], references: [id])
+  criadoPor       User            @relation("CriadoPor", fields: [criadoPorId], references: [id])
   pdfUrl          String?
   docxRascunhoUrl String?
-  hashAssinatura  String?
-  dadosFormulario Json     @default("{}")
+  hashIntegridade String?  @unique // SHA-256 do conteúdo
+  assinadoEm      DateTime?
+  assinadoPorId   String?
+  formData        Json     @default("{}")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// Atualizar User para ter a relação inversa
+model User {
+  id              String   @id @default(cuid())
+  name            String
+  email           String   @unique
+  password        String
+  role            String   @default("OPERADOR")
+  ativo           Boolean  @default(true)
+  permissoesExtra String[] @default([])
+  secretariaId    String?
+  setorId         String?
+  portarias       Portaria[] @relation("CriadoPor")
 }
 
 model FeedAtividade {
@@ -66,6 +75,7 @@ model ModeloDocumento {
   docxTemplateUrl String
   ativo           Boolean          @default(true)
   variaveis       ModeloVariavel[]
+  portarias       Portaria[]
 }
 
 model ModeloVariavel {
