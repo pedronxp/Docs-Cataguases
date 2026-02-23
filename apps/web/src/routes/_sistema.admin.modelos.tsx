@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Search, FileText, Settings, Copy, Power } from 'lucide-react'
+import { Plus, Search, FileText, Settings, Copy, Power, Trash2, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -19,7 +19,6 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Trash2 } from 'lucide-react'
 
 export const Route = createFileRoute('/_sistema/admin/modelos')({
     component: ModelosDocumentoPage,
@@ -63,7 +62,7 @@ function ModelosDocumentoPage() {
 
     const handleSalvar = async () => {
         if (!novoModelo.nome || !novoModelo.docxTemplateUrl) {
-            toast({ title: 'Campos obrigatórios', description: 'Nome e URL do template são necessários.', variant: 'destructive' })
+            toast({ title: 'Campos obrigatórios', description: 'Nome e Template DOCX são necessários.', variant: 'destructive' })
             return
         }
 
@@ -78,37 +77,6 @@ function ModelosDocumentoPage() {
             toast({ title: 'Erro', description: res.error, variant: 'destructive' })
         }
         setIsSaving(false)
-    }
-
-    const addVariavel = () => {
-        setNovoModelo(prev => ({
-            ...prev,
-            variaveis: [...prev.variaveis, { chave: '', label: '', tipo: 'texto', ordem: prev.variaveis.length }]
-        }))
-    }
-
-    const removeVariavel = (index: number) => {
-        setNovoModelo(prev => ({
-            ...prev,
-            variaveis: prev.variaveis.filter((_, i) => i !== index)
-        }))
-    }
-
-    const updateVariavel = (index: number, field: string, value: any) => {
-        const newVars = [...novoModelo.variaveis]
-        newVars[index] = { ...newVars[index], [field]: value }
-        setNovoModelo(prev => ({ ...prev, variaveis: newVars }))
-    }
-
-    const handleAcao = (acao: string) => {
-        if (acao === 'Novo Modelo') {
-            setOpenDialog(true)
-            return
-        }
-        toast({
-            title: "Em Desenvolvimento",
-            description: `A ação '${acao}' será totalmente implementada na próxima fase.`,
-        })
     }
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,6 +121,37 @@ function ModelosDocumentoPage() {
             })
         }
         setIsAnalyzing(false)
+    }
+
+    const addVariavel = () => {
+        setNovoModelo(prev => ({
+            ...prev,
+            variaveis: [...prev.variaveis, { chave: '', label: '', tipo: 'texto', ordem: prev.variaveis.length }]
+        }))
+    }
+
+    const removeVariavel = (index: number) => {
+        setNovoModelo(prev => ({
+            ...prev,
+            variaveis: prev.variaveis.filter((_, i) => i !== index)
+        }))
+    }
+
+    const updateVariavel = (index: number, field: string, value: any) => {
+        const newVars = [...novoModelo.variaveis]
+        newVars[index] = { ...newVars[index], [field]: value }
+        setNovoModelo(prev => ({ ...prev, variaveis: newVars }))
+    }
+
+    const handleAcao = (acao: string) => {
+        if (acao === 'Novo Modelo') {
+            setOpenDialog(true)
+            return
+        }
+        toast({
+            title: "Em Desenvolvimento",
+            description: `A ação '${acao}' será totalmente implementada na próxima fase.`,
+        })
     }
 
     const modelosFiltrados = modelos.filter(m =>
@@ -252,11 +251,15 @@ function ModelosDocumentoPage() {
                                                 <Button onClick={() => handleAcao('Configurar')} variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Configurar">
                                                     <Settings className="h-4 w-4" />
                                                 </Button>
-                                                {!modelo.ativo && (
-                                                    <Button onClick={() => handleAcao('Ativar')} variant="ghost" size="icon" className="text-slate-500 hover:text-emerald-600" title="Ativar">
-                                                        <Power className="h-4 w-4" />
-                                                    </Button>
-                                                )}
+                                                <Button
+                                                    onClick={() => handleAcao(modelo.ativo ? 'Desativar' : 'Ativar')}
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className={modelo.ativo ? "text-slate-400 hover:text-red-500" : "text-emerald-500 hover:text-emerald-600"}
+                                                    title={modelo.ativo ? 'Desativar' : 'Ativar'}
+                                                >
+                                                    <Power className="h-4 w-4" />
+                                                </Button>
                                             </div>
                                         </TableCell>
                                     </TableRow>

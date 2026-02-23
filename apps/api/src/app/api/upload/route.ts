@@ -14,22 +14,39 @@ export async function POST(request: Request) {
         const buffer = await file.arrayBuffer()
         const fileName = `templates/${Date.now()}-${file.name}`
 
+        // Garante que o bucket existe
+        const { data: buckets } = await supabaseAdmin.storage.listBuckets()
+        const bucketName = 'docs-cataguases'
+        const bucketExists = buckets?.some(b => b.name === bucketName)
+
+        if (!bucketExists) {
+            console.log(`Criando bucket ${bucketName}...`)
+            await supabaseAdmin.storage.createBucket(bucketName, {
+                public: true,
+                allowedMimeTypes: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+                fileSizeLimit: 5242880 // 5MB
+            })
+        }
+
         const { data, error } = await supabaseAdmin.storage
-            .from('docs-cataguases')
+            .from(bucketName)
             .upload(fileName, buffer, {
                 contentType: file.type,
                 upsert: true
             })
 
-        if (error) throw error
+        if (error) {
+            console.error('Erro no upload Storage:', error)
+            return NextResponse.json({ success: false, error: `Erro no Storage: ${error.message}` }, { status: 500 })
+        }
 
         const { data: { publicUrl } } = supabaseAdmin.storage
-            .from('docs-cataguases')
+            .from(bucketName)
             .getPublicUrl(fileName)
 
         return NextResponse.json({ success: true, url: publicUrl })
     } catch (error: any) {
-        console.error('Erro no upload:', error)
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+        console.error('Erro crítico no upload:', error)
+        return NextResponse.json({ success: false, error: `Erro interno: ${error.message}` }, { status: 500 })
     }
 }

@@ -40,6 +40,13 @@ export async function POST(request: Request) {
         })
 
     } catch (error: any) {
+        if (error.message?.includes('CLOUDCONVERT_API_KEY')) {
+            return NextResponse.json({
+                success: true,
+                data: { html: '', variaveis: [] },
+                warning: 'CloudConvert não configurado. As variáveis não puderam ser extraídas automaticamente.'
+            })
+        }
         console.error('Erro ao analisar modelo:', error)
         return NextResponse.json({ success: false, error: error.message || 'Erro ao processar documento' }, { status: 500 })
     }
