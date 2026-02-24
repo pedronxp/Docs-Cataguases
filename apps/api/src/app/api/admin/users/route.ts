@@ -41,7 +41,6 @@ export async function GET(request: Request) {
                 secretariaId: true,
                 setorId: true,
                 permissoesExtra: true,
-                createdAt: true,
             },
         })
 

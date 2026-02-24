@@ -1,7 +1,6 @@
 import { cookies } from 'next/headers'
 import { verifyToken, signToken } from './jwt'
 import bcrypt from 'bcryptjs'
-
 /**
  * Compara uma senha em texto puro com um hash.
  */

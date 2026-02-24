@@ -19,7 +19,7 @@ export class NumeracaoService {
                     where: {
                         secretariaId_setorId_ano: {
                             secretariaId,
-                            setorId,
+                            setorId: (setorId as any),
                             ano: anoCorrente,
                         },
                     } as any,
