@@ -79,10 +79,10 @@
 *Objetivo: todos os endpoints faltantes implementados. Cobertura: 60% → 100%.*
 *Leia: `agents/_infraestrutura/BACKEND.md` antes de iniciar qualquer tarefa deste ciclo.*
 
-### Fase 1: Fluxo de Portaria (CRÍTICO — sem estes o fluxo principal está bloqueado)
-- [ ] `feat(wizard)`: `PATCH /api/portarias/[id]/aprovar` — PENDENTE → APROVADA
-- [ ] `feat(wizard)`: `PATCH /api/portarias/[id]/rejeitar` — PENDENTE → RASCUNHO
-- [ ] `feat(wizard)`: `PATCH /api/portarias/[id]/retry` — FALHA_PROCESSAMENTO → PROCESSANDO (sem novo número)
+### 🟢 Fase 1: Fluxo de Portaria (CONCLUÍDO)
+- [x] `feat(wizard)`: `PATCH /api/portarias/[id]/aprovar` — PENDENTE → APROVADA
+- [x] `feat(wizard)`: `PATCH /api/portarias/[id]/rejeitar` — PENDENTE → RASCUNHO
+- [x] `feat(wizard)`: `PATCH /api/portarias/[id]/retry` — FALHA_PROCESSAMENTO → PROCESSANDO (sem novo número)
 
 ### Fase 2: Painel Administrativo
 - [ ] `feat(admin)`: `GET + POST /api/admin/modelos` — CRUD de modelos de documento
@@ -115,6 +115,6 @@
 
 ---
 
-### 📊 Cobertura Atual do Backend: 60%
-*Portarias (basic), Acervo e Gestão de Usuários 100% operacionais em tempo real.*
-*Faltam: aprovar, rejeitar, retry, feed, modelos, variáveis, gestao, upload, validar/[hash]*
+### 📊 Cobertura Atual do Backend: 75%
+*Portarias (workflow completo), Acervo e Gestão de Usuários 100% operacionais.*
+*Faltam: feed, modelos, variáveis, gestao, upload, validar/[hash]*

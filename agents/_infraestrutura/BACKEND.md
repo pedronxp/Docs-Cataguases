@@ -182,10 +182,10 @@ apps/api/src/services/
 
 | # | Prioridade | Endpoint | Arquivo a criar |
 |---|---|---|---|
-| 1 | 🔴 CRÍTICO | PATCH /api/portarias/[id]/aprovar | portarias/[id]/aprovar/route.ts |
-| 2 | 🔴 CRÍTICO | PATCH /api/portarias/[id]/rejeitar | portarias/[id]/rejeitar/route.ts |
-| 3 | 🔴 CRÍTICO | PATCH /api/portarias/[id]/retry | portarias/[id]/retry/route.ts |
-| 4 | 🟡 ALTO | GET /api/feed | feed/route.ts |
+| 1 | ✅ CONCLUÍDO | PATCH /api/portarias/[id]/aprovar | portarias/[id]/aprovar/route.ts |
+| 2 | ✅ CONCLUÍDO | PATCH /api/portarias/[id]/rejeitar | portarias/[id]/rejeitar/route.ts |
+| 3 | ✅ CONCLUÍDO | PATCH /api/portarias/[id]/retry | portarias/[id]/retry/route.ts |
+| 4 | ✅ CONCLUÍDO | POST /api/portarias | portarias/route.ts (ABAC + Service) |
 | 5 | 🟡 ALTO | GET + POST /api/admin/modelos | admin/modelos/route.ts |
 | 6 | 🟡 ALTO | GET + PATCH + DELETE /api/admin/modelos/[id] | admin/modelos/[id]/route.ts |
 | 7 | 🟡 ALTO | GET + POST + PATCH /api/admin/variaveis | admin/variaveis/route.ts |

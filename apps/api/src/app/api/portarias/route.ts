@@ -1,110 +1,71 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getSession } from '@/lib/auth'
-import { NumeracaoService } from '@/services/numeracao.service'
+import { getAuthUser } from '@/lib/auth'
+import { buildAbility } from '@/lib/ability'
+import { PortariaService } from '@/services/portaria.service'
+import { z } from 'zod'
 
-export async function POST(request: Request) {
+const criarSchema = z.object({
+    titulo: z.string().min(1),
+    descricao: z.string().optional(),
+    modeloId: z.string().min(1),
+    formData: z.record(z.string(), z.any()),
+    secretariaId: z.string().optional(),
+    setorId: z.string().optional(),
+    submetido: z.boolean().optional().default(false),
+})
+
+export async function POST(req: NextRequest) {
     try {
-        const session = await getSession()
+        const usuario = await getAuthUser()
+        if (!usuario)
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-        if (!session) {
-            return NextResponse.json(
-                { success: false, error: 'Não autorizado' },
-                { status: 401 }
-            )
-        }
+        const ability = buildAbility(usuario as any)
+        if (!ability.can('criar', 'Portaria'))
+            return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
 
-        const body = await request.json()
-        const {
-            titulo,
-            descricao,
-            modeloId,
-            formData,
-            secretariaId,
-            setorId,
-            submetido = false
-        } = body
+        const body = await req.json()
+        const parsed = criarSchema.safeParse(body)
+        if (!parsed.success)
+            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
-        // 1. Cria a portaria no banco
-        const portaria = await prisma.portaria.create({
-            data: {
-                titulo,
-                descricao,
-                modeloId,
-                formData,
-                secretariaId: secretariaId || (session as any).secretariaId,
-                setorId: setorId || (session as any).setorId,
-                criadoPorId: session.id as string,
-                status: submetido ? 'PROCESSANDO' : 'RASCUNHO',
-            },
+        const result = await PortariaService.criar({
+            ...parsed.data,
+            criadoPorId: usuario.id as string,
+            secretariaId: parsed.data.secretariaId || (usuario as any).secretariaId,
+            setorId: parsed.data.setorId || (usuario as any).setorId,
         })
 
-        // 2. Se for submetida, aloca o número oficial imediatamente
-        if (submetido) {
-            const result = await NumeracaoService.alocarNumero(
-                portaria.secretariaId,
-                portaria.setorId
-            )
-
-            if (result.ok) {
-                const portariaAtualizada = await prisma.portaria.update({
-                    where: { id: portaria.id },
-                    data: {
-                        numeroOficial: result.value,
-                    },
-                })
-
-                return NextResponse.json({
-                    success: true,
-                    data: portariaAtualizada,
-                })
-            } else {
-                // Se falhar a numeração, mantemos a portaria mas avisamos o erro
-                return NextResponse.json({
-                    success: true,
-                    data: portaria,
-                    warning: 'Portaria criada, mas houve um erro ao gerar o número oficial. O sistema tentará gerar novamente em breve.',
-                })
-            }
+        if (!result.ok) {
+            return NextResponse.json({ error: result.error }, { status: 500 })
         }
 
-        return NextResponse.json({
-            success: true,
-            data: portaria,
-        })
+        return NextResponse.json(result.value, { status: 201 })
     } catch (error) {
         console.error('Erro ao criar portaria:', error)
         return NextResponse.json(
-            { success: false, error: 'Erro interno ao criar portaria' },
+            { error: 'Erro interno ao criar portaria' },
             { status: 500 }
         )
     }
 }
 
-export async function GET(request: Request) {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getSession()
+        const usuario = await getAuthUser()
+        if (!usuario)
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-        if (!session) {
-            return NextResponse.json(
-                { success: false, error: 'Não autorizado' },
-                { status: 401 }
-            )
-        }
+        const ability = buildAbility(usuario as any)
 
-        const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(req.url)
         const status = searchParams.get('status')
 
+        // Busca básica
         const portarias = await prisma.portaria.findMany({
             where: {
                 ...(status && { status: status as any }),
-                // Operadores só veem suas próprias portarias ou de sua secretaria
-                ...(session.role === 'OPERADOR' && {
-                    OR: [
-                        { criadoPorId: session.id as string },
-                        { secretariaId: (session as any).secretariaId },
-                    ],
-                }),
             },
             orderBy: { createdAt: 'desc' },
             include: {
@@ -114,13 +75,14 @@ export async function GET(request: Request) {
             },
         })
 
-        return NextResponse.json({
-            success: true,
-            data: portarias,
-        })
+        // Filtra pela habilidade CASL no backend
+        const filtradas = portarias.filter(p => ability.can('ler', 'Portaria', p as any))
+
+        return NextResponse.json(filtradas)
     } catch (error) {
+        console.error('Erro ao listar portarias:', error)
         return NextResponse.json(
-            { success: false, error: 'Erro ao listar portarias' },
+            { error: 'Erro ao listar portarias' },
             { status: 500 }
         )
     }

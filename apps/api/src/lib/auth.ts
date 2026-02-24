@@ -1,35 +1,6 @@
-import bcrypt from 'bcryptjs'
-import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
-
-const JWT_SECRET = new TextEncoder().encode(
-    process.env.NEXTAUTH_SECRET || 'fallback-secret-para-desenvolvimento'
-)
-
-export async function hashPassword(password: string) {
-    return bcrypt.hash(password, 12)
-}
-
-export async function comparePassword(password: string, hash: string) {
-    return bcrypt.compare(password, hash)
-}
-
-export async function createToken(payload: any) {
-    return new SignJWT(payload)
-        .setProtectedHeader({ alg: 'HS256' })
-        .setIssuedAt()
-        .setExpirationTime('8h')
-        .sign(JWT_SECRET)
-}
-
-export async function verifyToken(token: string) {
-    try {
-        const { payload } = await jwtVerify(token, JWT_SECRET)
-        return payload
-    } catch (error) {
-        return null
-    }
-}
+import { verifyToken } from './jwt'
+import { cookies as nextCookies } from 'next/headers'
 
 export async function getSession() {
     const cookieStore = await cookies()
@@ -37,3 +8,8 @@ export async function getSession() {
     if (!token) return null
     return verifyToken(token)
 }
+
+/**
+ * Alias para getSession seguindo o padrão do BACKEND.md
+ */
+export const getAuthUser = getSession
