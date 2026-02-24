@@ -1,33 +1,136 @@
-# AGENTS_LAYOUT_ASSINATURA.md — COMPLEMENTO: POSICIONAMENTO DA ASSINATURA NO DOCX
-# Este arquivo garante que a assinatura eletronica seja renderizada no local correto do documento, 
-# respeitando o Manual de Redacao Oficial.
+# agents/_modulos/VALIDACAO_PUBLICA.md — PÁGINA DE VALIDAÇÃO PÚBLICA
+# Leia junto com: agents/_base/AGENTS.md | agents/_infraestrutura/BACKEND.md
+# IA: Responda SEMPRE em português (pt-BR). Para melhor compreensão técnica, leia também VALIDACAO_PUBLICA.en.md
 
 ---
 
-## 1. O PROBLEMA DO LAYOUT NO PDF
-Sistemas que tentam "injetar" uma assinatura por cima de um PDF pronto costumam quebrar o layout, sobrepor texto ou gerar paginas em branco. Em orgaos publicos, o alinhamento da assinatura (direita, centro) e rigoroso.
+## IDENTIDADE
+
+Este arquivo especifica a página pública `/validar/[hash]` e o endpoint `GET /api/validar/[hash]`.
+Acesso completamente público — sem login, sem token JWT, sem ABAC.
+Qualquer cidadão com o hash do documento pode confirmar sua autenticidade.
 
 ---
 
-## 2. A SOLUCAO: SSOT (Single Source of Truth) NO WORD
-A responsabilidade de dizer ONDE a assinatura vai ficar e do template `.docx`, nao do codigo React ou do backend.
+## 1. CONCEITO
 
-### Novas Variaveis de Sistema (SYS_TAGS)
-O Admin deve inserir as seguintes tags no local exato onde deseja que a assinatura apareca no Microsoft Word (centralizado, alinhado a direita, com ou sem linha superior):
+Cada portaria publicada ganha um `hashAssinatura` (SHA-256 do PDF em hex).
+O cidadão, ao receber uma cópia impressa ou digital, pode acessar:
 
-- `{{SYS_ASSINANTE_NOME}}`: Trocado pelo `user.name` de quem digitou a senha e clicou em assinar.
-- `{{SYS_ASSINANTE_CARGO}}`: Trocado pelo `user.role` (Ex: Prefeito, Secretario de Saude).
-- `{{SYS_DATA_ASSINATURA}}`: Trocado pelo timestamp do momento exato do clique (Ex: 10 de junho de 2025).
-- `{{SYS_CHANCELA_RODAPE}}`: Colocada no rodape do Word, fonte tamanho 8. Trocada pelo texto legal e o Hash de validacao publica.
+```
+https://docs.cataguases.mg.gov.br/validar/[hashAssinatura]
+```
+
+E o sistema confirma instantaneamente se o documento é legítimo.
 
 ---
 
-## 3. NOVO FLUXO DE ASSINATURA (CICLO 2 - BACKEND)
-No Ciclo 2, quando o endpoint `PATCH /api/portarias/[id]/assinar` for chamado:
-1. O backend baixa o `.docx` de rascunho (que o operador subiu na tela de revisao).
-2. O backend faz um `replace()` das tags `{{SYS_ASSINANTE_*}}` com os dados do usuario logado (Prefeito/Secretario) e a tag do rodape com o Hash recem-gerado.
-3. O backend envia esse `.docx` ja preenchido com os dados finais do assinante para o CloudConvert.
-4. O CloudConvert devolve o PDF imutavel.
-5. O PDF e salvo no Supabase Storage como a versao final e oficial.
+## 2. ROTA FRONTEND (`/validar`)
 
-*(Nota para a IA: No Ciclo 1, apenas adicione essas novas chaves na tabela da Tela 11 - Variaveis de Sistema, para que o Admin saiba que elas existem e devem ser usadas nos templates).*
+**Arquivo:** `src/routes/validar.$hash.tsx` (rota pública — fora do layout autenticado)
+
+**Comportamento:**
+- Não exige login. Guard Router não bloqueia.
+- Ao montar, chama `GET /api/validar/[hash]`
+- Enquanto carrega: skeleton loader centralizado
+- Se encontrado: exibe bloco verde de confirmação
+- Se não encontrado / hash inválido: exibe bloco vermelho de alerta
+
+---
+
+## 3. UI — DOCUMENTO ENCONTRADO
+
+```
+┌────────────────────────────────────────────────┐
+│  ✓  Documento válido e autêntico                     │
+│                                                      │
+│  Título:    Portaria de Nomeação nº 001/2026/SEMAD   │
+│  Número:    001/2026/SEMAD                           │
+│  Publicado: 10 de jan. de 2026, às 14h32             │
+│  Assinado por: Sr. Prefeito Municipal                │
+│  Secretaria: Secretaria Municipal de Administração   │
+│                                                      │
+│  Hash SHA-256:                                       │
+│  a3f1c9d2... (64 chars, fonte mono, quebra de linha)  │
+│                                                      │
+│  [ 📄 Ver PDF Oficial ]   [ Voltar ao Início ]        │
+└────────────────────────────────────────────────┘
+```
+
+- Fundo: `bg-green-50`, borda: `border-green-200`, ícone: `✓` verde
+- Botão "Ver PDF Oficial" abre `pdfUrl` em nova aba
+- Botão "Voltar ao Início" redireciona para `/`
+
+---
+
+## 4. UI — DOCUMENTO NÃO ENCONTRADO
+
+```
+┌────────────────────────────────────────────────┐
+│  ✕  Documento não encontrado                         │
+│                                                      │
+│  O hash informado não corresponde a nenhum           │
+│  documento publicado neste sistema.                  │
+│                                                      │
+│  Verifique se o código foi copiado corretamente.     │
+│                                                      │
+│  [ Voltar ao Início ]                                │
+└────────────────────────────────────────────────┘
+```
+
+- Fundo: `bg-red-50`, borda: `border-red-200`, ícone: `✕` vermelho
+
+---
+
+## 5. ENDPOINT BACKEND (Ciclo 3)
+
+```
+GET /api/validar/[hash]
+  Auth:      NÃO requerida (público)
+  ABAC:      NÃO aplicado
+  Valida:    hash com formato válido (Zod: string hex de 64 chars ou prefixo mock)
+  Consulta:  SELECT id, titulo, numeroOficial, assinadoEm, pdfUrl,
+                    assinante { name }, secretaria { nome }
+             FROM Portaria
+             WHERE hashAssinatura = hash AND status = 'PUBLICADA'
+  Retorno 200:
+    {
+      id, titulo, numeroOficial,
+      assinadoEm,   // ISO timestamp
+      pdfUrl,       // link público do Supabase Storage
+      assinante: { name },
+      secretaria: { nome }
+    }
+  Retorno 404: { error: 'Documento não encontrado.' }
+  Retorno 400: { error: 'Hash inválido.' }
+```
+
+**Atenção:** Não expor campos sensíveis (CPF, dados formulário, autorId).
+
+---
+
+## 6. CHANCELA NO RODAPÉ DO PDF
+
+O template DOCX deve conter a tag `{{SYS_CHANCELA_RODAPE}}` no rodapé.
+O backend substitui por:
+
+```
+Documento eletrônico publicado pelo Sistema Doc's Cataguases.
+Autenticidade verificável em: https://docs.cataguases.mg.gov.br/validar/[hashAssinatura]
+Hash SHA-256: [hashAssinatura]
+```
+
+Fonte: tamanho 8, cor cinza, centralizado.
+
+---
+
+## 7. CHECKLIST DE CONCLUSÃO (Ciclo 3)
+
+- [ ] `GET /api/validar/[hash]` retorna dados corretos sem autentiçao
+- [ ] `GET /api/validar/[hash]` retorna 404 para hash inexistente
+- [ ] `GET /api/validar/[hash]` retorna 400 para hash malformado
+- [ ] Página `/validar/[hash]` acessível sem login (Guard Router não bloqueia)
+- [ ] Bloco verde com dados completos do documento publicado
+- [ ] Bloco vermelho para hash não encontrado
+- [ ] Botão "Ver PDF Oficial" abre PDF em nova aba
+- [ ] `SYS_CHANCELA_RODAPE` substituída corretamente no PDF final
