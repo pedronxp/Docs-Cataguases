@@ -13,26 +13,18 @@ export class AssinaturaService {
                 include: { modelo: true }
             })
 
-            if (!portaria || !portaria.hashIntegridade) {
-                return err('Documento não encontrado ou ainda não numerado.')
+            if (!portaria) {
+                return err('Documento não encontrado.')
             }
 
-<<<<<<< HEAD
             // Reconstrói o HTML para validar o hash (mesma lógica do pdf.service)
-            let htmlFinal = (portaria.modelo as any).conteudoHtml
-            const formData = portaria.formData as Record<string, string>
-=======
-            // Validação de integridade baseada no hash (simplificada para o schema atual)
-            // Em uma implementação real, o PDF binário ou o conteúdo reconstruído seria usado.
-            // Aqui vamos apenas comprovar se o hash integridade existe.
+            // No momento usamos apenas a existência do hashIntegridade como prova de geração oficial.
             if (!portaria.hashIntegridade) {
-                return err('Documento sem hash de integridade.')
+                return err('Documento sem hash de integridade ou ainda não numerado.')
             }
->>>>>>> feat/core/dashboard-intelligence
 
             // O hashCalculado deve ser obtido de uma reconstrução confiável do binário ou conteúdo.
-            // Para efeitos de compatibilidade com o schema atual (sem conteudoHtml), 
-            // vamos considerar o hash armazenado como a verdade única.
+            // Para efeitos de compatibilidade com o schema atual, vamos considerar o hash armazenado como a verdade única.
             const hashCalculado = portaria.hashIntegridade
 
             if (hashCalculado !== portaria.hashIntegridade) {

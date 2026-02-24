@@ -1,17 +1,25 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
+
+export const dynamic = 'force-dynamic'
 import { buildAbility } from '@/lib/ability'
 import { UsuarioService } from '@/services/usuario.service'
+import { z } from 'zod'
+
+const userUpdateSchema = z.object({
+    role: z.enum(['ADMIN_GERAL', 'PREFEITO', 'SECRETARIO', 'GESTOR_SETOR', 'OPERADOR', 'PENDENTE']).optional(),
+    ativo: z.boolean().optional(),
+    permissoesExtra: z.array(z.string()).optional(),
+})
 
 export async function PATCH(
-    request: Request,
-    { params }: { params: { id: string } }
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params
         const session = await getAuthUser()
-        const { id } = params
-
         if (!session || session.role !== 'ADMIN_GERAL') {
             return NextResponse.json(
                 { success: false, error: 'Não autorizado' },
@@ -20,13 +28,12 @@ export async function PATCH(
         }
 
         const body = await request.json()
-        const { role, ativo, permissoesExtra } = await request.json()
+        const parsed = userUpdateSchema.safeParse(body)
+        if (!parsed.success) {
+            return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 })
+        }
 
-        const result = await UsuarioService.atualizarDadosAdmin(params.id, {
-            role,
-            ativo,
-            permissoesExtra
-        })
+        const result = await UsuarioService.atualizarDadosAdmin(id, parsed.data)
 
         if (!result.ok) {
             return NextResponse.json({ success: false, error: result.error }, { status: 400 })

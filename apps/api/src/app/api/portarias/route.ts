@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
+
+export const dynamic = 'force-dynamic'
 import { buildAbility } from '@/lib/ability'
 import { PortariaService } from '@/services/portaria.service'
 import { z } from 'zod'

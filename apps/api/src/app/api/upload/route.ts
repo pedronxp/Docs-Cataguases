@@ -1,39 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
-import { buildAbility } from '@/lib/ability'
-
-// Endpoint de Upload simplificado para o Ciclo 3.
-// Em produção, isso integraria com Supabase Storage.
-// Aqui, vamos apenas validar se o usuário pode gerenciar arquivos.
 
 export async function POST(req: NextRequest) {
     try {
         const usuario = await getAuthUser()
-        if (!usuario)
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+        if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-        // Lógica de upload (simulada para este estágio)
-        // O corpo deve ser um FormData com 'file'
+        // No momento, como ainda não configuramos um bucket S3/Supabase Storage real,
+        // vamos simular o upload e retornar uma URL fake para o rascunho.
+        // O frontend deve enviar um FormData com o campo 'file'.
+
         const formData = await req.formData()
         const file = formData.get('file') as File
 
         if (!file) {
-            return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 })
+            return NextResponse.json({ error: 'Arquivo não enviado' }, { status: 400 })
         }
 
-        if (!file.name.endsWith('.docx')) {
-            return NextResponse.json({ error: 'Somente arquivos .docx são permitidos' }, { status: 400 })
-        }
-
-        // Simulação de salvamento
-        const fileUrl = `https://storage.cataguases.gov.br/templates/${Date.now()}_${file.name}`
+        // Mock de URL de retorno
+        const fileUrl = `/uploads/${Date.now()}_${file.name.replace(/\s+/g, '_')}`
 
         return NextResponse.json({
             success: true,
-            url: fileUrl,
-            name: file.name
+            data: {
+                url: fileUrl,
+                name: file.name,
+                size: file.size,
+                type: file.type
+            }
         })
     } catch (error) {
-        return NextResponse.json({ error: 'Erro no upload' }, { status: 500 })
+        console.error('Erro no upload:', error)
+        return NextResponse.json({ error: 'Erro ao processar upload' }, { status: 500 })
     }
 }

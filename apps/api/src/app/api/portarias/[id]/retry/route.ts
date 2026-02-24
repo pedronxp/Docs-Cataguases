@@ -4,9 +4,11 @@ import { buildAbility } from '@/lib/ability'
 import { PortariaService } from '@/services/portaria.service'
 import prisma from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 export async function PATCH(
     req: NextRequest, // Embora não usemos o body, mantemos por padrão
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params

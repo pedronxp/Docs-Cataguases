@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { NextRequest, NextResponse } from 'next/server'
-=======
-import { NextResponse, type NextRequest } from 'next/server'
->>>>>>> feat/core/dashboard-intelligence
 import { jwtVerify } from 'jose'
 
 const JWT_SECRET = new TextEncoder().encode(

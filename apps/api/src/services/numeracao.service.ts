@@ -14,16 +14,17 @@ export class NumeracaoService {
 
         try {
             return await prisma.$transaction(async (tx) => {
-                // 1. Tenta encontrar o Livro de Numeração para o contexto (Secretaria + Setor + Ano)
-                let livro = await tx.livroNumeracao.findUnique({
-                    where: {
-                        secretariaId_setorId_ano: {
-                            secretariaId,
-                            setorId: (setorId as any),
-                            ano: anoCorrente,
-                        },
-                    } as any,
-                })
+                // 1. SELECT FOR UPDATE - Trava a linha para evitar duplicidade concorrente
+                const livros = await tx.$queryRaw<any[]>`
+                    SELECT id, "proximoNumero", formato
+                    FROM "LivroNumeracao"
+                    WHERE "secretariaId" = ${secretariaId}
+                      AND "setorId" IS NOT DISTINCT FROM ${setorId}
+                      AND ano = ${anoCorrente}
+                    FOR UPDATE
+                `
+
+                let livro = livros[0]
 
                 // 2. Se não existir, cria o livro inicial para o ano
                 if (!livro) {
@@ -33,19 +34,20 @@ export class NumeracaoService {
                             setorId,
                             ano: anoCorrente,
                             proximoNumero: 1,
-                            formato: 'XXX/YYYY', // Padrão: Número/Ano
+                            formato: 'XXX/YYYY', // Padrão
                         },
                     })
                 }
 
-                // 3. Incrementa o número no livro
+                // 3. Incrementa o número atomicamente
                 const numeroAlocado = livro.proximoNumero
-                await tx.livroNumeracao.update({
-                    where: { id: livro.id },
-                    data: { proximoNumero: { increment: 1 } },
-                })
+                await tx.$executeRaw`
+                    UPDATE "LivroNumeracao"
+                    SET "proximoNumero" = "proximoNumero" + 1
+                    WHERE id = ${livro.id}
+                `
 
-                // 4. Formata o número (ex: 001/2026)
+                // 4. Formata o número (ex: 001/2026/SEMAD)
                 const numeroFormatado = this.formatar(
                     numeroAlocado,
                     anoCorrente,
@@ -67,9 +69,8 @@ export class NumeracaoService {
         const padNumero = String(numero).padStart(3, '0')
         const padAno = String(ano)
 
-        // Simples substituição por enquanto, pode ser expandido conforme necessidade
         return formato
-            .replace('XXX', padNumero)
-            .replace('YYYY', padAno)
+            .replace('{N}', padNumero)
+            .replace('{ANO}', padAno)
     }
 }

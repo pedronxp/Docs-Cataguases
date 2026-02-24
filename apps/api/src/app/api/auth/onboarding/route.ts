@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { getAuthUser } from '@/lib/auth'
 import { UsuarioService } from '@/services/usuario.service'
 
+export const dynamic = 'force-dynamic'
+
 const onboardingSchema = z.object({
     secretariaId: z.string().uuid('ID da secretaria inválido'),
     setorId: z.string().uuid('ID do setor inválido').optional()

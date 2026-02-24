@@ -31,14 +31,18 @@ model Portaria {
   modeloId        String
   modelo          ModeloDocumento @relation(fields: [modeloId], references: [id])
   criadoPor       User            @relation("CriadoPor", fields: [criadoPorId], references: [id])
+  secretaria      Secretaria      @relation(fields: [secretariaId], references: [id])
+  setor           Setor?          @relation(fields: [setorId], references: [id])
   pdfUrl          String?
   docxRascunhoUrl String?
   hashIntegridade String?  @unique // SHA-256 do conteúdo
   assinadoEm      DateTime?
   assinadoPorId   String?
+  dataPublicacao  DateTime?
   formData        Json     @default("{}")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  atividades      FeedAtividade[]
 }
 
 // Atualizar User para ter a relação inversa
@@ -53,11 +57,12 @@ model User {
   permissoesExtra String[] @default([])
   secretariaId    String?
   setorId         String?
+  secretaria      Secretaria?     @relation(fields: [secretariaId], references: [id])
+  setor           Setor?          @relation(fields: [setorId], references: [id])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   portarias       Portaria[] @relation("CriadoPor")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  atividades      FeedAtividade[]
 }
 
 model FeedAtividade {
@@ -68,6 +73,8 @@ model FeedAtividade {
   autorId      String
   secretariaId String
   setorId      String?
+  portaria     Portaria @relation(fields: [portariaId], references: [id])
+  autor        User     @relation(fields: [autorId], references: [id])
   metadata     Json     @default("{}")
   createdAt    DateTime @default(now())
 }
@@ -102,4 +109,28 @@ model VariavelSistema {
   valor                    String
   descricao                String
   resolvidaAutomaticamente Boolean @default(false)
+}
+
+model Secretaria {
+  id      String   @id @default(cuid())
+  nome    String
+  sigla   String   @unique
+  cor     String   @default("#6366f1")
+  setores Setor[]
+  usuarios User[]
+  portarias Portaria[]
+  ativo   Boolean  @default(true)
+}
+
+model Setor {
+  id           String     @id @default(cuid())
+  nome         String
+  sigla        String
+  secretariaId String
+  secretaria   Secretaria @relation(fields: [secretariaId], references: [id])
+  usuarios     User[]
+  portarias    Portaria[]
+  ativo        Boolean    @default(true)
+  
+  @@unique([secretariaId, sigla])
 }

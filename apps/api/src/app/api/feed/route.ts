@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
+
+export const dynamic = 'force-dynamic'
 import { FeedService } from '@/services/feed.service'
 
 export async function GET(request: NextRequest) {

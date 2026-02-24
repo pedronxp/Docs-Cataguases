@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getAuthUser } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
 /**
  * GET /api/validar/[hash]
  * Rota pública para validação de autenticidade de documentos.
  */
 export async function GET(
     request: NextRequest,
-    { params }: { params: { hash: string } }
+    { params }: { params: Promise<{ hash: string }> }
 ) {
     try {
-        const { hash } = params
+        const { hash } = await params
 
         if (!hash || hash.length !== 64) {
             return NextResponse.json({

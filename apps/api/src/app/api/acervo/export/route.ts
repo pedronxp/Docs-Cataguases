@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
 import { AcervoService, FiltrosAcervo } from '@/services/acervo.service'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
     try {
         const session = await getAuthUser()

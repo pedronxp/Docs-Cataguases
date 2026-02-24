@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { AssinaturaService } from '@/services/assinatura.service'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getSession()

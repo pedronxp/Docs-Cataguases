@@ -1,39 +1,81 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth'
-import { buildAbility } from '@/lib/ability'
 import prisma from '@/lib/prisma'
+import { getAuthUser } from '@/lib/auth'
 
-// Este endpoint gerencia Secretarias e Setores. 
-// No schema atual, não há modelo 'Secretaria', mas os IDs são usados em outros lugares.
-// Para fins de Ciclo 3, vamos fornecer a listagem de secretarias e setores existentes no banco 
-// baseando-se nos usuários e portarias, ou retornar uma lista fixa se for o caso de configuração.
+export const dynamic = 'force-dynamic'
+import { buildAbility } from '@/lib/ability'
+import { z } from 'zod'
+
+const secretariaSchema = z.object({
+    nome: z.string().min(1),
+    sigla: z.string().min(1),
+    cor: z.string().regex(/^#[0-9A-F]{6}$/i).default('#6366f1'),
+})
+
+const setorSchema = z.object({
+    nome: z.string().min(1),
+    sigla: z.string().min(1),
+    secretariaId: z.string().min(1),
+})
 
 export async function GET(req: NextRequest) {
     try {
         const usuario = await getAuthUser()
-        if (!usuario)
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+        if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-        // No momento, as secretarias são apenas IDs de texto no banco.
-        // Em um cenário real, teríamos uma tabela para elas.
-        // Vamos retornar os filtros dinâmicos baseados no que já existe.
+        const { searchParams } = new URL(req.url)
+        const type = searchParams.get('type') // 'secretaria' ou 'setor'
 
-        const secretarias = await prisma.portaria.findMany({
-            select: { secretariaId: true },
-            distinct: ['secretariaId']
+        if (type === 'setor') {
+            const secId = searchParams.get('secretariaId')
+            const setores = await prisma.setor.findMany({
+                where: secId ? { secretariaId: secId } : {},
+                include: { secretaria: true },
+                orderBy: { nome: 'asc' }
+            })
+            return NextResponse.json({ success: true, data: setores })
+        }
+
+        const secretarias = await prisma.secretaria.findMany({
+            where: { ativo: true },
+            include: { setores: true },
+            orderBy: { nome: 'asc' }
         })
-
-        const setores = await prisma.portaria.findMany({
-            select: { setorId: true },
-            where: { NOT: { setorId: null } },
-            distinct: ['setorId']
-        })
-
-        return NextResponse.json({
-            secretarias: secretarias.map(s => s.secretariaId),
-            setores: setores.map(s => s.setorId)
-        })
+        return NextResponse.json({ success: true, data: secretarias })
     } catch (error) {
-        return NextResponse.json({ error: 'Erro ao listar estrutura' }, { status: 500 })
+        return NextResponse.json({ error: 'Erro ao listar estrutura municipal' }, { status: 500 })
+    }
+}
+
+export async function POST(req: NextRequest) {
+    try {
+        const usuario = await getAuthUser()
+        if (!usuario || usuario.role !== 'ADMIN_GERAL') {
+            return NextResponse.json({ error: 'Apenas administradores podem gerenciar a estrutura' }, { status: 403 })
+        }
+
+        const body = await req.json()
+        const { type, ...data } = body
+
+        if (type === 'secretaria') {
+            const parsed = secretariaSchema.safeParse(data)
+            if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+
+            const sec = await prisma.secretaria.create({ data: parsed.data })
+            return NextResponse.json({ success: true, data: sec })
+        }
+
+        if (type === 'setor') {
+            const parsed = setorSchema.safeParse(data)
+            if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+
+            const setor = await prisma.setor.create({ data: parsed.data })
+            return NextResponse.json({ success: true, data: setor })
+        }
+
+        return NextResponse.json({ error: 'Tipo inválido (secretaria ou setor)' }, { status: 400 })
+    } catch (error) {
+        console.error('Erro na gestão municipal:', error)
+        return NextResponse.json({ error: 'Erro interno ao salvar estrutura' }, { status: 500 })
     }
 }
