@@ -1,66 +1,135 @@
-# AGENTS_WIZARD_PORTARIA.md — COMPLEMENTO: MOTOR DE CRIAÇÃO E WIZARD
-# Leia junto com AGENTS.md, MOCKS.md e PROGRESS.md
-# Este arquivo detalha a engenharia da Tela 4 (Nova Portaria) e o Formulário Dinâmico.
+# agents/_modulos/WIZARD_PORTARIA.md — MOTOR DE CRIAÇÃO E WIZARD DE PORTARIA
+# Leia junto com: agents/_base/AGENTS.md | agents/_base/MOCKS.md | agents/_gestao/PROGRESS.md
+# IA: Responda SEMPRE em português (pt-BR). Para melhor compreensão técnica, leia também WIZARD_PORTARIA.en.md
 
 ---
 
-## 1. O CONCEITO DO WIZARD (STEPPER)
-A criação de um documento oficial é fatiada em passos para reduzir erros de digitação e garantir agilidade.
+## IDENTIDADE
 
-Componente visual no topo (Stepper):
-`[ 1. Selecionar Modelo ] -> [ 2. Preencher Dados ] -> [ 3. Conferência ]`
+Este arquivo especifica o motor do Wizard de criação de portaria (3 etapas).
+Abrange o frontend (Ciclo 1 — concluído) e a integração real com o backend (Ciclo 3 — em andamento).
+Nunca pule a etapa de Conferência. Nunca gere número oficial no frontend.
 
 ---
 
-## 2. ETAPA 1: SELEÇÃO DE MODELO (A Vitrine)
-O usuário escolhe qual "molde" de documento ele quer criar.
+## 1. CONCEITO DO WIZARD (STEPPER)
+
+A criação de um documento oficial é dividida em 3 etapas para reduzir erros e garantir rastreabilidade:
+
+```
+[ 1. Selecionar Modelo ] → [ 2. Preencher Dados ] → [ 3. Conferência e Envio ]
+```
+
+Componente visual: Stepper no topo da página, com indicador de etapa ativa.
+
+---
+
+## 2. ETAPA 1: SELEÇÃO DE MODELO
+
+**Fonte de dados (Ciclo 1 — Mock):** `listarModelos()`
+**Fonte de dados (Ciclo 3 — Real):** `GET /api/admin/modelos`
+
+**Regras de visibilidade por role:**
+
+| Role | Modelos que vê |
+|---|---|
+| `OPERADOR` | Prefeitura inteira (`secretariaId: null`) + própria secretaria |
+| `GESTOR_SETOR` | Prefeitura inteira (`secretariaId: null`) + próprio setor |
+| `SECRETARIO` | Prefeitura inteira + própria secretaria |
+| `PREFEITO` | Todos os modelos |
+| `ADMIN_GERAL` | Todos os modelos |
+
+**UI:**
+- Grid de Cards clicáveis (Shadcn Card com hover effect)
+- Ao selecionar um Card, habilita o botão [Próximo →]
+- Exibir nome, descrição e ícone do modelo
+
+---
+
+## 3. ETAPA 2: FORMULÁRIO DINÂMICO
+
+O formulário se molda lendo `variaveis: ModeloVariavel[]` do modelo selecionado.
+Nunca hardcode campos. O Admin configura, o sistema renderiza.
+
+**Tipos de variável e renderização:**
+
+| `tipo` | Componente renderizado |
+|---|---|
+| `texto` | `<Input type="text" />` |
+| `numero` | `<Input type="number" />` |
+| `data` | `<Input type="date" />` |
+| `moeda` | `<Input />` com máscara `R$ 0,00` (react-imask) |
+| `cpf` | `<Input />` com máscara `000.000.000-00` (react-imask) |
+| `select` | `<Select>` do Shadcn usando `opcoes[]` configuradas |
 
 **Regras:**
-1. A tela faz um fetch em `listarModelos()`.
-2. Exibe APENAS modelos da prefeitura inteira (`secretariaId === null`) ou da Secretaria do usuário logado.
-3. Grid de Cards clicáveis (Shadcn Card com hover effect).
-4. Ao clicar em um Card, o botão [Próximo →] é habilitado e avança para a Etapa 2.
+1. Asterisco vermelho `*` nas labels onde `obrigatorio === true`
+2. Validação on-the-fly com Zod — não avança com campo obrigatório vazio ou CPF/moeda incompleto
+3. Variáveis com prefixo `SYS_` (ex: `SYS_PREFEITO_NOME`) são preenchidas automaticamente pelo sistema — não exibir no formulário
+4. Botões: [← Voltar] e [Próximo →]
 
 ---
 
-## 3. ETAPA 2: FORMULÁRIO DINÂMICO E MÁSCARAS (O Motor)
-O formulário se molda sozinho lendo as `variaveis: ModeloVariavel[]` configuradas pelo Admin no modelo selecionado. O sistema não adivinha campos; ele obedece a configuração.
+## 4. ETAPA 3: CONFERÊNCIA E ENVIO
 
-**Regras de Renderização (React Hook Form):**
-1. O sistema faz um `.map()` nas variáveis e renderiza o input correspondente com base no `tipo` cadastrado pelo Admin:
-   - `tipo === 'texto'` -> `<Input type="text" />`
-   - `tipo === 'numero'` -> `<Input type="number" />`
-   - `tipo === 'data'` -> `<Input type="date" />`
-   - `tipo === 'moeda'` -> `<Input />` com máscara de Real (R$ 0,00)
-   - `tipo === 'cpf'` -> `<Input />` com máscara de CPF (000.000.000-00)
-   - `tipo === 'select'` -> `<Select>` do Shadcn usando as `opcoes[]` cadastradas.
-2. Adiciona um asterisco vermelho `*` nas labels onde `obrigatorio === true`.
-3. Validação on-the-fly (Zod): Não deixa avançar para o Resumo se faltar campo obrigatório ou se o CPF/Moeda estiver incompleto.
-4. Botões inferiores: [← Voltar] e [Próximo →].
+**UI:**
+1. Card cinza claro com lista de chave/valor dos dados preenchidos
+2. Alerta (amber): *"Confira os dados com atenção. Após gerar o rascunho, esses valores serão injetados no documento oficial."*
+3. Botões: [← Corrigir Dados] e **[ ✅ Gerar Rascunho do Documento ]** (gov-blue, largo)
 
----
-
-## 4. ETAPA 3: CONFERÊNCIA (O Resumo de Segurança)
-Última etapa antes de sujar o banco de dados. Serve para o servidor revisar o que digitou e evitar retrabalho.
-
-**Regras e UI:**
-1. **Resumo dos Dados:** Renderiza uma lista limpa de chave/valor em um Card cinza claro.
-   Exemplo visual:
-   - **Nome do Servidor:** João da Silva
-   - **CPF:** 123.456.789-00
-   - **Cargo:** Assistente Administrativo
-2. Alerta (amber-50): "Confira os dados com atenção. Após gerar o rascunho, esses valores serão injetados no documento oficial."
-3. Botões inferiores: [← Corrigir Dados] e o botão final **[ ✅ Gerar Rascunho do Documento ]** (gov-blue, grande).
-
-### O Payload Final de Submissão
-Quando clica no botão final, o Hook Form envia:
+**Payload enviado ao clicar:**
 ```json
 {
-  "titulo": "Portaria de Nomeação - João da Silva", 
-  "modeloId": "modelo-nomeacao",
+  "titulo": "Portaria de Nomeação - João da Silva",
+  "modeloId": "uuid-do-modelo",
   "dadosFormulario": {
     "NOME_SERVIDOR": "João da Silva",
     "CPF_SERVIDOR": "123.456.789-00",
     "CARGO": "Assistente Administrativo"
   }
 }
+```
+
+---
+
+## 5. INTEGRAÇÃO REAL — CICLO 3
+
+### Fluxo após clicar em "Gerar Rascunho"
+
+```
+1. Frontend chama POST /api/portarias
+      ↓ resposta imediata:
+   { id, status: 'PROCESSANDO', numeroOficial: '001/2026/SEMAD' }
+
+2. Frontend redireciona para /portarias/revisao/$id
+
+3. Tela de revisão faz polling:
+   GET /api/portarias/[id] a cada POLLING_INTERVAL_MS (5.000ms)
+   Máximo de POLLING_MAX_ATTEMPTS (60 tentativas = 5 minutos)
+
+4. Quando status mudar:
+   → PENDENTE      : exibir PDF gerado + botão de aprovação
+   → FALHA_PROCESSAMENTO : exibir alerta de erro (ver seção abaixo)
+```
+
+### Estado FALHA_PROCESSAMENTO na tela de revisão
+
+Quando `status === 'FALHA_PROCESSAMENTO'`:
+- Exibir alerta destrutivo (vermelho): *"Ocorreu um erro ao gerar o documento. O número {{numeroOficial}} foi reservado e será reutilizado."*
+- Exibir botão **[ 🔄 Tentar Novamente ]**
+- Ao clicar: `PATCH /api/portarias/[id]/retry`
+- Backend regenera apenas o PDF. **Nunca gera novo número.**
+- Status volta para PROCESSANDO → polling reinicia
+
+---
+
+## 6. CHECKLIST DE CONCLUSÃO (Ciclo 3 — Wizard)
+
+- [ ] `POST /api/portarias` retorna `{ id, status: 'PROCESSANDO', numeroOficial }`
+- [ ] Polling de 5s funcionando na tela revisão
+- [ ] Timeout de 5 minutos exibe mensagem de erro amigável
+- [ ] `FALHA_PROCESSAMENTO` exibe alerta e botão de retry
+- [ ] `PATCH /api/portarias/[id]/retry` regenera PDF sem novo número
+- [ ] `GET /api/admin/modelos` substitui `listarModelos()` mock
+- [ ] Variáveis `SYS_*` são preenchidas automaticamente, não aparecem no formulário
+- [ ] `GESTOR_SETOR` vê apenas modelos do próprio setor + prefeitura

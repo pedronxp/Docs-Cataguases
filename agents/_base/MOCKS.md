@@ -1,8 +1,14 @@
-# MOCKS.md — DOC'S CATAGUASES
-# Código completo dos serviços mock para o Ciclo 1 (Frontend-First)
-# Leia também: AGENTS.md (regras, arquitetura e roadmap)
-# IMPORTANTE: a interface de cada função é idêntica à versão real do Ciclo 2.
-# A troca Mock → Real é feita alterando apenas 1 linha de import no hook.
+# agents/_base/MOCKS.md — SERVIÇOS MOCK (CICLO 1)
+# Leia junto com: agents/_base/AGENTS.md | agents/_modulos/WIZARD_PORTARIA.md
+# IA: Responda SEMPRE em português (pt-BR).
+# IMPORTANTE: A interface de cada função é IDÊNTICA à versão real do Ciclo 2.
+# A troca Mock → Real é feita alterando APENAS 1 linha de import no hook.
+#
+# ALINHAMENTO PENDENTE (Ciclo 2):
+#   - ModeloDocumento e ModeloVariavel.chave → renomear para Modelo e campo tag
+#     conforme spec em agents/_modulos/GESTAO_MODELOS.md
+#   - TipoVariavel: adicionar 'textarea' ao union type em src/types/domain.ts
+#   - publicarPortaria (legado) substituída por enviarParaAssinatura + assinarPublicar
 
 ---
 
@@ -101,7 +107,7 @@ mockDB.portarias = [
     modeloId: 'modelo-nomeacao',
     pdfUrl: 'https://mock.storage/portaria-042.pdf',
     docxRascunhoUrl: null,
-    hashAssinatura: 'sha256-abc123def456',
+    hashAssinatura: 'sha256-abc123def456', // Mock: hash fake. No Ciclo 3 o backend gera SHA-256 real.
     dadosFormulario: { NOME_SERVIDOR: 'João Silva', CARGO: 'Assistente Administrativo' },
     createdAt: '2025-06-10T14:00:00Z',
     updatedAt: '2025-06-12T09:00:00Z',
@@ -153,6 +159,71 @@ mockDB.portarias = [
     dadosFormulario: { NOME_SERVIDOR: 'Ana Costa' },
     createdAt: '2025-06-13T10:00:00Z',
     updatedAt: '2025-06-13T11:30:00Z',
+  },
+  {
+    id: 'port-005',
+    titulo: 'Portaria de Redistribuição - Pedro Fonseca',
+    numeroOficial: '040/2025',
+    status: 'AGUARDANDO_ASSINATURA',
+    autorId: 'user-op-001',
+    secretariaId: 'sec-rh',
+    setorId: null,
+    modeloId: 'modelo-nomeacao',
+    pdfUrl: 'https://mock.storage/portaria-040-preview.pdf',
+    docxRascunhoUrl: 'https://mock.storage/rascunho-port-005.docx',
+    hashAssinatura: null,
+    dadosFormulario: { NOME_SERVIDOR: 'Pedro Fonseca', CARGO: 'Analista' },
+    createdAt: '2025-06-16T08:00:00Z',
+    updatedAt: '2025-06-16T10:00:00Z',
+  },
+  // Portarias PUBLICADAS para o Acervo (diferentes secretarias)
+  {
+    id: 'port-006',
+    titulo: 'Portaria de Nomeação - Roberta Lima',
+    numeroOficial: '035/2025',
+    status: 'PUBLICADA',
+    autorId: 'user-op-001',
+    secretariaId: 'sec-obras',
+    setorId: null,
+    modeloId: 'modelo-nomeacao',
+    pdfUrl: 'https://mock.storage/portaria-035.pdf',
+    docxRascunhoUrl: null,
+    hashAssinatura: 'sha256-obras001',
+    dadosFormulario: { NOME_SERVIDOR: 'Roberta Lima', CARGO: 'Engenheira Civil' },
+    createdAt: '2025-06-01T09:00:00Z',
+    updatedAt: '2025-06-01T11:00:00Z',
+  },
+  {
+    id: 'port-007',
+    titulo: 'Portaria de Gratificação - Dr. Marcos Silva',
+    numeroOficial: '036/2025',
+    status: 'PUBLICADA',
+    autorId: 'user-op-001',
+    secretariaId: 'sec-saude',
+    setorId: null,
+    modeloId: 'modelo-gratificacao',
+    pdfUrl: 'https://mock.storage/portaria-036.pdf',
+    docxRascunhoUrl: null,
+    hashAssinatura: 'sha256-saude001',
+    dadosFormulario: { NOME_SERVIDOR: 'Dr. Marcos Silva', PERCENTUAL: '20' },
+    createdAt: '2025-06-02T14:00:00Z',
+    updatedAt: '2025-06-02T16:00:00Z',
+  },
+  {
+    id: 'port-008',
+    titulo: 'Portaria de Licença - Profa. Ana Paula',
+    numeroOficial: '037/2025',
+    status: 'PUBLICADA',
+    autorId: 'user-op-001',
+    secretariaId: 'sec-educacao',
+    setorId: null,
+    modeloId: 'modelo-licenca',
+    pdfUrl: 'https://mock.storage/portaria-037.pdf',
+    docxRascunhoUrl: null,
+    hashAssinatura: 'sha256-educacao001',
+    dadosFormulario: { NOME_SERVIDOR: 'Profa. Ana Paula' },
+    createdAt: '2025-06-05T10:00:00Z',
+    updatedAt: '2025-06-05T12:00:00Z',
   },
 ]
 
@@ -275,14 +346,35 @@ export async function rejeitarPortaria(portariaId: string): Promise<Result<Porta
   return ok({ ...portaria })
 }
 
-export async function publicarPortaria(portariaId: string): Promise<Result<Portaria>> {
-  await mockDelay(700)
+// APROVADA → AGUARDANDO_ASSINATURA
+// Chamado quando o revisor envia o documento ao assinante autorizado (Prefeito/Secretário).
+export async function enviarParaAssinatura(portariaId: string): Promise<Result<Portaria>> {
+  await mockDelay(600)
   const portaria = mockDB.portarias.find((p) => p.id === portariaId)
   if (!portaria) return err('Portaria não encontrada.')
   if (portaria.status !== 'APROVADA')
-    return err('Apenas portarias aprovadas podem ser publicadas.')
+    return err('Apenas portarias aprovadas podem ser enviadas para assinatura.')
+  portaria.status = 'AGUARDANDO_ASSINATURA'
+  portaria.updatedAt = new Date().toISOString()
+  return ok({ ...portaria })
+}
+
+// AGUARDANDO_ASSINATURA → PUBLICADA
+// O assinante digita a senha e confirma. A portaria é publicada com hash.
+// Ciclo 1: senha mockada '123456'. Ciclo 3: Supabase Auth verifica a senha real.
+export async function assinarPublicar(
+  portariaId: string,
+  senha: string
+): Promise<Result<Portaria>> {
+  await mockDelay(900)
+  if (senha !== '123456') return err('Senha incorreta.')
+  const portaria = mockDB.portarias.find((p) => p.id === portariaId)
+  if (!portaria) return err('Portaria não encontrada.')
+  if (portaria.status !== 'AGUARDANDO_ASSINATURA')
+    return err('A portaria não está aguardando assinatura.')
   portaria.status = 'PUBLICADA'
-  portaria.hashAssinatura = `sha256-${Date.now()}`
+  // Mock: hash curto fake. No Ciclo 3 o backend gera SHA-256 real do binário do PDF.
+  portaria.hashAssinatura = `mock-sha256-${portariaId}-${Date.now()}`
   portaria.updatedAt = new Date().toISOString()
   return ok({ ...portaria })
 }
@@ -296,11 +388,11 @@ import { ok, err, type Result } from '../lib/result'
 import { mockDelay, mockDB } from './_mock.helpers'
 
 mockDB.usuarios = [
-  { id: 'user-admin',    name: 'Admin Geral',          email: 'admin@cataguases.mg.gov.br',     role: 'ADMIN_GERAL', ativo: true,  permissoesExtra: [], secretariaId: null,     setorId: null,      createdAt: '2025-01-01T00:00:00Z' },
-  { id: 'user-prefeito', name: 'Sr. Prefeito',          email: 'prefeito@cataguases.mg.gov.br',  role: 'PREFEITO',    ativo: true,  permissoesExtra: [], secretariaId: null,     setorId: null,      createdAt: '2025-01-01T00:00:00Z' },
-  { id: 'user-sec',      name: 'Dra. Secretária de RH', email: 'secretario@cataguases.mg.gov.br',role: 'SECRETARIO',  ativo: true,  permissoesExtra: [], secretariaId: 'sec-rh', setorId: null,      createdAt: '2025-01-01T00:00:00Z' },
-  { id: 'user-op-001',   name: 'Operador Padrão',       email: 'operador@cataguases.mg.gov.br',  role: 'OPERADOR',    ativo: true,  permissoesExtra: [], secretariaId: 'sec-rh', setorId: 'setor-dp',createdAt: '2025-01-01T00:00:00Z' },
-  { id: 'user-op-002',   name: 'Operadora Inativa',     email: 'inativa@cataguases.mg.gov.br',   role: 'OPERADOR',    ativo: false, permissoesExtra: [], secretariaId: 'sec-rh', setorId: null,      createdAt: '2025-02-01T00:00:00Z' },
+  { id: 'user-admin',    name: 'Admin Geral',          email: 'admin@cataguases.mg.gov.br',     role: 'ADMIN_GERAL', ativo: true,  permissoesExtra: [], secretariaId: null,     setorId: null,       createdAt: '2025-01-01T00:00:00Z' },
+  { id: 'user-prefeito', name: 'Sr. Prefeito',          email: 'prefeito@cataguases.mg.gov.br',  role: 'PREFEITO',    ativo: true,  permissoesExtra: [], secretariaId: null,     setorId: null,       createdAt: '2025-01-01T00:00:00Z' },
+  { id: 'user-sec',      name: 'Dra. Secretária de RH', email: 'secretario@cataguases.mg.gov.br',role: 'SECRETARIO',  ativo: true,  permissoesExtra: [], secretariaId: 'sec-rh', setorId: null,       createdAt: '2025-01-01T00:00:00Z' },
+  { id: 'user-op-001',   name: 'Operador Padrão',       email: 'operador@cataguases.mg.gov.br',  role: 'OPERADOR',    ativo: true,  permissoesExtra: [], secretariaId: 'sec-rh', setorId: 'setor-dp', createdAt: '2025-01-01T00:00:00Z' },
+  { id: 'user-op-002',   name: 'Operadora Inativa',     email: 'inativa@cataguases.mg.gov.br',   role: 'OPERADOR',    ativo: false, permissoesExtra: [], secretariaId: 'sec-rh', setorId: null,       createdAt: '2025-02-01T00:00:00Z' },
 ]
 
 export async function listarUsuarios(): Promise<Result<Usuario[]>> {
@@ -368,6 +460,22 @@ mockDB.feed = [
     metadata: { numero: '039/2025' },
     createdAt: new Date(Date.now() - 5 * 3600000).toISOString(),
   },
+  {
+    id: 'f-005', tipoEvento: 'PORTARIA_ENVIADA_ASSINATURA',
+    mensagem: 'Portaria 040/2025 enviada para assinatura do Prefeito.',
+    portariaId: 'port-005', autorId: 'user-sec',
+    secretariaId: 'sec-rh', setorId: null,
+    metadata: { numero: '040/2025', titulo: 'Portaria de Redistribuição - Pedro Fonseca' },
+    createdAt: new Date(Date.now() - 1 * 3600000).toISOString(),
+  },
+  {
+    id: 'f-006', tipoEvento: 'PORTARIA_RETRY',
+    mensagem: 'Reprocessamento da Portaria 038/2025 iniciado.',
+    portariaId: 'port-003', autorId: 'user-op-001',
+    secretariaId: 'sec-rh', setorId: null,
+    metadata: { numero: '038/2025' },
+    createdAt: new Date(Date.now() - 4 * 3600000).toISOString(),
+  },
 ]
 
 export async function listarFeed(secretariaId?: string): Promise<Result<FeedAtividade[]>> {
@@ -380,9 +488,11 @@ export async function listarFeed(secretariaId?: string): Promise<Result<FeedAtiv
 ---
 
 // src/services/modelo.service.ts
+// NOTA: ModeloDocumento → Modelo e chave → tag serão alinhados no Ciclo 2.
+// Ref: agents/_modulos/GESTAO_MODELOS.md
 
 import type { ModeloDocumento } from '../types/domain'
-import { ok, type Result } from '../lib/result'
+import { ok, err, type Result } from '../lib/result'
 import { mockDelay } from './_mock.helpers'
 
 const MOCK_MODELOS: ModeloDocumento[] = [
@@ -392,9 +502,9 @@ const MOCK_MODELOS: ModeloDocumento[] = [
     secretariaId: null, docxTemplateUrl: 'https://mock.storage/template-nomeacao.docx',
     ativo: true,
     variaveis: [
-      { id: 'v1', modeloId: 'modelo-nomeacao', chave: 'NOME_SERVIDOR', label: 'Nome do Servidor', tipo: 'texto', opcoes: [], obrigatorio: true, ordem: 1 },
-      { id: 'v2', modeloId: 'modelo-nomeacao', chave: 'CARGO', label: 'Cargo', tipo: 'texto', opcoes: [], obrigatorio: true, ordem: 2 },
-      { id: 'v3', modeloId: 'modelo-nomeacao', chave: 'DATA_INICIO', label: 'Data de Início', tipo: 'data', opcoes: [], obrigatorio: true, ordem: 3 },
+      { id: 'v1', modeloId: 'modelo-nomeacao', chave: 'NOME_SERVIDOR', label: 'Nome do Servidor', tipo: 'texto',  opcoes: [], obrigatorio: true, ordem: 1 },
+      { id: 'v2', modeloId: 'modelo-nomeacao', chave: 'CARGO',         label: 'Cargo',             tipo: 'texto',  opcoes: [], obrigatorio: true, ordem: 2 },
+      { id: 'v3', modeloId: 'modelo-nomeacao', chave: 'DATA_INICIO',   label: 'Data de Início',     tipo: 'data',   opcoes: [], obrigatorio: true, ordem: 3 },
     ],
   },
   {
@@ -403,9 +513,9 @@ const MOCK_MODELOS: ModeloDocumento[] = [
     secretariaId: null, docxTemplateUrl: 'https://mock.storage/template-exoneracao.docx',
     ativo: true,
     variaveis: [
-      { id: 'v4', modeloId: 'modelo-exoneracao', chave: 'NOME_SERVIDOR', label: 'Nome do Servidor', tipo: 'texto', opcoes: [], obrigatorio: true, ordem: 1 },
-      { id: 'v5', modeloId: 'modelo-exoneracao', chave: 'CARGO', label: 'Cargo', tipo: 'texto', opcoes: [], obrigatorio: true, ordem: 2 },
-      { id: 'v6', modeloId: 'modelo-exoneracao', chave: 'MOTIVO', label: 'Motivo', tipo: 'select', opcoes: ['A pedido', 'De ofício', 'Por conclusão de mandato'], obrigatorio: true, ordem: 3 },
+      { id: 'v4', modeloId: 'modelo-exoneracao', chave: 'NOME_SERVIDOR', label: 'Nome do Servidor', tipo: 'texto',  opcoes: [], obrigatorio: true, ordem: 1 },
+      { id: 'v5', modeloId: 'modelo-exoneracao', chave: 'CARGO',         label: 'Cargo',             tipo: 'texto',  opcoes: [], obrigatorio: true, ordem: 2 },
+      { id: 'v6', modeloId: 'modelo-exoneracao', chave: 'MOTIVO',        label: 'Motivo',            tipo: 'select', opcoes: ['A pedido', 'De ofício', 'Por conclusão de mandato'], obrigatorio: true, ordem: 3 },
     ],
   },
   {
@@ -414,9 +524,9 @@ const MOCK_MODELOS: ModeloDocumento[] = [
     secretariaId: 'sec-rh', docxTemplateUrl: 'https://mock.storage/template-gratificacao.docx',
     ativo: true,
     variaveis: [
-      { id: 'v7', modeloId: 'modelo-gratificacao', chave: 'NOME_SERVIDOR', label: 'Nome do Servidor', tipo: 'texto', opcoes: [], obrigatorio: true, ordem: 1 },
-      { id: 'v8', modeloId: 'modelo-gratificacao', chave: 'PERCENTUAL', label: 'Percentual (%)', tipo: 'numero', opcoes: [], obrigatorio: true, ordem: 2 },
-      { id: 'v9', modeloId: 'modelo-gratificacao', chave: 'JUSTIFICATIVA', label: 'Justificativa', tipo: 'textarea', opcoes: [], obrigatorio: true, ordem: 3 },
+      { id: 'v7', modeloId: 'modelo-gratificacao', chave: 'NOME_SERVIDOR', label: 'Nome do Servidor', tipo: 'texto',    opcoes: [], obrigatorio: true, ordem: 1 },
+      { id: 'v8', modeloId: 'modelo-gratificacao', chave: 'PERCENTUAL',    label: 'Percentual (%)',   tipo: 'numero',   opcoes: [], obrigatorio: true, ordem: 2 },
+      { id: 'v9', modeloId: 'modelo-gratificacao', chave: 'JUSTIFICATIVA', label: 'Justificativa',    tipo: 'textarea', opcoes: [], obrigatorio: true, ordem: 3 },
     ],
   },
 ]
@@ -431,4 +541,159 @@ export async function buscarModelo(id: string): Promise<Result<ModeloDocumento>>
   const modelo = MOCK_MODELOS.find((m) => m.id === id)
   if (!modelo) return err(`Modelo "${id}" não encontrado.`)
   return ok(modelo)
+}
+
+---
+
+// src/services/assinatura.service.ts
+// Gerencia assinatura em lote (seleção múltipla na listagem).
+// No Ciclo 1: simula. No Ciclo 3: chama PATCH /api/portarias/[id]/assinar.
+
+import type { Portaria } from '../types/domain'
+import { ok, err, type Result } from '../lib/result'
+import { mockDelay } from './_mock.helpers'
+import { assinarPublicar } from './portaria.service'
+
+export interface AssinaturaLoteResult {
+  sucesso: string[]  // IDs assinados com sucesso
+  falha:   string[]  // IDs que falharam (senha ok, mas status invalido ou nao encontrado)
+}
+
+export async function assinarLote(
+  portariaIds: string[],
+  senha: string
+): Promise<Result<AssinaturaLoteResult>> {
+  if (senha !== '123456') return err('Senha incorreta.')
+  const resultado: AssinaturaLoteResult = { sucesso: [], falha: [] }
+  for (const id of portariaIds) {
+    const res = await assinarPublicar(id, senha)
+    if (res.ok) resultado.sucesso.push(id)
+    else resultado.falha.push(id)
+  }
+  return ok(resultado)
+}
+
+---
+
+// src/services/validar.service.ts
+// Validação pública de documentos — SEM autenticação.
+// Simula GET /api/validar/[hash] do Ciclo 3.
+// Qualquer cidadão pode verificar a autenticidade de um documento publicado.
+
+import { ok, err, type Result } from '../lib/result'
+import { mockDelay, mockDB } from './_mock.helpers'
+
+export interface ValidacaoPublicaResult {
+  titulo:        string
+  numeroOficial: string
+  assinadoEm:    string
+  pdfUrl:        string
+  assinante:     string  // No Ciclo 3: JOIN com usuarios
+  secretaria:    string  // No Ciclo 3: JOIN com secretarias
+  hashSHA256:    string
+}
+
+export async function validarDocumento(
+  hash: string
+): Promise<Result<ValidacaoPublicaResult>> {
+  await mockDelay(500)
+  const portaria = mockDB.portarias.find(
+    (p) => p.hashAssinatura === hash && p.status === 'PUBLICADA'
+  )
+  if (!portaria) return err('Documento não encontrado. Verifique o código informado.')
+  return ok({
+    titulo:        portaria.titulo,
+    numeroOficial: portaria.numeroOficial ?? '',
+    assinadoEm:    portaria.updatedAt,
+    pdfUrl:        portaria.pdfUrl ?? '',
+    assinante:     'Sr. Prefeito Municipal',
+    secretaria:    'Secretaria Municipal de Administração',
+    hashSHA256:    hash,
+  })
+}
+
+---
+
+// src/services/acervo.service.ts
+// Busca histórica de portarias publicadas com filtros avançados.
+// Complementa agents/_modulos/ACERVO.md
+
+import type { Portaria } from '../types/domain'
+import type { PaginatedResponse } from '../types/api'
+import { ok, type Result } from '../lib/result'
+import { mockDelay, mockDB } from './_mock.helpers'
+
+export interface AcervoQueryParams {
+  secretariaId?: string
+  busca?: string
+  ano?: number
+  setorId?: string
+  page?: number
+  pageSize?: number
+  statusFiltro?: string[]
+}
+
+export async function buscarAcervo(
+  params: AcervoQueryParams
+): Promise<Result<PaginatedResponse<Portaria>>> {
+  await mockDelay(500)
+
+  let lista = [...mockDB.portarias]
+
+  // Filtro de status (padrão: apenas PUBLICADA)
+  const statusFiltro = params.statusFiltro ?? ['PUBLICADA']
+  lista = lista.filter((p) => statusFiltro.includes(p.status))
+
+  // Filtro ABAC por secretaria
+  if (params.secretariaId) {
+    lista = lista.filter((p) => p.secretariaId === params.secretariaId)
+  }
+
+  // Filtro por setor
+  if (params.setorId) {
+    lista = lista.filter((p) => p.setorId === params.setorId)
+  }
+
+  // Filtro por ano (extrai do numeroOficial ou createdAt)
+  if (params.ano) {
+    lista = lista.filter((p) => {
+      const ano = p.numeroOficial?.split('/')[1] ??
+                  new Date(p.createdAt).getFullYear().toString()
+      return ano === String(params.ano)
+    })
+  }
+
+  // Busca por texto (número, título ou valor em dadosFormulario)
+  if (params.busca) {
+    const termo = params.busca.toLowerCase()
+    lista = lista.filter((p) =>
+      p.titulo.toLowerCase().includes(termo) ||
+      (p.numeroOficial ?? '').toLowerCase().includes(termo) ||
+      Object.values(p.dadosFormulario).some((v) => v.toLowerCase().includes(termo))
+    )
+  }
+
+  // Ordena por data de publicação (mais recente primeiro)
+  lista.sort((a, b) =>
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  )
+
+  const page = params.page ?? 1
+  const pageSize = params.pageSize ?? 15
+  const total = lista.length
+  const data = lista.slice((page - 1) * pageSize, page * pageSize)
+
+  return ok({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) })
+}
+
+// Retorna contagem de docs publicados por secretaria (para os badges das pastas)
+export async function contarPorSecretaria(): Promise<Result<Record<string, number>>> {
+  await mockDelay(200)
+  const contadores: Record<string, number> = {}
+  mockDB.portarias
+    .filter((p) => p.status === 'PUBLICADA')
+    .forEach((p) => {
+      contadores[p.secretariaId] = (contadores[p.secretariaId] ?? 0) + 1
+    })
+  return ok(contadores)
 }
