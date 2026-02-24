@@ -18,7 +18,7 @@ export class AssinaturaService {
             }
 
             // Reconstrói o HTML para validar o hash (mesma lógica do pdf.service)
-            let htmlFinal = portaria.modelo.conteudoHtml
+            let htmlFinal = (portaria.modelo as any).conteudoHtml
             const formData = portaria.formData as Record<string, string>
 
             Object.entries(formData).forEach(([key, value]) => {

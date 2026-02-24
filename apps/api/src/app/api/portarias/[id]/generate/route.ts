@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getSession } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth'
 import { PdfService } from '@/services/pdf.service'
 
 export async function POST(
@@ -8,13 +8,13 @@ export async function POST(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getSession()
+        const session = await getAuthUser()
         // Apenas usuários logados podem gerar PDF
         if (!session) {
             return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 })
         }
 
-        const { id } = await params
+        const { id } = params
 
         // 1. Busca a portaria e os dados do modelo
         const portaria = await prisma.portaria.findUnique({
@@ -63,7 +63,7 @@ export async function POST(
             })
 
             // Retorna o PDF como stream
-            return new Response(pdfResult.value, {
+            return new Response(pdfResult.value as any, {
                 headers: {
                     'Content-Type': 'application/json', // Por enquanto retornamos o hash confirmação ou podemos mudar para application/pdf
                     'Content-Disposition': `attachment; filename="portaria-${portaria.numeroOficial.replace('/', '-')}.pdf"`

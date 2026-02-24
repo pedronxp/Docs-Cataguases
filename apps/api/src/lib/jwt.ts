@@ -4,7 +4,7 @@ const secret = new TextEncoder().encode(
     process.env.JWT_SECRET || 'secret-key-docs-cataguases-2024'
 )
 
-export async function createToken(payload: any) {
+export async function signToken(payload: any) {
     return await new SignJWT(payload)
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()

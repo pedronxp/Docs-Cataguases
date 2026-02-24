@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getSession } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth'
+import { buildAbility } from '@/lib/ability'
+import { UsuarioService } from '@/services/usuario.service'
 
 export async function PATCH(
     request: Request,
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getSession()
-        const { id } = await params
+        const session = await getAuthUser()
+        const { id } = params
 
         if (!session || session.role !== 'ADMIN_GERAL') {
             return NextResponse.json(
@@ -18,29 +20,26 @@ export async function PATCH(
         }
 
         const body = await request.json()
-        const { role, ativo, secretariaId, setorId, permissoesExtra } = body
+        const { role, ativo, permissoesExtra } = await request.json()
 
-        const updatedUser = await prisma.user.update({
-            where: { id },
-            data: {
-                ...(role && { role }),
-                ...(ativo !== undefined && { ativo }),
-                ...(secretariaId !== undefined && { secretariaId }),
-                ...(setorId !== undefined && { setorId }),
-                ...(permissoesExtra && { permissoesExtra }),
-            },
+        const result = await UsuarioService.atualizarDadosAdmin(params.id, {
+            role,
+            ativo,
+            permissoesExtra
         })
 
-        const { password: _, ...userWithoutPassword } = updatedUser
+        if (!result.ok) {
+            return NextResponse.json({ success: false, error: result.error }, { status: 400 })
+        }
 
         return NextResponse.json({
             success: true,
-            data: userWithoutPassword,
+            data: result.value
         })
     } catch (error) {
         console.error('Erro ao atualizar usuário:', error)
         return NextResponse.json(
-            { success: false, error: 'Erro ao atualizar dados do servidor' },
+            { success: false, error: 'Ocorreu um erro interno no servidor' },
             { status: 500 }
         )
     }

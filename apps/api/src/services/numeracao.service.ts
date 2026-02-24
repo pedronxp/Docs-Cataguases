@@ -22,7 +22,7 @@ export class NumeracaoService {
                             setorId,
                             ano: anoCorrente,
                         },
-                    },
+                    } as any,
                 })
 
                 // 2. Se não existir, cria o livro inicial para o ano

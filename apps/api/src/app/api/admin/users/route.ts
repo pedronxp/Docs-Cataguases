@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getSession } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth'
 
 export async function GET(request: Request) {
     try {
-        const session = await getSession()
+        const session = await getAuthUser()
 
         // Apenas admins podem listar todos os usuários
         if (!session || session.role !== 'ADMIN_GERAL') {
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
         const users = await prisma.user.findMany({
             where,
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: 'desc' } as any,
             select: {
                 id: true,
                 name: true,

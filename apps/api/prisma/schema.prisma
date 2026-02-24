@@ -47,11 +47,14 @@ model User {
   name            String
   email           String   @unique
   password        String
+  cpf             String?  @unique
   role            String   @default("OPERADOR")
   ativo           Boolean  @default(true)
   permissoesExtra String[] @default([])
   secretariaId    String?
   setorId         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   portarias       Portaria[] @relation("CriadoPor")
 }
 
@@ -73,6 +76,7 @@ model ModeloDocumento {
   descricao       String
   secretariaId    String?
   docxTemplateUrl String
+  conteudoHtml    String           @default("") @db.Text
   ativo           Boolean          @default(true)
   variaveis       ModeloVariavel[]
   portarias       Portaria[]

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth'
 import { AcervoService, FiltrosAcervo } from '@/services/acervo.service'
 
 export async function GET(request: Request) {
     try {
-        const session = await getSession()
+        const session = await getAuthUser()
         if (!session || session.role !== 'ADMIN_GERAL') {
             return NextResponse.json(
                 { success: false, error: 'Apenas administradores podem exportar o acervo.' },
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
             // Gera CSV simples
             const header = 'ID,Numero,Titulo,Secretaria,Status,DataCriacao,HashIntegridade\n'
-            const rows = itens.map(i => {
+            const rows = itens.map((i: any) => {
                 return `${i.id},"${i.numeroOficial || ''}","${i.titulo}","${i.secretariaId}","${i.status}","${i.createdAt.toISOString()}","${i.hashIntegridade || ''}"`
             }).join('\n')
 
