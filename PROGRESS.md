@@ -52,13 +52,34 @@
 
 ---
 
-## � CICLO 2: BACKEND REAL (COMPLETO)
+## 🟢 CICLO 2: INFRAESTRUTURA E CORE API (CONCLUÍDO)
 - [x] Configurar Prisma e Supabase
-- [x] Criar endpoints Next.js (com geração de PDF via Puppeteer e injeção de Hash)
-- [x] Trocar imports mock -> real
+- [x] Criar endpoints Next.js core (Auth Login, Portarias, Acervo, Users)
+- [x] Transição Mocks ➡️ Real em todos os serviços frontend
+- [x] Criar cliente Axios com Interceptadores JWT
 
 ---
 
-## 🟣 CICLO 3: REALTIME E NOTIFICAÇÕES (FUTURO)
+## 🔵 CICLO 3: FINALIZAÇÃO ADMIN & MONITORAMENTO (`epic/admin-api-final`)
+*Objetivo: Alcançar 100% de cobertura da API para todas as funções do frontend.*
+
+### Fase 1: Backend & Contratos
+- [ ] `feat(admin)`: Criar CRUD de Modelos de Documento (`/api/admin/modelos`)
+- [ ] `feat(admin)`: Criar API de Gestão Municipal (`/api/admin/gestao`)
+- [ ] `feat(core)`: Criar endpoint de Upload de Arquivos (`/api/upload`)
+
+### Fase 2: Integração & Lógica
+- [ ] `feat(admin)`: Implementar API de Analytics (`/api/admin/analytics`)
+- [ ] `feat(core)`: Implementar Feed de Atividades Real (`/api/feed`)
+
+### Fase 3: Frontend & UI
+- [ ] `fix(auth)`: Ajustar fluxo de Onboarding (`/api/auth/onboarding`)
+
+---
+
+## 🟣 CICLO 4: REALTIME E NOTIFICAÇÕES (FUTURO)
 - [ ] Supabase Realtime (Websockets)
 - [ ] E-mails transacionais (Outlook/Gmail genéricos)
+
+### 📊 Cobertura Atual do Backend: 60%
+*Status: Portarias, Acervo e Gestão de Usuários 100% operais em tempo real.*
