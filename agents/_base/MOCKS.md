@@ -1,7 +1,7 @@
 # agents/_base/MOCKS.md — SERVIÇOS MOCK (CICLO 1)
 # Leia junto com: agents/_base/AGENTS.md | agents/_modulos/WIZARD_PORTARIA.md
 # IA: Responda SEMPRE em português (pt-BR).
-# IMPORTANTE: A interface de cada função é IDÊNCITCA à versão real do Ciclo 2.
+# IMPORTANTE: A interface de cada função é IDÊNTICA à versão real do Ciclo 2.
 # A troca Mock → Real é feita alterando APENAS 1 linha de import no hook.
 #
 # ALINHAMENTO PENDENTE (Ciclo 2):
@@ -175,6 +175,55 @@ mockDB.portarias = [
     dadosFormulario: { NOME_SERVIDOR: 'Pedro Fonseca', CARGO: 'Analista' },
     createdAt: '2025-06-16T08:00:00Z',
     updatedAt: '2025-06-16T10:00:00Z',
+  },
+  // Portarias PUBLICADAS para o Acervo (diferentes secretarias)
+  {
+    id: 'port-006',
+    titulo: 'Portaria de Nomeação - Roberta Lima',
+    numeroOficial: '035/2025',
+    status: 'PUBLICADA',
+    autorId: 'user-op-001',
+    secretariaId: 'sec-obras',
+    setorId: null,
+    modeloId: 'modelo-nomeacao',
+    pdfUrl: 'https://mock.storage/portaria-035.pdf',
+    docxRascunhoUrl: null,
+    hashAssinatura: 'sha256-obras001',
+    dadosFormulario: { NOME_SERVIDOR: 'Roberta Lima', CARGO: 'Engenheira Civil' },
+    createdAt: '2025-06-01T09:00:00Z',
+    updatedAt: '2025-06-01T11:00:00Z',
+  },
+  {
+    id: 'port-007',
+    titulo: 'Portaria de Gratificação - Dr. Marcos Silva',
+    numeroOficial: '036/2025',
+    status: 'PUBLICADA',
+    autorId: 'user-op-001',
+    secretariaId: 'sec-saude',
+    setorId: null,
+    modeloId: 'modelo-gratificacao',
+    pdfUrl: 'https://mock.storage/portaria-036.pdf',
+    docxRascunhoUrl: null,
+    hashAssinatura: 'sha256-saude001',
+    dadosFormulario: { NOME_SERVIDOR: 'Dr. Marcos Silva', PERCENTUAL: '20' },
+    createdAt: '2025-06-02T14:00:00Z',
+    updatedAt: '2025-06-02T16:00:00Z',
+  },
+  {
+    id: 'port-008',
+    titulo: 'Portaria de Licença - Profa. Ana Paula',
+    numeroOficial: '037/2025',
+    status: 'PUBLICADA',
+    autorId: 'user-op-001',
+    secretariaId: 'sec-educacao',
+    setorId: null,
+    modeloId: 'modelo-licenca',
+    pdfUrl: 'https://mock.storage/portaria-037.pdf',
+    docxRascunhoUrl: null,
+    hashAssinatura: 'sha256-educacao001',
+    dadosFormulario: { NOME_SERVIDOR: 'Profa. Ana Paula' },
+    createdAt: '2025-06-05T10:00:00Z',
+    updatedAt: '2025-06-05T12:00:00Z',
   },
 ]
 
@@ -561,4 +610,90 @@ export async function validarDocumento(
     secretaria:    'Secretaria Municipal de Administração',
     hashSHA256:    hash,
   })
+}
+
+---
+
+// src/services/acervo.service.ts
+// Busca histórica de portarias publicadas com filtros avançados.
+// Complementa agents/_modulos/ACERVO.md
+
+import type { Portaria } from '../types/domain'
+import type { PaginatedResponse } from '../types/api'
+import { ok, type Result } from '../lib/result'
+import { mockDelay, mockDB } from './_mock.helpers'
+
+export interface AcervoQueryParams {
+  secretariaId?: string
+  busca?: string
+  ano?: number
+  setorId?: string
+  page?: number
+  pageSize?: number
+  statusFiltro?: string[]
+}
+
+export async function buscarAcervo(
+  params: AcervoQueryParams
+): Promise<Result<PaginatedResponse<Portaria>>> {
+  await mockDelay(500)
+
+  let lista = [...mockDB.portarias]
+
+  // Filtro de status (padrão: apenas PUBLICADA)
+  const statusFiltro = params.statusFiltro ?? ['PUBLICADA']
+  lista = lista.filter((p) => statusFiltro.includes(p.status))
+
+  // Filtro ABAC por secretaria
+  if (params.secretariaId) {
+    lista = lista.filter((p) => p.secretariaId === params.secretariaId)
+  }
+
+  // Filtro por setor
+  if (params.setorId) {
+    lista = lista.filter((p) => p.setorId === params.setorId)
+  }
+
+  // Filtro por ano (extrai do numeroOficial ou createdAt)
+  if (params.ano) {
+    lista = lista.filter((p) => {
+      const ano = p.numeroOficial?.split('/')[1] ??
+                  new Date(p.createdAt).getFullYear().toString()
+      return ano === String(params.ano)
+    })
+  }
+
+  // Busca por texto (número, título ou valor em dadosFormulario)
+  if (params.busca) {
+    const termo = params.busca.toLowerCase()
+    lista = lista.filter((p) =>
+      p.titulo.toLowerCase().includes(termo) ||
+      (p.numeroOficial ?? '').toLowerCase().includes(termo) ||
+      Object.values(p.dadosFormulario).some((v) => v.toLowerCase().includes(termo))
+    )
+  }
+
+  // Ordena por data de publicação (mais recente primeiro)
+  lista.sort((a, b) =>
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  )
+
+  const page = params.page ?? 1
+  const pageSize = params.pageSize ?? 15
+  const total = lista.length
+  const data = lista.slice((page - 1) * pageSize, page * pageSize)
+
+  return ok({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) })
+}
+
+// Retorna contagem de docs publicados por secretaria (para os badges das pastas)
+export async function contarPorSecretaria(): Promise<Result<Record<string, number>>> {
+  await mockDelay(200)
+  const contadores: Record<string, number> = {}
+  mockDB.portarias
+    .filter((p) => p.status === 'PUBLICADA')
+    .forEach((p) => {
+      contadores[p.secretariaId] = (contadores[p.secretariaId] ?? 0) + 1
+    })
+  return ok(contadores)
 }

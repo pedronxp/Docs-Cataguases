@@ -1,80 +1,83 @@
-# AGENTS_ACERVO.md — COMPLEMENTO: ACERVO DOCUMENTAL
-# Leia junto com AGENTS.md, MOCKS.md e AGENTS_ASSINATURA.md
-# Adiciona a tela 13: Acervo Documental (consulta e pesquisa de portarias publicadas)
+# agents/_modulos/ACERVO.md — ACERVO DOCUMENTAL
+# Leia junto com: agents/_base/AGENTS.md | agents/_base/MOCKS.md | agents/_modulos/ASSINATURA.md
+# IA: Responda SEMPRE em português (pt-BR). Para melhor compreensão técnica, leia também ACERVO.en.md
 
 ---
 
-## POR QUE ESTA TELA É DIFERENTE DA LISTA DE PORTARIAS
+## IDENTIDADE
 
-A Lista de Portarias (/_sistema/administrativo/portarias) é uma FILA DE TRABALHO.
-Mostra documentos que precisam de ação: rascunhos, pendentes, com falha.
-
-O Acervo Documental (/_sistema/acervo) é um ARQUIVO HISTÓRICO.
-Permite consultar, pesquisar e baixar qualquer portaria publicada da secretaria.
-É a tela que um servidor usa quando precisa verificar se uma portaria existe,
-qual o número de uma nomeação de 2023, ou imprimir um documento publicado.
+Este arquivo especifica a Tela de Acervo Documental (`/_sistema/acervo`).
+O Acervo é um arquivo histórico de portarias publicadas, com busca avançada e filtros.
+NÃO confundir com a Lista de Portarias (fila de trabalho operacional).
 
 ---
 
-## REGRAS DE ISOLAMENTO DE DADOS (ABAC) — ACERVO
+## 1. DIFERENÇA: LISTA vs. ACERVO
 
-OPERADOR:
-  → vê apenas portarias da sua própria secretariaId
-  → não vê portarias de outras secretarias
+### Lista de Portarias (`/_sistema/administrativo/portarias`)
+- Fila de trabalho operacional
+- Exibe: RASCUNHO, PROCESSANDO, PENDENTE, APROVADA, AGUARDANDO_ASSINATURA, FALHA_PROCESSAMENTO
+- Objetivo: gerenciar documentos em andamento
+- Ações: submeter, aprovar, rejeitar, enviar para assinatura, assinar
 
-GESTOR_SETOR:
-  → vê portarias do seu setorId dentro da sua secretariaId
-
-SECRETARIO:
-  → vê todas as portarias da sua secretariaId
-  → não vê portarias de outras secretarias
-
-SECRETARIO com permissão visualizar:PortariaGlobal:
-  → vê portarias de TODAS as secretarias
-  → este é o "Secretário de Administração" ou cargo equivalente
-
-ADMIN_GERAL e PREFEITO:
-  → veem tudo (já coberto pelo gerenciar: all no CASL)
-
-NUNCA exibir no acervo documentos com status RASCUNHO ou PROCESSANDO.
-O acervo exibe apenas: PUBLICADA (padrão), APROVADA, PENDENTE (opcional por filtro).
+### Acervo Documental (`/_sistema/acervo`)
+- Arquivo histórico de consulta
+- Exibe: PUBLICADA (padrão), APROVADA, PENDENTE (opcional por filtro)
+- Objetivo: buscar, consultar e baixar documentos oficiais já publicados
+- Ações: visualizar PDF, baixar, ver detalhes
 
 ---
 
-## NOVA PERMISSÃO — adicionar em src/lib/ability.ts
+## 2. REGRAS ABAC — ISOLAMENTO DE DADOS
 
-Adicione na lista de Subjects:
-  'PortariaGlobal'
+| Role | Acesso |
+|---|---|
+| `OPERADOR` | Portarias da própria `secretariaId` |
+| `GESTOR_SETOR` | Portarias do próprio `setorId` dentro da `secretariaId` |
+| `SECRETARIO` | Todas as portarias da própria `secretariaId` |
+| `SECRETARIO` com `visualizar:PortariaGlobal` | **Todas as secretarias** (ex: Secretário de Administração) |
+| `ADMIN_GERAL`, `PREFEITO` | Tudo (via `gerenciar: all`) |
 
-Adicione no buildAbility, após o bloco de permissoesExtra:
-
-// Permissão especial: visualizar acervo de todas as secretarias
-// Concedida via permissoesExtra: "visualizar:PortariaGlobal"
-// Usada pelo Secretário de Administração ou cargo equivalente
-// ADMIN_GERAL e PREFEITO já têm via gerenciar: all
-
-A permissão já é coberta automaticamente pelo loop de permissoesExtra existente.
-Basta o ADMIN_GERAL cadastrar "visualizar:PortariaGlobal" no array permissoesExtra
-do usuário desejado na tela de Gestão de Usuários.
-
-Adicione o checkbox na tela de Gestão de Usuários:
-  "visualizar:PortariaGlobal" → label: "Ver acervo de todas as Secretarias"
+**NUNCA exibir:** `RASCUNHO`, `PROCESSANDO`, `FALHA_PROCESSAMENTO`.
 
 ---
 
-## NOVA ROTA
+## 3. NOVA PERMISSÃO: `visualizar:PortariaGlobal`
 
-Adicione em src/routes/_sistema/:
+### Em `src/lib/ability.ts`
 
-/_sistema/acervo                          → Acervo Documental (busca geral)
-/_sistema/acervo/$secretariaId            → Pasta de uma Secretaria específica
+```typescript
+export type Subjects =
+  | 'all'
+  | 'Usuario'
+  | 'Portaria'
+  | 'PortariaGlobal'  // NOVO
+  | 'Modelo'
+  // ...
+```
+
+A permissão já é coberta pelo loop de `permissoesExtra` existente no `buildAbility`.
+Basta o `ADMIN_GERAL` adicionar `"visualizar:PortariaGlobal"` no array `permissoesExtra` do usuário.
+
+### Na Tela de Gestão de Usuários
+
+Adicionar checkbox:
+
+```typescript
+const PERMISSOES_DISPONIVEIS = [
+  { value: 'deletar:Portaria',          label: 'Deletar Portarias' },
+  { value: 'aprovar:Portaria',          label: 'Aprovar Portarias' },
+  { value: 'publicar:Portaria',         label: 'Assinar e Publicar Portarias' },
+  { value: 'gerenciar:Modelo',          label: 'Gerenciar Modelos de Documento' },
+  { value: 'visualizar:PortariaGlobal', label: 'Ver acervo de TODAS as Secretarias' }, // NOVO
+]
+```
 
 ---
 
-## NOVA TELA: src/routes/_sistema/acervo/index.tsx
+## 4. LAYOUT DA TELA
 
-LAYOUT DA TELA:
-
+```
 ┌─────────────────────────────────────────────────────────────────┐
 │ Acervo Documental                                               │
 │                                              [Buscar Portaria]  │
@@ -90,29 +93,45 @@ LAYOUT DA TELA:
 │ 📁 Sec. Educação │                                              │
 │                  │  ← anterior  página 1 de 4  próxima →       │
 └──────────────────┴──────────────────────────────────────────────┘
+```
 
-COMPORTAMENTO DAS PASTAS (painel esquerdo):
-- Usuário sem visualizar:PortariaGlobal → vê apenas sua própria secretaria, sem painel de pastas
-- Usuário com visualizar:PortariaGlobal ou ADMIN_GERAL/PREFEITO → vê lista de todas as pastas/secretarias
+### Comportamento do Painel de Pastas (esquerda)
+
+- **Sem `visualizar:PortariaGlobal`:** painel oculto, exibe apenas portarias da própria secretaria
+- **Com `visualizar:PortariaGlobal` ou `ADMIN_GERAL`/`PREFEITO`:** painel visível com todas as secretarias
 - Clicar em uma pasta filtra as portarias à direita
-
-FILTROS DISPONÍVEIS:
-- Busca por texto: número oficial, título, nome de servidor (dadosFormulario)
-- Ano: select com anos disponíveis (2023, 2024, 2025…)
-- Setor: select com setores da secretaria ativa
-- Status: checkbox PUBLICADA (padrão ativo), APROVADA, PENDENTE
-
-COLUNAS DA TABELA:
-- Número Oficial (ex: 042/2025)
-- Título
-- Secretaria (só visível para quem tem visualizar:PortariaGlobal)
-- Setor (opcional)
-- Data de Publicação
-- Ações: [Ver PDF] [Detalhes]
+- Badge ao lado da pasta mostra total de documentos publicados
 
 ---
 
-## COMPONENTE DE PASTA (src/components/features/acervo/PastaSecretaria.tsx)
+## 5. FILTROS DISPONÍVEIS
+
+| Filtro | Tipo | Descrição |
+|---|---|---|
+| Busca | texto | Procura em: `numeroOficial`, `titulo`, valores de `dadosFormulario` |
+| Ano | select | Filtra pelo ano do `numeroOficial` (ex: 2025) |
+| Setor | select | Filtra pelo `setorId` (apenas na secretaria ativa) |
+| Status | checkbox | `PUBLICADA` (padrão ativo), `APROVADA`, `PENDENTE` |
+
+---
+
+## 6. COLUNAS DA TABELA
+
+| Coluna | Visibilidade | Descrição |
+|---|---|---|
+| Número Oficial | sempre | ex: `042/2025` |
+| Título | sempre | Título da portaria |
+| Secretaria | `visualizar:PortariaGlobal` apenas | Nome/sigla da secretaria |
+| Setor | opcional | Setor emissor |
+| Data de Publicação | sempre | `updatedAt` formatado |
+| Ações | sempre | [Ver PDF] [Detalhes] |
+
+---
+
+## 7. COMPONENTE `PastaSecretaria.tsx`
+
+```typescript
+// src/components/features/acervo/PastaSecretaria.tsx
 
 import { Folder, FolderOpen } from 'lucide-react'
 import type { Secretaria } from '@/types/domain'
@@ -136,10 +155,7 @@ export function PastaSecretaria({ secretaria, ativa, totalDocs, onClick }: Props
         }
       `}
     >
-      {ativa
-        ? <FolderOpen size={16} />
-        : <Folder size={16} />
-      }
+      {ativa ? <FolderOpen size={16} /> : <Folder size={16} />}
       <span className="flex-1 truncate">{secretaria.sigla}</span>
       <span className={`text-xs ${ativa ? 'text-blue-200' : 'text-slate-400'}`}>
         {totalDocs}
@@ -147,10 +163,14 @@ export function PastaSecretaria({ secretaria, ativa, totalDocs, onClick }: Props
     </button>
   )
 }
+```
 
 ---
 
-## LÓGICA DE ABAC NO FRONTEND (src/routes/_sistema/acervo/index.tsx)
+## 8. LÓGICA ABAC NO FRONTEND
+
+```typescript
+// src/routes/_sistema/acervo/index.tsx (resumo)
 
 import { useAbility } from '@casl/react'
 import { AbilityContext } from '@/lib/ability'
@@ -160,17 +180,16 @@ export default function AcervoPage() {
   const ability = useAbility(AbilityContext)
   const { usuario } = useAuthStore()
 
-  // Define se o usuário pode ver pastas de outras secretarias
+  // Define se pode ver pastas de outras secretarias
   const podeVerTodasSecretarias =
     ability.can('gerenciar', 'all') ||
     ability.can('visualizar', 'PortariaGlobal')
 
-  // Secretaria inicial: a do próprio usuário, ou null se pode ver todas
+  // Secretaria inicial: a do usuário, ou vazio se pode ver todas
   const [secretariaAtivaId, setSecretariaAtivaId] = useState<string>(
     podeVerTodasSecretarias ? '' : (usuario?.secretariaId ?? '')
   )
 
-  // Parâmetros de busca
   const [busca, setBusca] = useState('')
   const [ano, setAno] = useState<number>(new Date().getFullYear())
   const [setorId, setSetorId] = useState<string>('')
@@ -185,264 +204,104 @@ export default function AcervoPage() {
       setorId,
       page,
       pageSize: 15,
-      statusFiltro: ['PUBLICADA'],  // padrão: só publicadas
+      statusFiltro: ['PUBLICADA'],
     }),
   })
 
   return (
     <PageLayout title="Acervo Documental">
       <div className="flex gap-6 h-full">
-
-        {/* Painel de pastas — só para quem tem visualizar:PortariaGlobal */}
         {podeVerTodasSecretarias && (
           <aside className="w-48 shrink-0">
-            <p className="text-xs font-semibold text-slate-500 uppercase mb-2 px-1">
-              Secretarias
-            </p>
-            <div className="space-y-1">
-              {secretarias.map((sec) => (
-                <PastaSecretaria
-                  key={sec.id}
-                  secretaria={sec}
-                  ativa={secretariaAtivaId === sec.id}
-                  totalDocs={contadores[sec.id] ?? 0}
-                  onClick={() => { setSecretariaAtivaId(sec.id); setPage(1) }}
-                />
-              ))}
-            </div>
+            {/* Painel de pastas */}
           </aside>
         )}
-
-        {/* Área principal */}
         <div className="flex-1 flex flex-col gap-4">
-
-          {/* Filtros */}
-          <div className="flex gap-3 items-center">
-            <Input
-              placeholder="Buscar por número, título ou servidor…"
-              value={busca}
-              onChange={(e) => { setBusca(e.target.value); setPage(1) }}
-              className="max-w-xs"
-            />
-            <Select value={String(ano)} onValueChange={(v) => setAno(Number(v))}>
-              <SelectTrigger className="w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[2025, 2024, 2023].map((a) => (
-                  <SelectItem key={a} value={String(a)}>{a}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Tabela */}
-          {isLoading
-            ? <DataTableSkeleton rows={8} />
-            : <AcervoTable
-                portarias={data?.success ? data.data.data : []}
-                mostrarSecretaria={podeVerTodasSecretarias}
-              />
-          }
-
-          {/* Paginação */}
-          <AcervoPagination
-            page={page}
-            totalPages={data?.success ? data.data.totalPages : 1}
-            onPageChange={setPage}
-          />
-
+          {/* Filtros + Tabela + Paginação */}
         </div>
       </div>
     </PageLayout>
   )
 }
+```
 
 ---
 
-## NOVO SERVIÇO MOCK: src/services/acervo.service.ts
+## 9. SERVIÇO MOCK (já incluído em `agents/_base/MOCKS.md`)
 
-import type { Portaria } from '../types/domain'
-import type { PaginatedResponse } from '../types/api'
-import { ok, type Result } from '../lib/result'
-import { mockDelay, mockDB } from './_mock.helpers'
-
-export interface AcervoQueryParams {
-  secretariaId?: string
-  busca?: string
-  ano?: number
-  setorId?: string
-  page?: number
-  pageSize?: number
-  statusFiltro?: string[]
-}
-
-export async function buscarAcervo(
-  params: AcervoQueryParams
-): Promise<Result<PaginatedResponse<Portaria>>> {
-  await mockDelay(500)
-
-  let lista = [...mockDB.portarias]
-
-  // Filtro de status (padrão: apenas PUBLICADA)
-  const statusFiltro = params.statusFiltro ?? ['PUBLICADA']
-  lista = lista.filter((p) => statusFiltro.includes(p.status))
-
-  // Filtro ABAC por secretaria
-  if (params.secretariaId) {
-    lista = lista.filter((p) => p.secretariaId === params.secretariaId)
-  }
-
-  // Filtro por setor
-  if (params.setorId) {
-    lista = lista.filter((p) => p.setorId === params.setorId)
-  }
-
-  // Filtro por ano (extrai do numeroOficial ou createdAt)
-  if (params.ano) {
-    lista = lista.filter((p) => {
-      const ano = p.numeroOficial?.split('/')[1] ??
-                  new Date(p.createdAt).getFullYear().toString()
-      return ano === String(params.ano)
-    })
-  }
-
-  // Busca por texto (número, título ou valor em dadosFormulario)
-  if (params.busca) {
-    const termo = params.busca.toLowerCase()
-    lista = lista.filter((p) =>
-      p.titulo.toLowerCase().includes(termo) ||
-      (p.numeroOficial ?? '').toLowerCase().includes(termo) ||
-      Object.values(p.dadosFormulario).some((v) => v.toLowerCase().includes(termo))
-    )
-  }
-
-  // Ordena por data de publicação (mais recente primeiro)
-  lista.sort((a, b) =>
-    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  )
-
-  const page = params.page ?? 1
-  const pageSize = params.pageSize ?? 15
-  const total = lista.length
-  const data = lista.slice((page - 1) * pageSize, page * pageSize)
-
-  return ok({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) })
-}
-
-// Retorna contagem de docs publicados por secretaria (para os badges das pastas)
-export async function contarPorSecretaria(): Promise<Result<Record<string, number>>> {
-  await mockDelay(200)
-  const contadores: Record<string, number> = {}
-  mockDB.portarias
-    .filter((p) => p.status === 'PUBLICADA')
-    .forEach((p) => {
-      contadores[p.secretariaId] = (contadores[p.secretariaId] ?? 0) + 1
-    })
-  return ok(contadores)
-}
+Ver arquivo `MOCKS.md` para implementação completa de:
+- `buscarAcervo(params: AcervoQueryParams)`
+- `contarPorSecretaria()`
 
 ---
 
-## ADICIONAR NO SIDEBAR (AppSidebar.tsx)
+## 10. ENDPOINTS BACKEND (Ciclo 3)
 
-Adicione o item de Acervo na lista NAV_ITEMS:
-
-{
-  to: '/_sistema/acervo',
-  label: 'Acervo',
-  icon: Archive,
-  action: 'ler',
-  subject: 'Portaria'
-}
-
-Importar ícone:
-  import { Archive } from 'lucide-react'
-
----
-
-## ADICIONAR NA GESTÃO DE USUÁRIOS — novo checkbox de permissão
-
-Na seção de Permissões Extras da tela de Gestão de Usuários, adicione:
-
-const PERMISSOES_DISPONIVEIS = [
-  { value: 'deletar:Portaria',          label: 'Deletar Portarias' },
-  { value: 'aprovar:Portaria',          label: 'Aprovar Portarias' },
-  { value: 'publicar:Portaria',         label: 'Assinar e Publicar Portarias' },
-  { value: 'gerenciar:Modelo',          label: 'Gerenciar Modelos de Documento' },
-  { value: 'visualizar:PortariaGlobal', label: 'Ver acervo de TODAS as Secretarias' }, // NOVO
-]
-
----
-
-## ENDPOINT BACKEND NOVO (Ciclo 2+)
-
+```
 GET /api/acervo
-  Query params: secretariaId, busca, ano, setorId, page, pageSize, status[]
-  → Aplica buildFiltroSeguranca (ABAC) antes de qualquer filtro
-  → Se usuario não tem visualizar:PortariaGlobal, força secretariaId = usuario.secretariaId
-  → Retorna PaginatedResponse<Portaria>
+  Query:   secretariaId, busca, ano, setorId, page, pageSize, status[]
+  ABAC:    buildFiltroSeguranca aplicado primeiro
+           Se usuário não tem visualizar:PortariaGlobal → força secretariaId = usuario.secretariaId
+  Retorna: PaginatedResponse<Portaria>
 
 GET /api/acervo/contadores
-  → Retorna Record<secretariaId, total> para popular badges das pastas
-  → Respeitando ABAC: quem não tem visualizar:PortariaGlobal recebe só a própria secretaria
+  Retorna: Record<secretariaId, total> para badges das pastas
+  ABAC:    Respeitando isolamento (sem visualizar:PortariaGlobal → só a própria secretaria)
+```
 
 ---
 
-## CRITÉRIOS DE ACEITAÇÃO — TELA ACERVO
+## 11. ADICIONAR NO SIDEBAR
 
-- Usuário OPERADOR/GESTOR/SECRETARIO vê apenas portarias da sua secretaria
-- Usuário sem visualizar:PortariaGlobal NÃO vê o painel de pastas lateral
-- Usuário com visualizar:PortariaGlobal vê painel de pastas com todas as secretarias
-- Clicar em uma pasta filtra as portarias corretamente
-- Busca por número "042" retorna portaria 042/2025
-- Busca por nome "João Silva" encontra portaria via dadosFormulario
-- Filtro por ano filtra corretamente pelo numeroOficial
-- Coluna "Secretaria" só aparece para quem tem visualizar:PortariaGlobal
-- Botão "Ver PDF" abre o pdfUrl em nova aba
-- Botão "Detalhes" redireciona para /_sistema/administrativo/portarias/$id
-- Status RASCUNHO e PROCESSANDO NUNCA aparecem no acervo
-- Skeleton exibido durante carregamento
-- Paginação de 15 itens por página
+```typescript
+// src/components/layout/AppSidebar.tsx
 
----
+import { Archive } from 'lucide-react'
 
-## ATUALIZAÇÃO DO MAPA DE TELAS (complementa AGENTS.md)
-
-O sistema agora tem 13 telas:
-
-TELAS OPERACIONAIS:
-1.  Login
-2.  Dashboard
-3.  Lista de Portarias       ← fila de trabalho (documentos em andamento)
-4.  Nova Portaria
-5.  Revisão (Upload DOCX)
-6.  Visualização/Aprovação/Assinatura
-7.  Acervo Documental        ← NOVA (arquivo histórico + busca)
-
-TELAS ADMINISTRATIVAS:
-8.  Gestão de Usuários
-9.  Modelos de Documento
-10. Fluxo de Numeração
-11. Variáveis de Sistema
-12. Gestão (Setup Prefeito)
-13. Analytics
+const NAV_ITEMS = [
+  // ...
+  {
+    to: '/_sistema/acervo',
+    label: 'Acervo',
+    icon: Archive,
+    action: 'ler',
+    subject: 'Portaria'
+  },
+  // ...
+]
+```
 
 ---
 
-## INSTRUÇÃO PARA A IDE
+## 12. CRITÉRIOS DE ACEITAÇÃO
 
-Leia AGENTS.md, MOCKS.md, AGENTS_ASSINATURA.md e AGENTS_ACERVO.md.
-Este arquivo adiciona a tela de Acervo Documental. Execute nesta ordem:
+- [ ] `OPERADOR`/`SECRETARIO` sem `visualizar:PortariaGlobal` vê apenas portarias da própria secretaria
+- [ ] Usuário sem `visualizar:PortariaGlobal` NÃO vê o painel de pastas lateral
+- [ ] Usuário com `visualizar:PortariaGlobal` vê painel de pastas com todas as secretarias
+- [ ] Clicar em uma pasta filtra as portarias corretamente
+- [ ] Busca por número "042" retorna portaria `042/2025`
+- [ ] Busca por nome "João Silva" encontra portaria via `dadosFormulario`
+- [ ] Filtro por ano funciona corretamente (extrai de `numeroOficial`)
+- [ ] Coluna "Secretaria" só aparece para quem tem `visualizar:PortariaGlobal`
+- [ ] Botão "Ver PDF" abre `pdfUrl` em nova aba
+- [ ] Botão "Detalhes" redireciona para `/_sistema/administrativo/portarias/[id]`
+- [ ] Status `RASCUNHO`, `PROCESSANDO`, `FALHA_PROCESSAMENTO` NUNCA aparecem no acervo
+- [ ] Skeleton exibido durante carregamento
+- [ ] Paginação de 15 itens por página funcionando
+- [ ] Badge nas pastas mostra total correto de documentos publicados
 
-1. Adicionar 'PortariaGlobal' nos Subjects do ability.ts
-2. Adicionar checkbox "visualizar:PortariaGlobal" na tela de Gestão de Usuários
-3. Criar src/services/acervo.service.ts com buscarAcervo e contarPorSecretaria
-4. Criar src/components/features/acervo/PastaSecretaria.tsx
-5. Criar src/components/features/acervo/AcervoTable.tsx
-6. Criar src/components/features/acervo/AcervoPagination.tsx
-7. Criar src/routes/_sistema/acervo/index.tsx
-8. Adicionar item "Acervo" no AppSidebar.tsx com ícone Archive
-9. Atualizar mocks: adicionar ao menos 3 portarias com status PUBLICADA de secretarias diferentes
+---
 
-Após cada item marque com ✅ ou ❌.
+## 13. CHECKLIST DE CONCLUSÃO (Ciclo 1)
+
+- [ ] `'PortariaGlobal'` adicionado aos `Subjects` em `src/lib/ability.ts`
+- [ ] Checkbox `visualizar:PortariaGlobal` na tela de Gestão de Usuários
+- [ ] `src/services/acervo.service.ts` criado com `buscarAcervo` e `contarPorSecretaria`
+- [ ] `src/components/features/acervo/PastaSecretaria.tsx` criado
+- [ ] `src/components/features/acervo/AcervoTable.tsx` criado
+- [ ] `src/components/features/acervo/AcervoPagination.tsx` criado
+- [ ] `src/routes/_sistema/acervo/index.tsx` criado
+- [ ] Item "Acervo" adicionado no `AppSidebar.tsx` com ícone `Archive`
+- [ ] Mocks atualizados: 3+ portarias `PUBLICADA` de secretarias diferentes no `mockDB.portarias`
+- [ ] Lógica ABAC testada: usuário sem permissão vê apenas própria secretaria
+- [ ] Lógica ABAC testada: usuário com `visualizar:PortariaGlobal` vê todas as secretarias
