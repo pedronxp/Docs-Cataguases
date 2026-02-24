@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
             // Gera CSV simples
             const header = 'ID,Numero,Titulo,Secretaria,Status,DataCriacao,HashIntegridade\n'
-            const rows = itens.map(i => {
+            const rows = itens.map((i: any) => {
                 return `${i.id},"${i.numeroOficial || ''}","${i.titulo}","${i.secretariaId}","${i.status}","${i.createdAt.toISOString()}","${i.hashIntegridade || ''}"`
             }).join('\n')
 

@@ -32,8 +32,10 @@ export async function POST(
             return NextResponse.json({ success: false, error: 'Portaria ainda não possui número oficial. Submeta o documento primeiro.' }, { status: 400 })
         }
 
-        // 2. Prepara o HTML final (substituição de variáveis)
-        let htmlFinal = portaria.modelo.conteudoHtml
+        // 2. Prepara o conteúdo (Simulação baseada no template DOCX)
+        // No futuro, o CloudConvert ou similar usará o docxTemplateUrl.
+        // Por enquanto, geramos um HTML base para o PDF.
+        let htmlFinal = `<h1>Modelo: ${portaria.modelo.nome}</h1><p>Conteúdo gerado via template DOCX.</p>`
         const formData = portaria.formData as Record<string, string>
 
         // Substitui variáveis do formulário no HTML
@@ -63,7 +65,7 @@ export async function POST(
             })
 
             // Retorna o PDF como stream
-            return new Response(pdfResult.value, {
+            return new Response(pdfResult.value as any, {
                 headers: {
                     'Content-Type': 'application/json', // Por enquanto retornamos o hash confirmação ou podemos mudar para application/pdf
                     'Content-Disposition': `attachment; filename="portaria-${portaria.numeroOficial.replace('/', '-')}.pdf"`
