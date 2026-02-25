@@ -33,10 +33,10 @@ Toda nova branch deve usar rigorosamente o padrão: `<tipo>/<matriz>/<tarefa-em-
 - 📂 **`acervo`**: Busca de documentos, filtros e listagem.
 
 ### 1.2 Tipos Permitidos (Conventional Commits & Epics)
-- `epic` 🗂️: **Branch Pai (Agrupadora).** Branch de longa duração que vai receber branches filhas (Ex: `epic/auth-api`). Não recebe commits diretos, apenas PRs das filhas.
-- `feat` ✨: Adição de nova funcionalidade, tela ou componente.
-- `fix` 🐛: Correção de um bug ou erro.
-- `chore` 🔧: Manutenção, atualização de dependências, refatoração de código sem mudança visual.
+- `modulo` 🗂️: **Branch Pai (Agrupadora).** Branch de longa duração que vai receber branches filhas (Ex: `modulo/auth-api`). Não recebe commits diretos, apenas PRs das filhas.
+- `nova` ✨: Adição de nova funcionalidade, tela ou componente.
+- `corrige` 🐛: Correção de um bug ou erro.
+- `tarefa` 🔧: Manutenção, atualização de dependências, refatoração de código sem mudança visual.
 
 ---
 
@@ -58,18 +58,18 @@ Apresente no chat o formulário interativo abaixo:
 > 🧠 **MOMENTO ARQUITETURA E HIERARQUIA:**
 > 
 > **Q1: Qual a Categoria (Tipo) e a Matriz desta tarefa?**
-> - [1] **`feat`** (<matriz>) ➡️ *Novas telas, botões ou funcionalidades.*
-> - [2] **`fix`** (<matriz>) ➡️ *Consertar um bug ou erro.*
-> - [3] **`chore`** (<matriz>) ➡️ *Instalar bibliotecas ou refatorar código.*
-> - [4] **`epic`** (<matriz>) ➡️ *Criar uma **Branch Pai** agrupadora de longa duração.*
+> - [1] **`nova`** (<matriz>) ➡️ *Novas telas, botões ou funcionalidades.*
+> - [2] **`corrige`** (<matriz>) ➡️ *Consertar um bug ou erro.*
+> - [3] **`tarefa`** (<matriz>) ➡️ *Instalar bibliotecas ou refatorar código.*
+> - [4] **`modulo`** (<matriz>) ➡️ *Criar uma **Branch Pai** agrupadora de longa duração.*
 > 
 > **Q2: Qual é o tamanho/hierarquia dessa tarefa? (De onde ela nasce?)**
 > - [0] **Tarefa Independente (Vai para a `main`)** ➡️ *Tarefa pequena, vai direto para produção.*
-> - [1] **Tarefa de um Epic (Branch Filha)** ➡️ *Nasce da branch `epic/` e o PR volta para ela, mantendo a `main` segura.*
+> - [1] **Tarefa de um Modulo (Branch Filha)** ➡️ *Nasce da branch `modulo/` e o PR volta para ela, mantendo a `main` segura.*
 > 
 > *(Branches ativas no projeto agora — escolha uma como base se necessário):*
-> - [2] `[Nome Branch Ativa / Epic 1]`
-> - [3] `[Nome Branch Ativa / Epic 2]`
+> - [2] `[Nome Branch Ativa / Modulo 1]`
+> - [3] `[Nome Branch Ativa / Modulo 2]`
 > 
 > Digite sua resposta (Ex: Q1: 1 core, Q2: 0)."
 
@@ -91,8 +91,8 @@ NUNCA execute `git commit` direto. Apresente este formulário:
 > "Chegou a hora de fazer o backup do código (Commit e Push).
 > - **Autor do Commit:** [Nome do Usuário].
 > - **Mensagens Sugeridas:**
->   - [1] `feat(<matriz>): <descrição curta em pt-br>`
->   - [2] `feat(<matriz>): <descrição muito detalhada em pt-br>`
+>   - [1] `nova(<matriz>): <descrição curta em pt-br>`
+>   - [2] `nova(<matriz>): <descrição muito detalhada em pt-br>`
 > 
 > Escolha a opção ou digite a sua mensagem personalizada."
 
@@ -101,7 +101,7 @@ Após a resposta, execute a ordem: `git add .` -> `git commit -m "..."` -> `git 
 ### 🛑 PASSO 6: GERAÇÃO DE PULL REQUEST (PR) E ALVO CORRETO
 Ao finalizar a tarefa da branch:
 1. **NUNCA** faça `git merge` localmente para a `main`.
-2. Identifique a **Branch Alvo (Target)** correta (Se Q2=0, target é `main`. Se Q2=1, target é o respectivo `epic/`).
+2. Identifique a **Branch Alvo (Target)** correta (Se Q2=0, target é `main`. Se Q2=1, target é o respectivo `modulo/`).
 3. Gere o template de PR abaixo no chat:
 
 ```text
@@ -109,7 +109,7 @@ Ao finalizar a tarefa da branch:
 [Resumo de 1 a 2 linhas em pt-BR sobre o propósito principal]
 
 ⚠️ **ATENÇÃO AO MERGE — BRANCH ALVO (TARGET):**
-Este PR deve ser apontado para: `[main OU epic/<nome-do-epic>]`
+Este PR deve ser apontado para: `[main OU modulo/<nome-do-modulo>]`
 
 ## 🛠️ Mudanças Realizadas
 - [Mudança 1]
@@ -118,3 +118,20 @@ Este PR deve ser apontado para: `[main OU epic/<nome-do-epic>]`
 ## 🧪 Como Testar
 1. Faça o pull desta branch (`git pull origin <branch>`).
 2. Rode a aplicação.
+```
+ 
+---
+
+## 3. 💡 Quiz: Como fica na prática? (Perguntas e Respostas)
+
+**Q1: Se eu for criar uma nova página de perfil para os usuários, qual branch eu devo criar?**
+> **R:** `nova/auth/pagina-de-perfil`. (Antes seria `feat/auth/pagina-de-perfil`).
+
+**Q2: Encontrei um erro crítico na exibição do PDF na página de acervo. Qual branch eu crio para corrigir?**
+> **R:** `corrige/acervo/erro-exibicao-pdf`. (Antes seria `fix/acervo/erro-exibicao-pdf`).
+
+**Q3: Vou apenas atualizar a versão do React no `package.json`. Qual tipo usar na branch e no commit?**
+> **R:** Tipo `tarefa`. Exemplo de branch: `tarefa/core/atualiza-react`. Exemplo de commit: `tarefa(core): atualiza react para v19`. (Antes seria `chore`).
+
+**Q4: A equipe decidiu que precisamos reformular todo o sistema de Autenticação. Serão semanas de trabalho agrupando várias funcionalidades menores. Qual nome base damos a essa iniciativa?**
+> **R:** Usamos a branch agrupadora (branch pai): `modulo/auth-reformulacao`. Todo o trabalho de "novas" e "corriges" feitos depois serão enviadas (via PR) para cá antes de ir para a `main`. (Antes seria `epic/auth-reformulacao`).
