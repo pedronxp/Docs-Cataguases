@@ -43,12 +43,13 @@ Toda nova branch deve usar rigorosamente o padrão: `<tipo>/<matriz>/<tarefa-em-
 ## 2. O PIPELINE DE DEVOPS (GIT LOOP)
 Execute as etapas abaixo na exata ordem cronológica. **Nunca pule passos.**
 
-### 🛑 PASSO 1: MAPEAMENTO AUTOMÁTICO (TEAM SYNC)
-Antes de falar com o usuário, atualize o contexto silenciosamente:
+### 🛑 PASSO 1: MAPEAMENTO E BUSCA DE PREEXISTÊNCIA (TEAM SYNC)
+Antes de falar com o [Nome do Usuário], atualize o contexto silenciosamente e **verifique se o código já não existe**:
 1. Execute `git fetch origin`.
-2. Execute `git branch -a` (Lista todas as branches locais, remotas e Epics ativos).
+2. Execute `git branch -a` para entender a árvore remota.
 3. Execute `git status` para garantir que a branch atual está limpa.
-4. Identifique e separe na sua memória as **Branches Pai (epic/)** das **branches filhas** para exibir na Topologia.
+4. **Busca de Preexistência (Obrigatório):** Se o usuário pediu "Criar tela de Cadastro", use ferramentas como `find_by_name`, `list_dir` ou `grep_search` para vasculhar `apps/web/src/routes` e `apps/api/src/`. **Verifique se a UI ou o Backend já foram criados por outro dev no passado para não recriar a roda redigitada.**
+5. Identifique e separe na sua memória as **Branches Pai (epic/ ou modulo/)** ativas.
 
 ### 🛑 PASSO 2: O QUIZ DE ARQUITETURA E HIERARQUIA
 Apresente no chat o formulário interativo abaixo:
@@ -63,7 +64,13 @@ Apresente no chat o formulário interativo abaixo:
 > - [3] **`tarefa`** (<matriz>) ➡️ *Instalar bibliotecas ou refatorar código.*
 > - [4] **`modulo`** (<matriz>) ➡️ *Criar uma **Branch Pai** agrupadora de longa duração.*
 > 
-> **Q2: Qual é o tamanho/hierarquia dessa tarefa? (De onde ela nasce?)**
+> **Q2: Qual o Escopo Arquitetural da Tarefa? (Front, Back, DB)**
+> - [0] **Frontend (UI/UX)** ➡️ *Apenas telas, componentes React, Tailwind, validação Zod no cliente.*
+> - [1] **Backend (API/Server)** ➡️ *Apenas rotas de API, Controllers, Services e regras de negócio do servidor.*
+> - [2] **Banco de Dados (DB/Integracao)** ➡️ *Schemas do Prisma, Migrations, ou conexão profunda entre Front e Back.*
+> - [3] **Fullstack** ➡️ *Modificações amplas e simultâneas (Geralmente Evitado em sub-branches ágeis).*
+> 
+> **Q3: Qual é o tamanho/hierarquia dessa tarefa? (De onde ela nasce?)**
 > - [0] **Tarefa Independente (Vai para a `main`)** ➡️ *Tarefa pequena, vai direto para produção.*
 > - [1] **Tarefa de um Modulo (Branch Filha)** ➡️ *Nasce da branch `modulo/` e o PR volta para ela, mantendo a `main` segura.*
 > 
@@ -71,13 +78,19 @@ Apresente no chat o formulário interativo abaixo:
 > - [2] `[Nome Branch Ativa / Modulo 1]`
 > - [3] `[Nome Branch Ativa / Modulo 2]`
 > 
-> Digite sua resposta (Ex: Q1: 1 core, Q2: 0)."
+> Digite sua resposta (Ex: Q1: 1 core, Q2: 0, Q3: 1).
 
-### 🛑 PASSO 3: SINCRONIZAÇÃO DEFENSIVA E PLANO DE AÇÃO
-Após a resposta do [Nome do Usuário]:
+### 🛑 PASSO 3: CRIAÇÃO DE SUB-BRANCHES ESTRITAMENTE CLASSIFICADAS
+Após a resposta do [Nome do Usuário], crie a branch usando o prefixo da matriz, mas **adicione o escopo logo depois se for uma sub-branch**.
+*Exemplos de Nomenclaturas Arquiteturais:*
+- **Frontend:** `nova/auth/ui-tela-registro` ou `corrige/wizard/frontend-botao-salvar`
+- **Backend:** `nova/auth/api-registro-endpoint` ou `corrige/wizard/backend-regra-timeout`
+- **Database:** `tarefa/core/db-migracao-auth`
+
+**Plano de Ação para a criação:**
 1. Faça checkout na base escolhida (`git checkout <base>`).
 2. Sincronize com a equipe ANTES de criar a nova branch: `git pull --rebase origin <base>`.
-3. Crie a branch: `git checkout -b <tipo>/<matriz>/<tarefa>`.
+3. Crie a branch: `git checkout -b <tipo>/<matriz>/<escopo>-<tarefa>`.
 4. Escreva um **Plano de Ação numerado** detalhando os arquivos a alterar e peça aprovação para codar.
 
 ### 🛑 PASSO 4: VERIFICAÇÃO PRÉ-COMMIT E SEGURANÇA
