@@ -10,16 +10,12 @@ import { useAuthStore } from '@/store/auth.store'
 import { Eye, EyeOff, Building2, AlertCircle } from 'lucide-react'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { useIMask } from 'react-imask'
 
 const registroSchema = z.object({
     nome: z.string().min(3, 'Nome muito curto'),
     email: z.string().email('E-mail inválido').refine(e => e.endsWith('@cataguases.mg.gov.br'), {
         message: 'Apenas e-mails institucionais oficiais (@cataguases.mg.gov.br) são permitidos'
     }),
-    cpf: z.string()
-        .transform(v => v.replace(/\D/g, ''))
-        .refine(v => v.length === 11, 'CPF deve conter exatamente 11 números'),
     password: z.string().min(6, 'A senha deve ter pelo menos 6 caracteres'),
     confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
@@ -42,11 +38,8 @@ function RegistroPage() {
 
     const form = useForm<RegistroForm>({
         resolver: zodResolver(registroSchema),
-        defaultValues: { nome: '', email: '', cpf: '', password: '', confirmPassword: '' },
+        defaultValues: { nome: '', email: '', password: '', confirmPassword: '' },
     })
-
-    // Mask logic using react-imask for CPF
-    const { ref: cpfRef } = useIMask({ mask: '000.000.000-00' })
 
     const onSubmit = async (data: RegistroForm) => {
         setIsLoading(true)
@@ -58,7 +51,6 @@ function RegistroPage() {
                 name: data.nome,
                 email: data.email,
                 password: data.password,
-                cpf: data.cpf, // Já desformatado pelo Zod .transform(...)
             })
 
             if (response.data.success) {
@@ -133,29 +125,7 @@ function RegistroPage() {
                                 )}
                             />
 
-                            <FormField
-                                control={form.control}
-                                name="cpf"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-700">CPF</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                // Link inputs imask hook to input dom
-                                                ref={cpfRef as any}
-                                                // Maintain form sync
-                                                onChange={field.onChange}
-                                                onBlur={field.onBlur}
-                                                name={field.name}
-                                                placeholder="000.000.000-00"
-                                                className="border-slate-300"
-                                                disabled={isLoading}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+
 
                             <FormField
                                 control={form.control}

@@ -10,7 +10,7 @@ export class UsuarioService {
         name: string;
         email: string;
         password: string;
-        cpf: string;
+        cpf?: string;
     }): Promise<Result<any>> {
         try {
             // Verifica se o e-mail já existe
@@ -19,11 +19,13 @@ export class UsuarioService {
             })
             if (existeEmail) return err('E-mail já cadastrado.')
 
-            // Verifica se o CPF já existe
-            const existeCpf = await prisma.user.findFirst({
-                where: { cpf: data.cpf }
-            })
-            if (existeCpf) return err('CPF já cadastrado.')
+            // Verifica se o CPF já existe, APENAS se o CPF foi fornecido
+            if (data.cpf) {
+                const existeCpf = await prisma.user.findFirst({
+                    where: { cpf: data.cpf }
+                })
+                if (existeCpf) return err('CPF já cadastrado.')
+            }
 
             // Gera o hash da senha
             const hashedPassword = await bcrypt.hash(data.password, 10)
