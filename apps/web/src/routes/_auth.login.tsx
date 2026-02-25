@@ -61,9 +61,9 @@ function LoginPage() {
                                 name="email"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-slate-700">E-mail institucional</FormLabel>
+                                        <FormLabel className="text-slate-700">E-mail ou Username</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="servidor@cataguases.mg.gov.br" className="border-slate-300" {...field} />
+                                            <Input placeholder="seu.usuario ou email@provedor.com" className="border-slate-300" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

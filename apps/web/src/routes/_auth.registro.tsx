@@ -13,9 +13,8 @@ import api from '@/lib/api'
 
 const registroSchema = z.object({
     nome: z.string().min(3, 'Nome muito curto'),
-    email: z.string().email('E-mail inválido').refine(e => e.endsWith('@cataguases.mg.gov.br'), {
-        message: 'Apenas e-mails institucionais oficiais (@cataguases.mg.gov.br) são permitidos'
-    }),
+    username: z.string().min(3, 'Username deve ter pelo menos 3 caracteres').regex(/^[a-zA-Z0-9_\.]+$/, 'Apenas letras, números, pontos e underlines'),
+    email: z.string().email('E-mail inválido'),
     password: z.string().min(6, 'A senha deve ter pelo menos 6 caracteres'),
     confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
@@ -38,7 +37,7 @@ function RegistroPage() {
 
     const form = useForm<RegistroForm>({
         resolver: zodResolver(registroSchema),
-        defaultValues: { nome: '', email: '', password: '', confirmPassword: '' },
+        defaultValues: { nome: '', username: '', email: '', password: '', confirmPassword: '' },
     })
 
     const onSubmit = async (data: RegistroForm) => {
@@ -49,6 +48,7 @@ function RegistroPage() {
             // Chamada à nova rota real construída no backend
             const response = await api.post('/api/auth/registro', {
                 name: data.nome,
+                username: data.username,
                 email: data.email,
                 password: data.password,
             })
@@ -129,12 +129,29 @@ function RegistroPage() {
 
                             <FormField
                                 control={form.control}
+                                name="username"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="text-slate-700">Username</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="seu.usuario" className="border-slate-300" disabled={isLoading} {...field} />
+                                        </FormControl>
+                                        <p className="text-[0.8rem] text-slate-500 mt-1">
+                                            Nome de usuário único para acessar o sistema mais rápido (ex: joao.silva).
+                                        </p>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
                                 name="email"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-slate-700">E-mail institucional</FormLabel>
+                                        <FormLabel className="text-slate-700">E-mail</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="servidor@cataguases.mg.gov.br" className="border-slate-300" disabled={isLoading} {...field} />
+                                            <Input placeholder="servidor@provedor.com" className="border-slate-300" disabled={isLoading} {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -193,7 +210,7 @@ function RegistroPage() {
                 </CardContent>
                 <CardFooter className="flex flex-col items-center gap-3 pt-2 pb-6">
                     <p className="text-xs text-slate-400 text-center px-6">
-                        Apenas e-mails institucionais oficiais serão aprovados.
+                        Crie seu Username e conecte com seu e-mail favorito (Gmail, Outlook, etc).
                     </p>
                     <Link to="/login" className="text-xs text-primary hover:underline font-bold">
                         Já possui conta? Fazer Login

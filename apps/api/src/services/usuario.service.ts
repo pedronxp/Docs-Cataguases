@@ -8,6 +8,7 @@ export class UsuarioService {
      */
     static async registrar(data: {
         name: string;
+        username: string;
         email: string;
         password: string;
         cpf?: string;
@@ -18,6 +19,12 @@ export class UsuarioService {
                 where: { email: data.email }
             })
             if (existeEmail) return err('E-mail já cadastrado.')
+
+            // Verifica se o username já existe
+            const existeUsername = await prisma.user.findUnique({
+                where: { username: data.username }
+            })
+            if (existeUsername) return err('Username já está em uso.')
 
             // Verifica se o CPF já existe, APENAS se o CPF foi fornecido
             if (data.cpf) {
@@ -33,6 +40,7 @@ export class UsuarioService {
             const usuario = await prisma.user.create({
                 data: {
                     name: data.name,
+                    username: data.username,
                     email: data.email,
                     password: hashedPassword,
                     cpf: data.cpf,

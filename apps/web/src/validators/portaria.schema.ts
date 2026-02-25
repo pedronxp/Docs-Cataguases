@@ -8,7 +8,7 @@ export const criarPortariaSchema = z.object({
 export type CriarPortariaForm = z.infer<typeof criarPortariaSchema>
 
 export const loginSchema = z.object({
-    email: z.string().email('E-mail inválido'),
+    email: z.string().min(3, 'Informe seu e-mail ou username'),
     password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
 })
 export type LoginForm = z.infer<typeof loginSchema>

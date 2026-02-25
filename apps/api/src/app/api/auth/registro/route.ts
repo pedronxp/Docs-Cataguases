@@ -4,6 +4,7 @@ import { UsuarioService } from '@/services/usuario.service'
 
 const registroSchema = z.object({
     name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
+    username: z.string().min(3, 'Username deve ter no mínimo 3 caracteres'),
     email: z.string().email('E-mail inválido'),
     password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
     cpf: z.string().length(11, 'CPF deve ter 11 dígitos numéricos').optional()

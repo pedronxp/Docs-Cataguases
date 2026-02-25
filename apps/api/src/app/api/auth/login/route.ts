@@ -7,17 +7,25 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
     try {
-        const { email, password } = await request.json()
+        // Pega os campos. Vamos assumir que o FE pode mandar "email" como identifier (email ou username).
+        const identifier = await request.json()
+        const loginIdentifier = identifier.email || identifier.username
+        const password = identifier.password
 
-        if (!email || !password) {
+        if (!loginIdentifier || !password) {
             return NextResponse.json(
-                { success: false, error: 'E-mail e senha são obrigatórios' },
+                { success: false, error: 'E-mail/Username e senha são obrigatórios' },
                 { status: 400 }
             )
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email },
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { email: loginIdentifier },
+                    { username: loginIdentifier }
+                ]
+            },
         })
 
         if (!user || !(await comparePassword(password, user.password))) {
