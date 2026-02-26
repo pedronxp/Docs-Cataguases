@@ -9,7 +9,6 @@ import { loginSchema, type LoginForm } from '@/validators/portaria.schema'
 import { useAuthStore } from '@/store/auth.store'
 import { Eye, EyeOff, Building2 } from 'lucide-react'
 import { useState } from 'react'
-import { authService } from '@/services/auth.service'
 import { useToast } from '@/hooks/use-toast'
 
 import api from '@/lib/api'
@@ -21,14 +20,9 @@ export const Route = createFileRoute('/_auth/login')({
 function LoginPage() {
     const navigate = useNavigate()
     const setSession = useAuthStore(s => s.setSession)
-    const { toast } = useToast()
     const [showPassword, setShowPassword] = useState(false)
-<<<<<<< Updated upstream
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
-=======
-    const [isSubmitting, setIsSubmitting] = useState(false)
->>>>>>> Stashed changes
 
     const form = useForm<LoginForm>({
         resolver: zodResolver(loginSchema),
@@ -36,7 +30,6 @@ function LoginPage() {
     })
 
     const onSubmit = async (data: LoginForm) => {
-<<<<<<< Updated upstream
         setIsLoading(true)
         setError(null)
         try {
@@ -63,30 +56,6 @@ function LoginPage() {
             setError(err.response?.data?.error || 'Email/Username ou senha inválidos')
         } finally {
             setIsLoading(false)
-=======
-        setIsSubmitting(true)
-        try {
-            const result = await authService.login(data)
-
-            if (result.success) {
-                setSession(result.data.usuario, result.data.token)
-                navigate({ to: '/dashboard' })
-            } else {
-                toast({
-                    title: 'Erro no Acesso',
-                    description: result.error,
-                    variant: 'destructive'
-                })
-            }
-        } catch (error) {
-            toast({
-                title: 'Erro Inesperado',
-                description: 'Não foi possível conectar ao servidor.',
-                variant: 'destructive'
-            })
-        } finally {
-            setIsSubmitting(false)
->>>>>>> Stashed changes
         }
     }
 
@@ -157,17 +126,8 @@ function LoginPage() {
                                     </FormItem>
                                 )}
                             />
-<<<<<<< Updated upstream
                             <Button type="submit" disabled={isLoading} className="w-full bg-primary hover:bg-primary/90 text-white mt-4 font-bold h-11 transition-all shadow-sm">
                                 {isLoading ? 'Entrando...' : 'Entrar no sistema'}
-=======
-                            <Button
-                                type="submit"
-                                className="w-full bg-primary hover:bg-primary/90 text-white mt-4 font-bold h-11 transition-all shadow-sm"
-                                disabled={isSubmitting}
-                            >
-                                {isSubmitting ? 'Entrando...' : 'Entrar no sistema'}
->>>>>>> Stashed changes
                             </Button>
                         </form>
                     </Form>

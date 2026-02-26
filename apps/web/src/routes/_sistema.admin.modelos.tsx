@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Search, FileText, Settings, Copy } from 'lucide-react'
@@ -18,6 +18,7 @@ export const Route = createFileRoute('/_sistema/admin/modelos')({
 
 function ModelosDocumentoPage() {
     const { toast } = useToast()
+    const navigate = useNavigate()
     const [modelos, setModelos] = useState<ModeloDocumento[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -48,9 +49,9 @@ function ModelosDocumentoPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight text-slate-800">Modelos de Documento</h2>
-                    <p className="text-sm text-slate-500">Gerencie os templates DOCX base para a geração de portarias e documentos.</p>
+                    <p className="text-sm text-slate-500">Gerencie os templates textuais base para a geração de portarias e documentos.</p>
                 </div>
-                <Button onClick={() => handleAcao('Novo Modelo')} className="bg-[#1351B4] hover:bg-[#0f4496] text-white w-full sm:w-auto shadow-sm">
+                <Button onClick={() => navigate({ to: '/_sistema/admin/modelos/novo' })} className="bg-[#1351B4] hover:bg-[#0f4496] text-white w-full sm:w-auto shadow-sm">
                     <Plus className="mr-2 h-4 w-4" />
                     Novo Modelo
                 </Button>
