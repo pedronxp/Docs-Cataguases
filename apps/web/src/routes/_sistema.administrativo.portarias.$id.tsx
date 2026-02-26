@@ -104,7 +104,7 @@ function PortariaDetalhesPage() {
     const isPublicada = portaria.status === STATUS_PORTARIA.PUBLICADA
     const isPendente = portaria.status === STATUS_PORTARIA.PENDENTE
     const isAprovada = portaria.status === STATUS_PORTARIA.APROVADA
-    const dadosLista = Object.entries(portaria.dadosFormulario || {})
+    const dadosLista = Object.entries(portaria.formData || {})
     const canSign = ability.can('assinar', 'Portaria')
     const canApprove = ability.can('aprovar', 'Portaria')
 

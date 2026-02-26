@@ -10,7 +10,10 @@ const prismaClientSingleton = () => {
         connectionTimeoutMillis: 5000,
     })
     const adapter = new PrismaPg(pool)
-    return new PrismaClient({ adapter })
+    return new PrismaClient({
+        adapter,
+        log: ['query', 'error', 'warn'],
+    })
 }
 
 declare global {

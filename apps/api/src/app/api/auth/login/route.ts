@@ -4,6 +4,7 @@ import { comparePassword, createToken } from '@/lib/auth'
 import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
     try {
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
                 token,
             },
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error('Erro no login:', error)
         return NextResponse.json(
             { success: false, error: 'Ocorreu um erro interno no servidor' },

@@ -44,6 +44,7 @@ export class AcervoService {
             if (setorId) where.setorId = setorId
             if (status) where.status = status
 
+            /*
             if (ano) {
                 const dataInicio = new Date(`${ano}-01-01T00:00:00Z`)
                 const dataFim = new Date(`${ano}-12-31T23:59:59Z`)
@@ -52,6 +53,7 @@ export class AcervoService {
                     lte: dataFim
                 }
             }
+            */
 
             // Executa a busca e a contagem total para paginação
             const [itens, total] = await Promise.all([
@@ -65,7 +67,7 @@ export class AcervoService {
                             select: { name: true }
                         }
                     },
-                    orderBy: { createdAt: 'desc' },
+                    // orderBy: { createdAt: 'desc' },
                     skip,
                     take: limit
                 }),

@@ -35,7 +35,11 @@ export function useDashboard() {
                     setStats({
                         rascunhos: docs.filter((d: Portaria) => d.status === STATUS_PORTARIA.RASCUNHO).length,
                         aguardandoRevisao: docs.filter((d: Portaria) => d.status === STATUS_PORTARIA.PENDENTE).length,
-                        publicadasMes: docs.filter((d: Portaria) => d.status === STATUS_PORTARIA.PUBLICADA && new Date(d.createdAt) >= inicioMes).length,
+                        publicadasMes: docs.filter((d: Portaria) =>
+                            d.status === STATUS_PORTARIA.PUBLICADA &&
+                            d.createdAt &&
+                            new Date(d.createdAt) >= inicioMes
+                        ).length,
                         assinaturasPendentes: docs.filter((d: Portaria) => d.status === STATUS_PORTARIA.APROVADA).length
                     })
                 }

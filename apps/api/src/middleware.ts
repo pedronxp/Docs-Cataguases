@@ -6,6 +6,16 @@ const JWT_SECRET = new TextEncoder().encode(
 )
 
 export async function middleware(request: NextRequest) {
+    // 1. Preflight CORS
+    if (request.method === 'OPTIONS') {
+        const response = new NextResponse(null, { status: 204 })
+        response.headers.set('Access-Control-Allow-Origin', '*')
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+        response.headers.set('Access-Control-Allow-Credentials', 'true')
+        return response
+    }
+
     const token = request.cookies.get('auth-token')?.value
 
     // Rotas que começam com /api/_sistema exigem autenticação

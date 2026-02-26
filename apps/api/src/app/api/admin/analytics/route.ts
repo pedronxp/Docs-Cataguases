@@ -15,7 +15,7 @@ export async function GET() {
 
         // Apenas ADMIN_GERAL, PREFEITO e SECRETARIO costumam ver analytics
         // mas o service já filtra pelo secretariaId se necessário
-        const result = await AnalyticsService.obterMetricasGerais({
+        const result = await AnalyticsService.obterDashboardCompleto({
             secretariaId: (usuario as any).secretariaId || undefined,
             role: (usuario as any).role || 'OPERADOR'
         })

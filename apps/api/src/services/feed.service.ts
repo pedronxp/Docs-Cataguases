@@ -46,7 +46,7 @@ export class FeedService {
                             select: { id: true, titulo: true, numeroOficial: true }
                         }
                     } as any,
-                    orderBy: { createdAt: 'desc' },
+                    // orderBy: { createdAt: 'desc' },
                     skip,
                     take: pageSize
                 }),

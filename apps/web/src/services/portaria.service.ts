@@ -12,14 +12,14 @@ export async function listarPortarias(
     try {
         const response = await api.get('/api/portarias', { params })
         const raw = response.data
-        // Aceita array direto ou envolto em { success, data }
-        const data = Array.isArray(raw) ? raw : (raw.data || [])
+        const data = raw.data || raw
+        const items = Array.isArray(data) ? data : (data.items || [])
         return ok({
-            data,
-            total: data.length, // Ajustar conforme implementação de paginação real no backend
+            data: items,
+            total: items.length,
             page: params.page ?? 1,
             pageSize: params.pageSize ?? 10,
-            totalPages: Math.ceil(data.length / (params.pageSize ?? 10))
+            totalPages: 1
         })
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao listar portarias')
@@ -29,7 +29,7 @@ export async function listarPortarias(
 export async function buscarPortaria(id: string): Promise<Result<Portaria>> {
     try {
         const response = await api.get(`/api/portarias/${id}`)
-        return ok(response.data.data)
+        return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao buscar portaria')
     }
@@ -40,7 +40,7 @@ export async function criarPortaria(
 ): Promise<Result<Portaria>> {
     try {
         const response = await api.post('/api/portarias', payload)
-        return ok(response.data.data)
+        return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao criar portaria')
     }
@@ -49,7 +49,7 @@ export async function criarPortaria(
 export async function assinarPortaria(id: string): Promise<Result<Portaria>> {
     try {
         const response = await api.post(`/api/portarias/${id}/assinar`)
-        return ok(response.data.data)
+        return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao assinar portaria')
     }
@@ -60,12 +60,10 @@ export async function submeterPortaria(
 ): Promise<Result<Portaria>> {
     try {
         // Na API real, submeter pode ser um PATCH que muda o status ou um POST específico
-        // Conforme portarias/route.ts, o POST já aceita 'submetido: true'
-        // Se for uma portaria existente, usamos o PATCH
         const response = await api.patch(`/api/portarias/${payload.portariaId}`, {
             status: 'PROCESSANDO'
         })
-        return ok(response.data.data)
+        return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao submeter portaria')
     }
@@ -73,8 +71,8 @@ export async function submeterPortaria(
 
 export async function tentarNovamente(portariaId: string): Promise<Result<Portaria>> {
     try {
-        const response = await api.post(`/api/portarias/${portariaId}/retry`)
-        return ok(response.data.data)
+        const response = await api.patch(`/api/portarias/${portariaId}/retry`)
+        return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao reprocessar portaria')
     }
@@ -82,8 +80,8 @@ export async function tentarNovamente(portariaId: string): Promise<Result<Portar
 
 export async function aprovarPortaria(portariaId: string): Promise<Result<Portaria>> {
     try {
-        const response = await api.post(`/api/portarias/${portariaId}/aprovar`)
-        return ok(response.data.data)
+        const response = await api.patch(`/api/portarias/${portariaId}/aprovar`)
+        return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao aprovar portaria')
     }
@@ -91,8 +89,8 @@ export async function aprovarPortaria(portariaId: string): Promise<Result<Portar
 
 export async function rejeitarPortaria(portariaId: string): Promise<Result<Portaria>> {
     try {
-        const response = await api.post(`/api/portarias/${portariaId}/rejeitar`)
-        return ok(response.data.data)
+        const response = await api.patch(`/api/portarias/${portariaId}/rejeitar`)
+        return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao rejeitar portaria')
     }

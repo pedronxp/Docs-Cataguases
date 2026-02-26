@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const criarPortariaSchema = z.object({
     titulo: z.string().min(10, 'Título deve ter no mínimo 10 caracteres').max(200, 'Título muito longo'),
     modeloId: z.string().min(1, 'Selecione um modelo de documento'),
-    dadosFormulario: z.record(z.string(), z.string()),
+    formData: z.record(z.string(), z.any()),
 })
 export type CriarPortariaForm = z.infer<typeof criarPortariaSchema>
 

@@ -42,7 +42,7 @@ export interface Portaria {
     id: string; titulo: string; numeroOficial: string | null; status: StatusPortaria
     autorId: string; secretariaId: string; setorId: string | null; modeloId: string
     pdfUrl: string | null; docxRascunhoUrl: string | null; hashAssinatura: string | null
-    dadosFormulario: Record<string, string>
+    formData: Record<string, any>
     autor?: Pick<Usuario, 'id' | 'name' | 'email'>
     secretaria?: Secretaria; createdAt: string; updatedAt: string
 }

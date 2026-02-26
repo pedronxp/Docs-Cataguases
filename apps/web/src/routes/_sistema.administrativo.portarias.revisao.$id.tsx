@@ -137,7 +137,7 @@ function PortariaRevisaoPage() {
 
     const isRascunho = portaria.status === 'RASCUNHO'
     const isProcessando = portaria.status === 'PROCESSANDO' || pollingActive
-    const dadosLista = Object.entries(portaria.dadosFormulario || {})
+    const dadosLista = Object.entries(portaria.formData || {})
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl">
@@ -213,8 +213,8 @@ function PortariaRevisaoPage() {
                                 {!uploadedFile ? (
                                     <div
                                         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${dragOver
-                                                ? 'border-primary bg-primary/5 scale-[1.01]'
-                                                : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                                            ? 'border-primary bg-primary/5 scale-[1.01]'
+                                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
                                             }`}
                                         onClick={() => fileInputRef.current?.click()}
                                         onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}

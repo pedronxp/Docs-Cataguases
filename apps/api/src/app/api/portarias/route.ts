@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
             where: {
                 ...(status && { status: status as any }),
             },
-            orderBy: { createdAt: 'desc' },
+            // orderBy: { createdAt: 'desc' },
             include: {
                 criadoPor: {
                     select: { name: true, email: true },

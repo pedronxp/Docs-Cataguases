@@ -138,7 +138,9 @@ function DashboardPage() {
                                                     <span className="text-slate-600">{atividade.mensagem}</span>
                                                 </p>
                                                 <p className="text-xs text-slate-500">
-                                                    {formatDistanceToNow(new Date(atividade.createdAt), { addSuffix: true, locale: ptBR })}
+                                                    {atividade.createdAt
+                                                        ? formatDistanceToNow(new Date(atividade.createdAt), { addSuffix: true, locale: ptBR })
+                                                        : 'Data indisponível'}
                                                 </p>
                                             </div>
                                         </div>

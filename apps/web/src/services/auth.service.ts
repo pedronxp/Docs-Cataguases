@@ -6,12 +6,12 @@ import api from '../lib/api'
 export async function login(payload: LoginRequest): Promise<Result<LoginResponse>> {
     try {
         const response = await api.post('/api/auth/login', payload)
-        const { data, token } = response.data.data
+        const { user, token } = response.data.data
 
         // Salvar token no localStorage para o interceptador Axios
         localStorage.setItem('auth-token', token)
 
-        return ok({ token, usuario: data.user || data })
+        return ok({ token, usuario: user })
     } catch (error: any) {
         const message = error.response?.data?.error || 'Erro ao realizar login'
         return err(message)

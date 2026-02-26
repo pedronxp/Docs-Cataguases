@@ -25,7 +25,7 @@ export function usePortariaWizard() {
         const res = await portariaService.criarPortaria({
             titulo: `${selectedModelo.nome} - ${new Date().toLocaleDateString()}`,
             modeloId: selectedModelo.id,
-            dadosFormulario: dados
+            formData: dados
         })
         setLoading(false)
         return res

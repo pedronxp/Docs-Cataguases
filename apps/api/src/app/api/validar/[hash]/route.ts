@@ -46,7 +46,7 @@ export async function GET(
                 status: 'VALIDO',
                 titulo: portaria.titulo,
                 numeroOficial: portaria.numeroOficial,
-                dataPublicacao: portaria.dataPublicacao || portaria.updatedAt,
+                dataPublicacao: portaria.dataPublicacao || portaria.createdAt,
                 secretaria: portaria.secretaria.nome,
                 isPublicado: portaria.status === 'PUBLICADA'
             }
