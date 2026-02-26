@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, Outlet, useLocation } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Search, FileText, Settings, Copy } from 'lucide-react'
@@ -19,8 +19,15 @@ export const Route = createFileRoute('/_sistema/admin/modelos')({
 function ModelosDocumentoPage() {
     const { toast } = useToast()
     const navigate = useNavigate()
+    const location = useLocation()
     const [modelos, setModelos] = useState<ModeloDocumento[]>([])
     const [loading, setLoading] = useState(true)
+
+    // Se a rota atual nao for exatamente /modelos, renderiza o filho (Outlet)
+    // Isso é pq o TanStack Router aninha admin.modelos.novo dentro de admin.modelos
+    if (location.pathname !== '/_sistema/admin/modelos') {
+        return <Outlet />
+    }
 
     useEffect(() => {
         loadModelos()
