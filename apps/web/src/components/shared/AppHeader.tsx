@@ -47,7 +47,7 @@ export function AppHeader({ title, actions }: AppHeaderProps) {
                             </Avatar>
                             <div className="flex flex-col items-start -space-y-0.5">
                                 <span className="text-sm font-medium text-slate-700">{usuario?.name}</span>
-                                <span className="text-xs text-slate-500 capitalize">{usuario?.role.replace('_', ' ').toLowerCase()}</span>
+                                <span className="text-xs text-slate-500 capitalize">{usuario?.role?.replace('_', ' ').toLowerCase() || 'Carregando...'}</span>
                             </div>
                         </Button>
                     </DropdownMenuTrigger>

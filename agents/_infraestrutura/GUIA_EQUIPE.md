@@ -87,6 +87,12 @@ Um "Conflito de Merge" acontece quando duas pessoas modificam a **mesma linha de
 
 > **Regra de Ouro:** Se bater o desespero e você achar que quebrou tudo durante um rebase longo ou merge complexo, aborte tudo com `git merge --abort` ou `git rebase --abort` e seu código voltará ao normal intacto.
 
+> *(Branches ativas no projeto agora — escolha uma como base se necessário):*
+> - `nova/auth/api-sistema-cadastro` (Atual / Full Refinement)
+> - `main` (Produção)
+
+> **Compatibilidade Next.js 15+:** Sempre utilize `await params` antes de acessar IDs em rotas de API. Acessar de forma síncrona causará Erro Interno (500).
+
 ---
 
 ## 🧐 4. CODE REVIEW E PULL REQUESTS (PRs)

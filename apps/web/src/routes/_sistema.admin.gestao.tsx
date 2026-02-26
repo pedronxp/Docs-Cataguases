@@ -5,14 +5,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Save, Building2, UserCircle2, CalendarDays, Plus, Trash2, ListTree, Edit2 } from 'lucide-react'
+import { Save, Building2, UserCircle2, CalendarDays, Plus, Trash2, ListTree, RefreshCw } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { listarGestoes, salvarGestao, type DadosGestao } from '@/services/gestao.service'
-import { listarSecretarias, criarSecretaria, deletarSecretaria } from '@/services/secretaria.service'
+import { listarSecretarias, criarSecretaria, deletarSecretaria, listarSetores, criarSetor, deletarSetor, type Setor } from '@/services/secretaria.service'
 import { listarUsuarios } from '@/services/usuario.service'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import type { Secretaria, Usuario, Setor } from '@/types/domain'
+import type { Secretaria, Usuario } from '@/types/domain'
 
 export const Route = createFileRoute('/_sistema/admin/gestao')({
     component: GestaoPage,
@@ -40,6 +40,8 @@ function GestaoPage() {
     const [selectedSecForSectors, setSelectedSecForSectors] = useState<Secretaria | null>(null)
     const [setores, setSetores] = useState<Setor[]>([])
     const [novoSetorNome, setNovoSetorNome] = useState('')
+    const [novoSetorSigla, setNovoSetorSigla] = useState('')
+    const [loadingSetores, setLoadingSetores] = useState(false)
 
     useEffect(() => {
         loadData()
@@ -113,7 +115,10 @@ function GestaoPage() {
             setNovaSecNome('')
             setNovaSecSigla('')
             setIsNovaSecOpen(false)
-            loadData()
+            // Pequeno delay para consistência
+            setTimeout(() => {
+                loadData()
+            }, 1000)
         }
         setSaving(false)
     }
@@ -123,7 +128,9 @@ function GestaoPage() {
             const result = await deletarSecretaria(id)
             if (result.success) {
                 toast({ title: 'Órgão removido com sucesso' })
-                loadData()
+                setTimeout(() => {
+                    loadData()
+                }, 1000)
             }
         }
     }
@@ -146,30 +153,46 @@ function GestaoPage() {
         setNovaGestaoNome('')
     }
 
-    const handleOpenSectors = (sec: Secretaria) => {
+    const handleOpenSectors = async (sec: Secretaria) => {
         setSelectedSecForSectors(sec)
-        // Mock de busca de setores
-        setSetores([
-            { id: `s1-${sec.id}`, nome: 'Departamento de Compras', secretariaId: sec.id },
-            { id: `s2-${sec.id}`, nome: 'Recursos Humanos Interno', secretariaId: sec.id },
-            { id: `s3-${sec.id}`, nome: 'Gabinete do Secretário', secretariaId: sec.id },
-        ])
+        setLoadingSetores(true)
+        const res = await listarSetores(sec.id)
+        if (res.success) setSetores(res.data)
+        setLoadingSetores(false)
     }
 
-    const handleAddSetor = () => {
-        if (!novoSetorNome || !selectedSecForSectors) return
-        const novo: Setor = {
-            id: `s-new-${Date.now()}`,
-            nome: novoSetorNome,
-            secretariaId: selectedSecForSectors.id
+    const handleAddSetor = async () => {
+        if (!novoSetorNome || !novoSetorSigla || !selectedSecForSectors) return
+        const result = await criarSetor(selectedSecForSectors.id, { nome: novoSetorNome, sigla: novoSetorSigla })
+        if (result.success) {
+            setSetores(prev => [...prev, result.data])
+            setNovoSetorNome('')
+            setNovoSetorSigla('')
+            toast({ title: 'Setor criado com sucesso' })
+        } else {
+            toast({ title: 'Erro ao criar setor', description: result.error, variant: 'destructive' })
         }
-        setSetores([...setores, novo])
-        setNovoSetorNome('')
-        toast({ title: 'Setor adicionado' })
+    }
+
+    const handleDeletarSetor = async (setorId: string) => {
+        if (!selectedSecForSectors) return
+        if (!confirm('Remover este setor?')) return
+        const result = await deletarSetor(selectedSecForSectors.id, setorId)
+        if (result.success) {
+            setSetores(prev => prev.filter(s => s.id !== setorId))
+            toast({ title: 'Setor removido' })
+        } else {
+            toast({ title: 'Erro', description: result.error, variant: 'destructive' })
+        }
     }
 
     if (loading && gestoes.length === 0) {
-        return <div className="p-6 text-sm text-slate-500 animate-pulse">Carregando dados da gestão...</div>
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4 animate-in fade-in duration-500">
+                <RefreshCw className="h-8 w-8 text-gov-blue animate-spin" />
+                <p className="text-sm text-slate-500 font-medium italic">Sincronizando dados institucionais...</p>
+            </div>
+        )
     }
 
     return (
@@ -179,14 +202,26 @@ function GestaoPage() {
                     <h2 className="text-2xl font-bold tracking-tight text-slate-800">Gestão Institucional</h2>
                     <p className="text-sm text-slate-500">Configure os nomes das autoridades organizados por mandato.</p>
                 </div>
-                <Button onClick={handleSave} disabled={saving || !activeGestao} className="bg-primary hover:bg-primary/90 text-white shadow-sm font-bold">
-                    {saving ? 'Salvando...' : (
-                        <>
-                            <Save className="mr-2 h-4 w-4" />
-                            Salvar Alterações
-                        </>
-                    )}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={loadData}
+                        disabled={loading}
+                        className={`text-slate-500 hover:text-gov-blue ${loading ? 'animate-spin' : ''}`}
+                        title="Atualizar dados"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                    </Button>
+                    <Button onClick={handleSave} disabled={saving || !activeGestao} className="bg-primary hover:bg-primary/90 text-white shadow-sm font-bold">
+                        {saving ? 'Salvando...' : (
+                            <>
+                                <Save className="mr-2 h-4 w-4" />
+                                Salvar Alterações
+                            </>
+                        )}
+                    </Button>
+                </div>
             </div>
 
             {/* Selector de Gestões */}
@@ -410,12 +445,18 @@ function GestaoPage() {
                             <Label className="text-sm font-semibold text-slate-700">Adicionar Novo Setor</Label>
                             <div className="flex gap-2">
                                 <Input
-                                    placeholder="Ex: Departamento de Compras"
+                                    placeholder="Nome (Ex: Depto. de Compras)"
                                     value={novoSetorNome}
                                     onChange={e => setNovoSetorNome(e.target.value)}
                                     className="bg-slate-50 border-slate-200"
                                 />
-                                <Button onClick={handleAddSetor} className="bg-primary hover:bg-primary/90 text-white shadow-sm font-bold">
+                                <Input
+                                    placeholder="Sigla"
+                                    value={novoSetorSigla}
+                                    onChange={e => setNovoSetorSigla(e.target.value)}
+                                    className="bg-slate-50 border-slate-200 w-24"
+                                />
+                                <Button onClick={handleAddSetor} disabled={!novoSetorNome || !novoSetorSigla} className="bg-primary hover:bg-primary/90 text-white shadow-sm font-bold">
                                     <Plus className="h-4 w-4" />
                                 </Button>
                             </div>
@@ -426,17 +467,17 @@ function GestaoPage() {
                             <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                                 {setores.length === 0 ? (
                                     <div className="text-center py-12 border-2 border-dashed border-slate-100 rounded-lg text-slate-400">
-                                        Nenhum setor cadastrado.
+                                        {loadingSetores ? 'Carregando...' : 'Nenhum setor cadastrado.'}
                                     </div>
                                 ) : (
                                     setores.map(setor => (
                                         <div key={setor.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-md shadow-sm group hover:border-[#1351B4]/30 transition-colors">
-                                            <span className="text-sm font-medium text-slate-700">{setor.nome}</span>
+                                            <div>
+                                                <span className="text-sm font-medium text-slate-700">{setor.nome}</span>
+                                                <span className="ml-2 text-xs font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{setor.sigla}</span>
+                                            </div>
                                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-blue-600">
-                                                    <Edit2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-500">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-500" onClick={() => handleDeletarSetor(setor.id)}>
                                                     <Trash2 className="h-3.5 w-3.5" />
                                                 </Button>
                                             </div>

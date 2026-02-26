@@ -21,7 +21,9 @@ import { Route as AuthOnboardingRouteImport } from './routes/_auth.onboarding'
 import { Route as AuthLoginRouteImport } from './routes/_auth.login'
 import { Route as AuthAguardandoRouteImport } from './routes/_auth.aguardando'
 import { Route as SistemaAdminVariaveisRouteImport } from './routes/_sistema.admin.variaveis'
+import { Route as SistemaAdminUsuariosOrgaoRouteImport } from './routes/_sistema.admin.usuarios-orgao'
 import { Route as SistemaAdminUsuariosRouteImport } from './routes/_sistema.admin.usuarios'
+import { Route as SistemaAdminOrganogramaRouteImport } from './routes/_sistema.admin.organograma'
 import { Route as SistemaAdminModelosRouteImport } from './routes/_sistema.admin.modelos'
 import { Route as SistemaAdminLivrosRouteImport } from './routes/_sistema.admin.livros'
 import { Route as SistemaAdminGestaoRouteImport } from './routes/_sistema.admin.gestao'
@@ -89,9 +91,20 @@ const SistemaAdminVariaveisRoute = SistemaAdminVariaveisRouteImport.update({
   path: '/admin/variaveis',
   getParentRoute: () => SistemaRoute,
 } as any)
+const SistemaAdminUsuariosOrgaoRoute =
+  SistemaAdminUsuariosOrgaoRouteImport.update({
+    id: '/admin/usuarios-orgao',
+    path: '/admin/usuarios-orgao',
+    getParentRoute: () => SistemaRoute,
+  } as any)
 const SistemaAdminUsuariosRoute = SistemaAdminUsuariosRouteImport.update({
   id: '/admin/usuarios',
   path: '/admin/usuarios',
+  getParentRoute: () => SistemaRoute,
+} as any)
+const SistemaAdminOrganogramaRoute = SistemaAdminOrganogramaRouteImport.update({
+  id: '/admin/organograma',
+  path: '/admin/organograma',
   getParentRoute: () => SistemaRoute,
 } as any)
 const SistemaAdminModelosRoute = SistemaAdminModelosRouteImport.update({
@@ -154,7 +167,9 @@ export interface FileRoutesByFullPath {
   '/admin/gestao': typeof SistemaAdminGestaoRoute
   '/admin/livros': typeof SistemaAdminLivrosRoute
   '/admin/modelos': typeof SistemaAdminModelosRoute
+  '/admin/organograma': typeof SistemaAdminOrganogramaRoute
   '/admin/usuarios': typeof SistemaAdminUsuariosRoute
+  '/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
   '/administrativo/portarias/novo': typeof SistemaAdministrativoPortariasNovoRoute
@@ -176,7 +191,9 @@ export interface FileRoutesByTo {
   '/admin/gestao': typeof SistemaAdminGestaoRoute
   '/admin/livros': typeof SistemaAdminLivrosRoute
   '/admin/modelos': typeof SistemaAdminModelosRoute
+  '/admin/organograma': typeof SistemaAdminOrganogramaRoute
   '/admin/usuarios': typeof SistemaAdminUsuariosRoute
+  '/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
   '/administrativo/portarias/novo': typeof SistemaAdministrativoPortariasNovoRoute
@@ -200,7 +217,9 @@ export interface FileRoutesById {
   '/_sistema/admin/gestao': typeof SistemaAdminGestaoRoute
   '/_sistema/admin/livros': typeof SistemaAdminLivrosRoute
   '/_sistema/admin/modelos': typeof SistemaAdminModelosRoute
+  '/_sistema/admin/organograma': typeof SistemaAdminOrganogramaRoute
   '/_sistema/admin/usuarios': typeof SistemaAdminUsuariosRoute
+  '/_sistema/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/_sistema/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/_sistema/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
   '/_sistema/administrativo/portarias/novo': typeof SistemaAdministrativoPortariasNovoRoute
@@ -224,7 +243,9 @@ export interface FileRouteTypes {
     | '/admin/gestao'
     | '/admin/livros'
     | '/admin/modelos'
+    | '/admin/organograma'
     | '/admin/usuarios'
+    | '/admin/usuarios-orgao'
     | '/admin/variaveis'
     | '/administrativo/portarias/$id'
     | '/administrativo/portarias/novo'
@@ -246,7 +267,9 @@ export interface FileRouteTypes {
     | '/admin/gestao'
     | '/admin/livros'
     | '/admin/modelos'
+    | '/admin/organograma'
     | '/admin/usuarios'
+    | '/admin/usuarios-orgao'
     | '/admin/variaveis'
     | '/administrativo/portarias/$id'
     | '/administrativo/portarias/novo'
@@ -269,7 +292,9 @@ export interface FileRouteTypes {
     | '/_sistema/admin/gestao'
     | '/_sistema/admin/livros'
     | '/_sistema/admin/modelos'
+    | '/_sistema/admin/organograma'
     | '/_sistema/admin/usuarios'
+    | '/_sistema/admin/usuarios-orgao'
     | '/_sistema/admin/variaveis'
     | '/_sistema/administrativo/portarias/$id'
     | '/_sistema/administrativo/portarias/novo'
@@ -369,11 +394,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SistemaAdminVariaveisRouteImport
       parentRoute: typeof SistemaRoute
     }
+    '/_sistema/admin/usuarios-orgao': {
+      id: '/_sistema/admin/usuarios-orgao'
+      path: '/admin/usuarios-orgao'
+      fullPath: '/admin/usuarios-orgao'
+      preLoaderRoute: typeof SistemaAdminUsuariosOrgaoRouteImport
+      parentRoute: typeof SistemaRoute
+    }
     '/_sistema/admin/usuarios': {
       id: '/_sistema/admin/usuarios'
       path: '/admin/usuarios'
       fullPath: '/admin/usuarios'
       preLoaderRoute: typeof SistemaAdminUsuariosRouteImport
+      parentRoute: typeof SistemaRoute
+    }
+    '/_sistema/admin/organograma': {
+      id: '/_sistema/admin/organograma'
+      path: '/admin/organograma'
+      fullPath: '/admin/organograma'
+      preLoaderRoute: typeof SistemaAdminOrganogramaRouteImport
       parentRoute: typeof SistemaRoute
     }
     '/_sistema/admin/modelos': {
@@ -460,7 +499,9 @@ interface SistemaRouteChildren {
   SistemaAdminGestaoRoute: typeof SistemaAdminGestaoRoute
   SistemaAdminLivrosRoute: typeof SistemaAdminLivrosRoute
   SistemaAdminModelosRoute: typeof SistemaAdminModelosRoute
+  SistemaAdminOrganogramaRoute: typeof SistemaAdminOrganogramaRoute
   SistemaAdminUsuariosRoute: typeof SistemaAdminUsuariosRoute
+  SistemaAdminUsuariosOrgaoRoute: typeof SistemaAdminUsuariosOrgaoRoute
   SistemaAdminVariaveisRoute: typeof SistemaAdminVariaveisRoute
   SistemaAdministrativoPortariasIdRoute: typeof SistemaAdministrativoPortariasIdRoute
   SistemaAdministrativoPortariasNovoRoute: typeof SistemaAdministrativoPortariasNovoRoute
@@ -477,7 +518,9 @@ const SistemaRouteChildren: SistemaRouteChildren = {
   SistemaAdminGestaoRoute: SistemaAdminGestaoRoute,
   SistemaAdminLivrosRoute: SistemaAdminLivrosRoute,
   SistemaAdminModelosRoute: SistemaAdminModelosRoute,
+  SistemaAdminOrganogramaRoute: SistemaAdminOrganogramaRoute,
   SistemaAdminUsuariosRoute: SistemaAdminUsuariosRoute,
+  SistemaAdminUsuariosOrgaoRoute: SistemaAdminUsuariosOrgaoRoute,
   SistemaAdminVariaveisRoute: SistemaAdminVariaveisRoute,
   SistemaAdministrativoPortariasIdRoute: SistemaAdministrativoPortariasIdRoute,
   SistemaAdministrativoPortariasNovoRoute:

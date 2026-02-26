@@ -18,13 +18,7 @@ export const Route = createFileRoute('/validar')({
     component: ValidarPage,
 })
 
-// --- Mock lookup by hash ---
-async function buscarPorHash(hash: string): Promise<Portaria | null> {
-    // Em produção consultaria o banco via hash SHA256
-    const res = await portariaService.listarPortarias()
-    if (!res.success) return null
-    return res.data.data.find(p => p.hashAssinatura === hash || p.id === hash) ?? null
-}
+// --- Real lookup moved to portariaService.validarDocumento ---
 
 type VerificationState = 'idle' | 'loading' | 'valid' | 'invalid'
 
@@ -44,11 +38,10 @@ function ValidarPage() {
         if (!query.trim()) return
         setState('loading')
         setPortaria(null)
-        // pequeno delay para UX
-        await new Promise(r => setTimeout(r, 800))
-        const found = await buscarPorHash(query.trim())
-        if (found && found.status === 'PUBLICADA') {
-            setPortaria(found)
+
+        const res = await portariaService.validarDocumento(query.trim())
+        if (res.success && res.data.status === 'PUBLICADA') {
+            setPortaria(res.data)
             setState('valid')
         } else {
             setState('invalid')
@@ -137,8 +130,8 @@ function ValidarPage() {
                             <CertRow label="Título" value={portaria.titulo} />
                             <CertRow label="Número Oficial" value={portaria.numeroOficial ?? '—'} />
                             <CertRow label="Data de Publicação" value={new Date(portaria.updatedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })} />
-                            <CertRow label="Hash de Autenticidade" value={portaria.hashAssinatura ?? '—'} mono />
-                            <CertRow label="Secretaria Emissora" value={portaria.secretariaId} />
+                            <CertRow label="Hash de Autenticidade" value={(portaria as any).hashIntegridade ?? portaria.hashAssinatura ?? '—'} mono />
+                            <CertRow label="Secretaria Emissora" value={portaria.secretaria?.nome || portaria.secretariaId} />
                         </div>
 
                         <div className="flex items-start gap-2 px-1">
@@ -173,23 +166,7 @@ function ValidarPage() {
                     </div>
                 )}
 
-                {/* Exemplos de teste (só em DEV) */}
-                {import.meta.env.DEV && state === 'idle' && (
-                    <div className="mt-10 p-4 bg-amber-50 border border-amber-200 rounded-lg max-w-xl w-full">
-                        <p className="text-xs font-black text-amber-700 uppercase tracking-wider mb-2">🧪 Códigos de teste (DEV)</p>
-                        <div className="flex flex-wrap gap-2">
-                            {['port-001', 'sha256-abc123def456'].map(code => (
-                                <button
-                                    key={code}
-                                    className="text-xs font-mono bg-white border border-amber-200 px-2 py-1 rounded text-amber-800 hover:border-amber-400 transition-colors"
-                                    onClick={() => { setCodigo(code); handleVerificar(code) }}
-                                >
-                                    {code}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                {/* Seção de códigos de teste removida (Produção) */}
             </main>
 
             {/* Rodapé */}

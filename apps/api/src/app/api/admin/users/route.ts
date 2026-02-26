@@ -8,10 +8,20 @@ export async function GET(request: Request) {
     try {
         const session = await getAuthUser()
 
+        // DEBUG: Log session to a file since terminal output is hard to read
+        try {
+            const fs = require('fs')
+            fs.appendFileSync('auth_debug.log', `[${new Date().toISOString()}] Session: ${JSON.stringify(session)}\n`)
+        } catch (e) { }
+
         // Apenas admins podem listar todos os usuários
         if (!session || session.role !== 'ADMIN_GERAL') {
             return NextResponse.json(
-                { success: false, error: 'Não autorizado. Apenas administradores podem acessar esta lista.' },
+                {
+                    success: false,
+                    error: `Não autorizado. Sua role atual é: ${session?.role || 'Visitante (Sem Token)'}.`,
+                    debug: { session: !!session }
+                },
                 { status: 403 }
             )
         }

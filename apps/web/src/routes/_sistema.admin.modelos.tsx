@@ -1,13 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Search, FileText, Settings, Copy, Power } from 'lucide-react'
+import { Plus, Search, FileText, Settings, Copy } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
+import { useState, useEffect } from 'react'
+import { modeloService } from '@/services/modelo.service'
+import type { ModeloDocumento } from '@/types/domain'
 
 export const Route = createFileRoute('/_sistema/admin/modelos')({
     component: ModelosDocumentoPage,
@@ -15,6 +18,23 @@ export const Route = createFileRoute('/_sistema/admin/modelos')({
 
 function ModelosDocumentoPage() {
     const { toast } = useToast()
+    const [modelos, setModelos] = useState<ModeloDocumento[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        loadModelos()
+    }, [])
+
+    async function loadModelos() {
+        setLoading(true)
+        const res = await modeloService.listarModelos()
+        if (res.success) {
+            setModelos(res.data)
+        } else {
+            toast({ title: 'Erro ao carregar modelos', description: res.error, variant: 'destructive' })
+        }
+        setLoading(false)
+    }
 
     const handleAcao = (acao: string) => {
         toast({
@@ -58,81 +78,56 @@ function ModelosDocumentoPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody className="bg-white">
-                            {/* Mock Modelo 1 */}
-                            <TableRow className="hover:bg-slate-50 transition-colors">
-                                <TableCell>
-                                    <div className="flex items-start gap-3">
-                                        <div className="mt-1 p-1.5 bg-blue-50 text-[#1351B4] rounded-md">
-                                            <FileText className="h-4 w-4" />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="font-semibold text-slate-800">Portaria de Nomeação (Padrão)</span>
-                                            <span className="text-xs text-slate-500 line-clamp-1 mt-0.5">Template oficial para nomeação de comissões e cargos.</span>
-                                        </div>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className="text-slate-600 bg-slate-50 border-slate-200 font-normal">
-                                        Todas (Global)
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant="secondary" className="bg-blue-50 text-[#1351B4]">4 Variáveis</Badge>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className="text-emerald-700 border-emerald-300 bg-emerald-50">Ativo</Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        <Button onClick={() => handleAcao('Duplicar')} variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Duplicar">
-                                            <Copy className="h-4 w-4" />
-                                        </Button>
-                                        <Button onClick={() => handleAcao('Configurar')} variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Configurar">
-                                            <Settings className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-
-                            {/* Mock Modelo 2 */}
-                            <TableRow className="hover:bg-slate-50 transition-colors">
-                                <TableCell>
-                                    <div className="flex items-start gap-3">
-                                        <div className="mt-1 p-1.5 bg-slate-100 text-slate-500 rounded-md">
-                                            <FileText className="h-4 w-4" />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="font-medium text-slate-700">Portaria de Férias (Específica)</span>
-                                            <span className="text-xs text-slate-500 line-clamp-1 mt-0.5">Concessão de férias regulamentares ao servidor.</span>
-                                        </div>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className="text-slate-600 bg-slate-50 border-slate-200 font-normal">
-                                        Sec. de Administração
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant="secondary" className="bg-blue-50 text-[#1351B4]">2 Variáveis</Badge>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className="text-slate-500 border-slate-300 bg-slate-50">Inativo</Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        <Button onClick={() => handleAcao('Ativar')} variant="ghost" size="icon" className="text-slate-500 hover:text-emerald-600" title="Ativar">
-                                            <Power className="h-4 w-4" />
-                                        </Button>
-                                        <Button onClick={() => handleAcao('Configurar')} variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Configurar">
-                                            <Settings className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">Carregando modelos...</TableCell>
+                                </TableRow>
+                            ) : modelos.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">Nenhum modelo cadastrado.</TableCell>
+                                </TableRow>
+                            ) : (
+                                modelos.map(modelo => (
+                                    <TableRow key={modelo.id} className="hover:bg-slate-50 transition-colors">
+                                        <TableCell>
+                                            <div className="flex items-start gap-3">
+                                                <div className="mt-1 p-1.5 bg-blue-50 text-[#1351B4] rounded-md">
+                                                    <FileText className="h-4 w-4" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="font-semibold text-slate-800">{modelo.nome}</span>
+                                                    <span className="text-xs text-slate-500 line-clamp-1 mt-0.5">{modelo.descricao}</span>
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className="text-slate-600 bg-slate-50 border-slate-200 font-normal">
+                                                {modelo.secretariaId ? 'Secretaria' : 'Todas (Global)'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="secondary" className="bg-blue-50 text-[#1351B4]">{modelo.variaveis.length} Variáveis</Badge>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className={modelo.ativo ? "text-emerald-700 border-emerald-300 bg-emerald-50" : "text-slate-500 border-slate-300 bg-slate-50"}>
+                                                {modelo.ativo ? 'Ativo' : 'Inativo'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button onClick={() => handleAcao('Duplicar')} variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Duplicar">
+                                                    <Copy className="h-4 w-4" />
+                                                </Button>
+                                                <Button onClick={() => handleAcao('Configurar')} variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Configurar">
+                                                    <Settings className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>

@@ -9,6 +9,7 @@ async function main() {
     const users = [
         {
             name: 'Admin Geral',
+            username: 'admin.geral',
             email: 'admin@cataguases.mg.gov.br',
             password,
             role: 'ADMIN_GERAL',
@@ -16,6 +17,7 @@ async function main() {
         },
         {
             name: 'Prefeito',
+            username: 'prefeito',
             email: 'prefeito@cataguases.mg.gov.br',
             password,
             role: 'PREFEITO',
@@ -23,6 +25,7 @@ async function main() {
         },
         {
             name: 'Secretário',
+            username: 'secretario',
             email: 'secretario@cataguases.mg.gov.br',
             password,
             role: 'SECRETARIO',
@@ -30,6 +33,7 @@ async function main() {
         },
         {
             name: 'Operador',
+            username: 'operador',
             email: 'operador@cataguases.mg.gov.br',
             password,
             role: 'OPERADOR',

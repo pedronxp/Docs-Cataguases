@@ -3,79 +3,92 @@ import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
-import { buildAbility } from '@/lib/ability'
-import { z } from 'zod'
 
-const secretariaSchema = z.object({
-    nome: z.string().min(1),
-    sigla: z.string().min(1),
-    cor: z.string().regex(/^#[0-9A-F]{6}$/i).default('#6366f1'),
-})
+const GESTAO_KEY = 'SYS_GESTAO_DADOS'
 
-const setorSchema = z.object({
-    nome: z.string().min(1),
-    sigla: z.string().min(1),
-    secretariaId: z.string().min(1),
-})
-
-export async function GET(req: NextRequest) {
+// GET /api/admin/gestao
+export async function GET() {
     try {
         const usuario = await getAuthUser()
         if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-        const { searchParams } = new URL(req.url)
-        const type = searchParams.get('type') // 'secretaria' ou 'setor'
+        const config = await prisma.variavelSistema.findUnique({
+            where: { chave: GESTAO_KEY }
+        })
 
-        if (type === 'setor') {
-            const secId = searchParams.get('secretariaId')
-            const setores = await prisma.setor.findMany({
-                where: secId ? { secretariaId: secId } : {},
-                include: { secretaria: true },
-                orderBy: { nome: 'asc' }
-            })
-            return NextResponse.json({ success: true, data: setores })
+        if (!config) {
+            // Se não existir, retorna um estado inicial padrão para não quebrar o frontend
+            const defaultGestao = [{
+                id: 'gestao-atual',
+                nomeGestao: 'Gestão Atual',
+                dataInicio: '',
+                dataFim: '',
+                prefeito: '',
+                vicePrefeito: '',
+                chefeGabinete: '',
+                secretarios: {}
+            }]
+            return NextResponse.json({ success: true, data: defaultGestao })
         }
 
-        const secretarias = await prisma.secretaria.findMany({
-            where: { ativo: true },
-            include: { setores: true },
-            orderBy: { nome: 'asc' }
-        })
-        return NextResponse.json({ success: true, data: secretarias })
+        const data = JSON.parse(config.valor)
+        return NextResponse.json({ success: true, data: data })
     } catch (error) {
-        return NextResponse.json({ error: 'Erro ao listar estrutura municipal' }, { status: 500 })
+        console.error('Erro ao listar gestões:', error)
+        return NextResponse.json({ success: false, error: 'Erro ao listar gestões' }, { status: 500 })
     }
 }
 
+// POST /api/admin/gestao
 export async function POST(req: NextRequest) {
     try {
         const usuario = await getAuthUser()
-        if (!usuario || usuario.role !== 'ADMIN_GERAL') {
-            return NextResponse.json({ error: 'Apenas administradores podem gerenciar a estrutura' }, { status: 403 })
+        if (!usuario || (usuario as any).role !== 'ADMIN_GERAL') {
+            return NextResponse.json({ error: 'Apenas administradores podem gerenciar a gestão' }, { status: 403 })
         }
 
         const body = await req.json()
-        const { type, ...data } = body
 
-        if (type === 'secretaria') {
-            const parsed = secretariaSchema.safeParse(data)
-            if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+        // Formato esperado: DadosGestao ou DadosGestao[]
+        // O frontend envia um objeto único ao salvar (handleSave)
+        // mas a página espera receber um array no GET.
+        // Vamos normalizar para sempre salvar o estado completo.
 
-            const sec = await prisma.secretaria.create({ data: parsed.data })
-            return NextResponse.json({ success: true, data: sec })
+        let gestaoParaSalvar: any[] = []
+
+        // Se recebermos um objeto único (vários campos de gestão), encontramos no array atual e atualizamos
+        const configAtual = await prisma.variavelSistema.findUnique({ where: { chave: GESTAO_KEY } })
+        let gestoesAtuais = configAtual ? JSON.parse(configAtual.valor) : []
+        if (!Array.isArray(gestoesAtuais)) gestoesAtuais = []
+
+        if (body.id) {
+            // É um objeto de DadosGestao
+            const existe = gestoesAtuais.findIndex((g: any) => g.id === body.id)
+            if (existe >= 0) {
+                gestoesAtuais[existe] = body
+            } else {
+                gestoesAtuais.unshift(body)
+            }
+            gestaoParaSalvar = gestoesAtuais
+        } else if (Array.isArray(body)) {
+            gestaoParaSalvar = body
+        } else {
+            return NextResponse.json({ success: false, error: 'Formato de dados inválido' }, { status: 400 })
         }
 
-        if (type === 'setor') {
-            const parsed = setorSchema.safeParse(data)
-            if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+        const v = await prisma.variavelSistema.upsert({
+            where: { chave: GESTAO_KEY },
+            update: { valor: JSON.stringify(gestaoParaSalvar) },
+            create: {
+                chave: GESTAO_KEY,
+                valor: JSON.stringify(gestaoParaSalvar),
+                descricao: 'Dados institucional da Gestão Municipal (Prefeito, Secretários, etc)'
+            }
+        })
 
-            const setor = await prisma.setor.create({ data: parsed.data })
-            return NextResponse.json({ success: true, data: setor })
-        }
-
-        return NextResponse.json({ error: 'Tipo inválido (secretaria ou setor)' }, { status: 400 })
+        return NextResponse.json({ success: true, data: body })
     } catch (error) {
-        console.error('Erro na gestão municipal:', error)
-        return NextResponse.json({ error: 'Erro interno ao salvar estrutura' }, { status: 500 })
+        console.error('Erro ao salvar gestão:', error)
+        return NextResponse.json({ success: false, error: 'Erro interno ao salvar gestão' }, { status: 500 })
     }
 }

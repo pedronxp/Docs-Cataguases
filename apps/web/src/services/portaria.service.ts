@@ -11,8 +11,9 @@ export async function listarPortarias(
 ): Promise<Result<PaginatedResponse<Portaria>>> {
     try {
         const response = await api.get('/api/portarias', { params })
-        // A API real pode retornar o array direto ou com metadados de paginação
-        const data = response.data.data
+        const raw = response.data
+        // Aceita array direto ou envolto em { success, data }
+        const data = Array.isArray(raw) ? raw : (raw.data || [])
         return ok({
             data,
             total: data.length, // Ajustar conforme implementação de paginação real no backend
@@ -115,6 +116,15 @@ export async function assinarLote(ids: string[]): Promise<Result<Portaria[]>> {
     }
 }
 
+export async function validarDocumento(hash: string): Promise<Result<Portaria>> {
+    try {
+        const response = await api.get('/api/public/validar', { params: { hash } })
+        return ok(response.data.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Documento não localizado ou inválido')
+    }
+}
+
 export const portariaService = {
     listarPortarias,
     buscarPortaria,
@@ -127,4 +137,5 @@ export const portariaService = {
     aprovarPortaria,
     rejeitarPortaria,
     publicarPortaria,
+    validarDocumento,
 }

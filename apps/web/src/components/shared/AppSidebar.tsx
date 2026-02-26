@@ -1,7 +1,7 @@
 import { useAbility } from '@casl/react'
 import { AbilityContext } from '@/lib/ability'
 import { Link, useRouterState } from '@tanstack/react-router'
-import { LayoutDashboard, FileText, Users, Settings, BookOpen, Braces, Archive, Building2, BarChart2 } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, Settings, BookOpen, Braces, Archive, Building2, BarChart2, Network } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 type NavItem = {
@@ -19,10 +19,12 @@ const NAV_ITEMS: NavItem[] = [
     { to: '/acervo', label: 'Acervo Documental', icon: Archive, action: 'ler', subject: 'Portaria' },
     { to: '/admin/modelos', label: 'Modelos', icon: BookOpen, action: 'gerenciar', subject: 'Modelo' },
     { to: '/admin/gestao', label: 'Gestão Institucional', icon: Building2, action: 'gerenciar', subject: 'Secretaria' },
+    { to: '/admin/organograma', label: 'Órgãos e Setores', icon: Building2, action: 'gerenciar', subject: 'Secretaria' },
     { to: '/admin/variaveis', label: 'Variáveis Globais', icon: Braces, action: 'gerenciar', subject: 'VariavelSistema' },
     { to: '/admin/livros', label: 'Numeração', icon: Settings, action: 'gerenciar', subject: 'LivroNumeracao' },
     { to: '/admin/analytics', label: 'Painel Analytics', icon: BarChart2, action: 'gerenciar', subject: 'Usuario' },
     { to: '/admin/usuarios', label: 'Usuários', icon: Users, action: 'gerenciar', subject: 'Usuario' },
+    { to: '/admin/usuarios-orgao', label: 'Usuários por Órgão', icon: Network, action: 'gerenciar', subject: 'Usuario' },
     { to: '/tutorial', label: 'Tutorial', icon: BookOpen, action: 'ler', subject: 'Portaria' },
 ]
 

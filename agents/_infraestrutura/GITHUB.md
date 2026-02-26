@@ -75,8 +75,8 @@ Apresente no chat o formulário interativo abaixo:
 > - [1] **Tarefa de um Modulo (Branch Filha)** ➡️ *Nasce da branch `modulo/` e o PR volta para ela, mantendo a `main` segura.*
 > 
 > *(Branches ativas no projeto agora — escolha uma como base se necessário):*
-> - [2] `[Nome Branch Ativa / Modulo 1]`
-> - [3] `[Nome Branch Ativa / Modulo 2]`
+> - [2] `nova/auth/api-sistema-cadastro` (Atual / Full Refinement)
+> - [3] `main` (Produção)
 > 
 > Digite sua resposta (Ex: Q1: 1 core, Q2: 0, Q3: 1).
 

@@ -37,6 +37,16 @@ Todo handler DEVE seguir este pipeline. Não pule etapas, não inverta a ordem.
 4. prisma.$transaction()   → lógica de negócio isolada no service
 5. feed.criarEvento()      → auditoria de toda mutação
 6. NextResponse.json()     → resposta tipada e padronizada
+
+### ⚠️ REGRA NEXT.JS 15+ (CRÍTICO)
+As propriedades `params` e `searchParams` em Route Handlers de API agora são **Promises**. Você DEVE sempre desestruturá-las após o `await`:
+```typescript
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  // ...
+}
+```
+A falha em dar `await` nos `params` resultará em um "Erro Interno" (500) em tempo de execução.
 ```
 
 ```typescript

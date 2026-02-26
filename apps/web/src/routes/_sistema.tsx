@@ -13,6 +13,7 @@ const ROUTE_TITLES: Record<string, string> = {
     '/dashboard': 'Visão Geral',
     '/administrativo/portarias': 'Gestão de Portarias',
     '/admin/usuarios': 'Controle de Acessos',
+    '/admin/usuarios-orgao': 'Usuários por Órgão',
     '/admin/modelos': 'Modelos de Documento',
     '/admin/variaveis': 'Variáveis Globais',
     '/admin/livros': 'Livros de Numeração',

@@ -177,6 +177,42 @@ export class PortariaService {
     }
 
     /**
+     * Busca uma portaria pelo hash de integridade ou ID (para validação pública).
+     * Retorna apenas campos seguros para exibição pública.
+     */
+    static async buscarPorHash(query: string): Promise<Result<any>> {
+        try {
+            const portaria = await prisma.portaria.findFirst({
+                where: {
+                    OR: [
+                        { hashIntegridade: query },
+                        { id: query }
+                    ],
+                    status: 'PUBLICADA' // Só permite validar portarias já publicadas
+                },
+                select: {
+                    id: true,
+                    titulo: true,
+                    numeroOficial: true,
+                    status: true,
+                    hashIntegridade: true,
+                    dataPublicacao: true,
+                    updatedAt: true,
+                    secretaria: {
+                        select: { nome: true, sigla: true }
+                    }
+                }
+            })
+
+            if (!portaria) return err('Documento não localizado ou ainda não publicado.')
+            return ok(portaria)
+        } catch (error) {
+            console.error('Erro ao buscar portaria por hash:', error)
+            return err('Erro na consulta de validação.')
+        }
+    }
+
+    /**
      * Helper para registro de eventos no feed.
      */
     private static async registrarEvento(data: {

@@ -89,6 +89,10 @@
   - [x] `feat(admin)`: `GET + PATCH + DELETE /api/admin/modelos/[id]` — detalhe e edição <!-- id: 46 -->
   - [x] `feat(admin)`: `GET + POST + PATCH /api/admin/variaveis` — variáveis de sistema (SYS_*) <!-- id: 9 -->
   - [x] `feat(admin)`: `GET + POST /api/admin/gestao` — gestão municipal (secretarias e setores) <!-- id: 10 -->
+    - [x] Refinamento: Soft Delete e Reativação Automática de Órgãos
+    - [x] Refinamento: Soft Delete de Setores
+    - [x] Refinamento: Compatibilidade Next.js 15+ (Await Params)
+    - [x] Correção: Persistência JSON de Gabinete via `VariavelSistema`
   - [x] `feat(core)`: `POST /api/upload` — upload de arquivos DOCX para modelos <!-- id: 11 -->
 
 ### 🟢 Fase 3: Feed e Integração (CONCLUÍDO)

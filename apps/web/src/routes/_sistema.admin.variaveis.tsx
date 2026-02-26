@@ -7,12 +7,35 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { useState, useEffect } from 'react'
+import { variavelService } from '@/services/variavel.service'
+import type { VariavelSistema } from '@/types/domain'
+import { useToast } from '@/hooks/use-toast'
 
 export const Route = createFileRoute('/_sistema/admin/variaveis')({
     component: VariaveisGlobaisPage,
 })
 
 function VariaveisGlobaisPage() {
+    const { toast } = useToast()
+    const [variaveis, setVariaveis] = useState<VariavelSistema[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        loadVariaveis()
+    }, [])
+
+    async function loadVariaveis() {
+        setLoading(true)
+        const res = await variavelService.listarVariaveis()
+        if (res.success) {
+            setVariaveis(res.data)
+        } else {
+            toast({ title: 'Erro ao carregar variáveis', description: res.error, variant: 'destructive' })
+        }
+        setLoading(false)
+    }
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -48,60 +71,51 @@ function VariaveisGlobaisPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody className="bg-white">
-                            {/* Mock Variavel Dinamica */}
-                            <TableRow className="hover:bg-slate-50 transition-colors">
-                                <TableCell>
-                                    <div className="flex items-center gap-2">
-                                        <Variable className="h-4 w-4 text-emerald-600" />
-                                        <span className="font-mono text-sm font-semibold text-slate-800">{"{{NUMERO_PORTARIA}}"}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <span className="text-sm font-mono text-slate-500 italic">Autogerado via Livro</span>
-                                </TableCell>
-                                <TableCell>
-                                    <span className="text-sm text-slate-600">Retorna o número oficial da portaria no padrão XXX/ANO.</span>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className="text-emerald-700 border-emerald-300 bg-emerald-50">Dinâmica</Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        <Button variant="ghost" size="icon" className="text-slate-400" disabled title="Sistema">
-                                            <Edit className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-
-                            {/* Mock Variavel Estática */}
-                            <TableRow className="hover:bg-slate-50 transition-colors">
-                                <TableCell>
-                                    <div className="flex items-center gap-2">
-                                        <Variable className="h-4 w-4 text-[#1351B4]" />
-                                        <span className="font-mono text-sm font-semibold text-slate-800">{"{{NOME_PREFEITO}}"}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <span className="text-sm text-slate-800 font-medium">José da Silva Pereira</span>
-                                </TableCell>
-                                <TableCell>
-                                    <span className="text-sm text-slate-600">Nome completo do atual gestor do executivo.</span>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="secondary" className="bg-blue-50 text-[#1351B4]">Estática</Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        <Button variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Editar">
-                                            <Edit className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="text-slate-500 hover:text-rose-600" title="Remover">
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">Carregando variáveis...</TableCell>
+                                </TableRow>
+                            ) : variaveis.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">Nenhuma variável cadastrada.</TableCell>
+                                </TableRow>
+                            ) : (
+                                variaveis.map(v => (
+                                    <TableRow key={v.id} className="hover:bg-slate-50 transition-colors">
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <Variable className={v.resolvidaAutomaticamente ? "h-4 w-4 text-emerald-600" : "h-4 w-4 text-[#1351B4]"} />
+                                                <span className="font-mono text-sm font-semibold text-slate-800">{`{{${v.chave}}}`}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className={v.resolvidaAutomaticamente ? "text-sm font-mono text-slate-500 italic" : "text-sm text-slate-800 font-medium"}>
+                                                {v.resolvidaAutomaticamente ? 'Autogerado via Sistema' : v.valor}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-sm text-slate-600">{v.descricao}</span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={v.resolvidaAutomaticamente ? "outline" : "secondary"} className={v.resolvidaAutomaticamente ? "text-emerald-700 border-emerald-300 bg-emerald-50" : "bg-blue-50 text-[#1351B4]"}>
+                                                {v.resolvidaAutomaticamente ? 'Dinamica' : 'Estática'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Editar">
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                {!v.resolvidaAutomaticamente && (
+                                                    <Button variant="ghost" size="icon" className="text-slate-500 hover:text-rose-600" title="Remover">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>

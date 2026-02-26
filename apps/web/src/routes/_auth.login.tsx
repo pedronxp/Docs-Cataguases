@@ -10,6 +10,8 @@ import { useAuthStore } from '@/store/auth.store'
 import { Eye, EyeOff, Building2 } from 'lucide-react'
 import { useState } from 'react'
 
+import api from '@/lib/api'
+
 export const Route = createFileRoute('/_auth/login')({
     component: LoginPage,
 })
@@ -18,22 +20,42 @@ function LoginPage() {
     const navigate = useNavigate()
     const setSession = useAuthStore(s => s.setSession)
     const [showPassword, setShowPassword] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
 
     const form = useForm<LoginForm>({
         resolver: zodResolver(loginSchema),
         defaultValues: { email: '', password: '' },
     })
 
-    const onSubmit = (data: LoginForm) => {
-        // Mock login para o frontend-first
-        setSession(
-            {
-                id: '1', name: 'Administrador Gov', email: data.email, role: 'ADMIN_GERAL',
-                ativo: true, permissoesExtra: [], secretariaId: null, setorId: null, createdAt: new Date().toISOString()
-            },
-            'fake-jwt-token'
-        )
-        navigate({ to: '/dashboard' })
+    const onSubmit = async (data: LoginForm) => {
+        setIsLoading(true)
+        setError(null)
+        try {
+            const response = await api.post('/api/auth/login', {
+                email: data.email,
+                password: data.password
+            })
+
+            if (response.data.success) {
+                const { user, token } = response.data.data
+                setSession(user, token)
+
+                // Redirecionamento baseado no role
+                if (user.role === 'PENDENTE') {
+                    navigate({ to: user.secretariaId ? '/aguardando' : '/onboarding' })
+                } else {
+                    navigate({ to: '/dashboard' })
+                }
+            } else {
+                setError(response.data.error || 'Erro ao realizar login')
+            }
+        } catch (err: any) {
+            console.error('Login error:', err)
+            setError(err.response?.data?.error || 'Email/Username ou senha inválidos')
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -54,6 +76,11 @@ function LoginPage() {
                     <div className="h-px bg-slate-100 w-full mb-6" />
                 </div>
                 <CardContent>
+                    {error && (
+                        <div className="mb-4 p-3 rounded-md bg-red-50 text-red-600 text-sm border border-red-100">
+                            {error}
+                        </div>
+                    )}
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                             <FormField
@@ -63,7 +90,7 @@ function LoginPage() {
                                     <FormItem>
                                         <FormLabel className="text-slate-700">E-mail ou Username</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="seu.usuario ou email@provedor.com" className="border-slate-300" {...field} />
+                                            <Input disabled={isLoading} placeholder="seu.usuario ou email@provedor.com" className="border-slate-300" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -78,6 +105,7 @@ function LoginPage() {
                                         <FormControl>
                                             <div className="relative">
                                                 <Input
+                                                    disabled={isLoading}
                                                     type={showPassword ? "text" : "password"}
                                                     placeholder="••••••••"
                                                     className="border-slate-300 pr-10"
@@ -85,6 +113,7 @@ function LoginPage() {
                                                 />
                                                 <button
                                                     type="button"
+                                                    disabled={isLoading}
                                                     onClick={() => setShowPassword(!showPassword)}
                                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
                                                 >
@@ -96,8 +125,8 @@ function LoginPage() {
                                     </FormItem>
                                 )}
                             />
-                            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white mt-4 font-bold h-11 transition-all shadow-sm">
-                                Entrar no sistema
+                            <Button type="submit" disabled={isLoading} className="w-full bg-primary hover:bg-primary/90 text-white mt-4 font-bold h-11 transition-all shadow-sm">
+                                {isLoading ? 'Entrando...' : 'Entrar no sistema'}
                             </Button>
                         </form>
                     </Form>
