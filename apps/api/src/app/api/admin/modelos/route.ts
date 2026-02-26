@@ -9,8 +9,9 @@ import { z } from 'zod'
 const modeloSchema = z.object({
     nome: z.string().min(1),
     descricao: z.string().min(1),
-    secretariaId: z.string().optional(),
-    docxTemplateUrl: z.string().url(),
+    categoria: z.string().default('Outros'),
+    secretariaId: z.string().optional().nullable(),
+    docxTemplateUrl: z.string().url().optional().nullable(),
     conteudoHtml: z.string().min(1),
     variaveis: z.array(z.object({
         chave: z.string().min(1),
@@ -22,12 +23,15 @@ const modeloSchema = z.object({
     })).default([])
 })
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const usuario = await getAuthUser()
         if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-        const result = await ModeloService.listarTodos()
+        const { searchParams } = new URL(request.url)
+        const secretariaId = searchParams.get('secretariaId') ?? undefined
+
+        const result = await ModeloService.listarTodos(secretariaId)
         if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 })
 
         return NextResponse.json({ success: true, data: result.value })

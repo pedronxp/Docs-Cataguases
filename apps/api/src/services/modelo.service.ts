@@ -1,14 +1,26 @@
 import prisma from '@/lib/prisma'
-import { Result, ok, err } from '@/lib/result'
+import { ok, err } from '@/lib/result'
 
 export class ModeloService {
     /**
-     * Lista todos os modelos ativos.
+     * Lista todos os modelos ativos, com filtro opcional por secretaria.
+     * ADMIN_GERAL (secretariaId = undefined) vê todos.
+     * SECRETARIO vê globais (secretariaId = null) + os da sua secretaria.
      */
-    static async listarTodos() {
+    static async listarTodos(secretariaId?: string) {
         try {
+            const where: any = { ativo: true }
+
+            if (secretariaId) {
+                // Mostra modelos globais (null) + modelos da secretaria específica
+                where.OR = [
+                    { secretariaId: null },
+                    { secretariaId }
+                ]
+            }
+
             const modelos = await prisma.modeloDocumento.findMany({
-                where: { ativo: true },
+                where,
                 include: {
                     variaveis: {
                         orderBy: { ordem: 'asc' }
@@ -44,12 +56,14 @@ export class ModeloService {
 
     /**
      * Cria um novo modelo com suas variáveis.
+     * docxTemplateUrl é opcional (modelos HTML-only são válidos).
      */
     static async criar(data: {
         nome: string;
         descricao: string;
-        secretariaId?: string;
-        docxTemplateUrl: string;
+        categoria?: string;
+        secretariaId?: string | null;
+        docxTemplateUrl?: string | null;
         conteudoHtml: string;
         variaveis: {
             chave: string;
@@ -65,8 +79,8 @@ export class ModeloService {
                 data: {
                     nome: data.nome,
                     descricao: data.descricao,
-                    secretariaId: data.secretariaId,
-                    docxTemplateUrl: data.docxTemplateUrl,
+                    secretariaId: data.secretariaId ?? null,
+                    docxTemplateUrl: data.docxTemplateUrl ?? '',
                     conteudoHtml: data.conteudoHtml,
                     variaveis: {
                         create: data.variaveis.map(v => ({
@@ -93,8 +107,6 @@ export class ModeloService {
      */
     static async atualizar(id: string, data: any) {
         try {
-            // Se houver variáveis no update, limpamos as antigas e criamos as novas para simplificar
-            // Em uma implementação real, faríamos um "upsert/merge"
             if (data.variaveis) {
                 await prisma.modeloVariavel.deleteMany({ where: { modeloId: id } })
                 const { variaveis, ...modeloData } = data
@@ -131,9 +143,20 @@ export class ModeloService {
 
     /**
      * Soft delete de um modelo.
+     * Bloqueia se houver portarias vinculadas ao modelo.
      */
     static async desativar(id: string) {
         try {
+            const portariasVinculadas = await prisma.portaria.count({
+                where: { modeloId: id }
+            })
+
+            if (portariasVinculadas > 0) {
+                return err(
+                    `Não é possível desativar este modelo pois há ${portariasVinculadas} portaria(s) vinculada(s) a ele.`
+                )
+            }
+
             await prisma.modeloDocumento.update({
                 where: { id },
                 data: { ativo: false }

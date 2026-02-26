@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
-
-export const dynamic = 'force-dynamic'
 import { buildAbility } from '@/lib/ability'
 import { ModeloService } from '@/services/modelo.service'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET(
     request: Request,
@@ -62,8 +61,9 @@ export async function DELETE(
             return NextResponse.json({ error: 'Sem permissão para excluir modelos' }, { status: 403 })
         }
 
+        // Bloquear exclusão se houver portarias vinculadas
         const result = await ModeloService.desativar(id)
-        if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 })
+        if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
 
         return NextResponse.json({ success: true, message: 'Modelo desativado com sucesso' })
     } catch (error) {

@@ -2,9 +2,10 @@ import type { ModeloDocumento } from '../types/domain'
 import { ok, err, type Result } from '../lib/result'
 import api from '../lib/api'
 
-export async function listarModelos(): Promise<Result<ModeloDocumento[]>> {
+export async function listarModelos(secretariaId?: string): Promise<Result<ModeloDocumento[]>> {
     try {
-        const response = await api.get('/api/admin/modelos')
+        const params = secretariaId ? `?secretariaId=${secretariaId}` : ''
+        const response = await api.get(`/api/admin/modelos${params}`)
         return ok(response.data.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao listar modelos')
@@ -38,6 +39,15 @@ export async function atualizarModelo(id: string, payload: any): Promise<Result<
     }
 }
 
+export async function deletarModelo(id: string): Promise<Result<void>> {
+    try {
+        await api.delete(`/api/admin/modelos/${id}`)
+        return ok(undefined)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao deletar modelo')
+    }
+}
+
 export async function uploadTemplate(file: File): Promise<Result<string>> {
     try {
         const formData = new FormData()
@@ -51,9 +61,17 @@ export async function uploadTemplate(file: File): Promise<Result<string>> {
     }
 }
 
-export async function analisarModelo(url: string): Promise<Result<{ html: string, variaveis: any[] }>> {
+/**
+ * Envia o conteúdo HTML para a API extrair as variáveis {{TAG}}.
+ * Retorna variáveis de usuário (para configurar no Wizard) separadas das SYS_*.
+ */
+export async function analisarModelo(conteudoHtml: string): Promise<Result<{
+    variaveis: { chave: string; label: string; tipo: string; obrigatorio: boolean; opcoes: string[]; ordem: number }[];
+    variaveisSistema: string[];
+    totalTags: number;
+}>> {
     try {
-        const response = await api.post('/api/admin/modelos/analisar', { url })
+        const response = await api.post('/api/admin/modelos/analisar', { conteudoHtml })
         return ok(response.data.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao analisar variáveis do documento')
@@ -65,6 +83,7 @@ export const modeloService = {
     buscarModelo,
     criarModelo,
     atualizarModelo,
+    deletarModelo,
     uploadTemplate,
     analisarModelo
 }
