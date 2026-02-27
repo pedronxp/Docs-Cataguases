@@ -30,9 +30,17 @@ export function AppHeader({ title, actions }: AppHeaderProps) {
     const initials = usuario?.name.substring(0, 2).toUpperCase() || 'US'
 
     return (
-        <header className="h-14 border-b border-slate-200 bg-white px-6 flex items-center justify-between shrink-0 sticky top-0 z-10">
+        <header className="h-14 border-b border-slate-200 bg-white px-6 flex items-center justify-between shrink-0 sticky top-0 z-10 transition-all duration-300">
             <div className="flex items-center gap-4">
-                <h1 className="text-xl font-bold text-slate-800 tracking-tight">{title}</h1>
+                <h1 className="text-xl font-black text-slate-800 tracking-tight">{title}</h1>
+                <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
+                <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-100">
+                    <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider">Sincronizado</span>
+                </div>
             </div>
             <div className="flex items-center gap-4">
                 {actions && <div className="flex items-center gap-2">{actions}</div>}

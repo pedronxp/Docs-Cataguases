@@ -11,7 +11,7 @@ type Actions = 'criar' | 'ler' | 'editar' | 'deletar' | 'submeter' |
  * Entidades (Subjects) protegidas.
  */
 type Subjects = 'Portaria' | 'User' | 'ModeloDocumento' | 'Modelo' | 'Secretaria' | 'Setor' |
-    'LivroNumeracao' | 'VariavelSistema' | 'FeedAtividade' | 'Analytics' | 'all'
+    'LivrosNumeracao' | 'VariavelSistema' | 'FeedAtividade' | 'Analytics' | 'all'
 
 /**
  * Definição de condições para filtragem de objetos.

@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { modeloService } from '@/services/modelo.service'
 import { variavelService } from '@/services/variavel.service'
-import { ChevronRight, ChevronLeft, Save, FileCode2, Settings2, Info, Users, FileSignature, Building2, Calculator, LayoutGrid, Plus, Trash2, FileText } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Save, FileCode2, Settings2, Info, Users, FileSignature, Building2, Calculator, LayoutGrid, Plus, Trash2, FileText, Activity, Sparkles } from 'lucide-react'
 
 export const Route = createFileRoute('/_sistema/admin/modelos/novo')({
   component: NovoModeloWizard,
@@ -45,6 +45,7 @@ function NovoModeloWizard() {
   // Variáveis Analisadas (Passo 3)
   const [variaveis, setVariaveis] = useState<VariavelExtraida[]>([])
   const [sysTags, setSysTags] = useState<string[]>([])
+  const [recomendacoes, setRecomendacoes] = useState<any[]>([])
   const [textoSelecionado, setTextoSelecionado] = useState('')
 
   const handleSelection = () => {
@@ -100,49 +101,85 @@ function NovoModeloWizard() {
   }
 
   const analisarERestaurarPasso3 = async () => {
-    if (modoEntrada === 'texto' && !conteudoHtml) {
-      toast({ title: 'O template HTML não pode estar vazio', variant: 'destructive' })
-      return
-    }
-    if (modoEntrada === 'upload' && !arquivo) {
-      toast({ title: 'Selecione um arquivo DOCX', variant: 'destructive' })
-      return
-    }
-
-    setLoading(true)
-    const res = await modeloService.analisarModelo(modoEntrada === 'upload' ? arquivo! : conteudoHtml)
-
-    // Buscar variáveis globais para pré-preencher configurações
-    const globaisRes = await variavelService.listarVariaveis()
-    const varsGlobais = globaisRes.success ? globaisRes.data : []
-    const dicionarioGlobal = new Map(varsGlobais.map(v => [v.chave, v]))
-
-    setLoading(false)
-
-    if (res.success) {
-      if (res.data.conteudoHtml) {
-        setConteudoHtml(res.data.conteudoHtml)
+    try {
+      if (modoEntrada === 'texto' && !conteudoHtml) {
+        toast({ title: 'O template HTML não pode estar vazio', variant: 'destructive' })
+        return
+      }
+      if (modoEntrada === 'upload' && !arquivo) {
+        toast({ title: 'Selecione um arquivo DOCX', variant: 'destructive' })
+        return
       }
 
-      const variaveisMapeadas = res.data.variaveis.map((v: any, idx: number): VariavelExtraida => {
-        const tag = v.chave
-        const globalConfig = dicionarioGlobal.get(tag)
-        return {
-          tag,
-          label: globalConfig?.descricao || v.label || tag.replace(/_/g, ' '),
-          tipo: (globalConfig as any)?.tipo || 'texto',
-          obrigatorio: true,
-          opcoes: [],
-          ordem: idx
-        }
-      })
+      setLoading(true)
+      const res = await modeloService.analisarModelo(modoEntrada === 'upload' ? arquivo! : conteudoHtml)
 
-      setVariaveis(variaveisMapeadas)
-      setSysTags(res.data.variaveisSistema)
-      setPasso(3)
-    } else {
-      toast({ title: 'Erro ao analisar', description: res.error, variant: 'destructive' })
+      // Buscar variáveis globais para pré-preencher configurações
+      const globaisRes = await variavelService.listarVariaveis()
+      const varsGlobais = globaisRes.success ? globaisRes.data : []
+      const dicionarioGlobal = new Map(varsGlobais?.map(v => [v.chave, v]) || [])
+
+      if (res.success) {
+        if (res.data?.conteudoHtml) {
+          setConteudoHtml(res.data.conteudoHtml)
+        }
+
+        const variaveisMapeadas = (res.data?.variaveis || []).map((v: any, idx: number): VariavelExtraida => {
+          const tag = v.chave
+          const globalConfig = dicionarioGlobal.get(tag)
+          return {
+            tag,
+            label: globalConfig?.descricao || v.label || tag.replace(/_/g, ' '),
+            tipo: (globalConfig as any)?.tipo || 'texto',
+            obrigatorio: true,
+            opcoes: [],
+            ordem: idx
+          }
+        })
+
+        setVariaveis(variaveisMapeadas)
+        setSysTags(res.data?.variaveisSistema || [])
+        setRecomendacoes(res.data?.recomendacoes || [])
+        setPasso(3)
+      } else {
+        toast({ title: 'Erro ao analisar', description: res.error, variant: 'destructive' })
+      }
+    } catch (error: any) {
+      console.error('[analisarERestaurarPasso3] Erro catastrófico:', error)
+      toast({
+        title: 'Falha crítica na análise',
+        description: 'Verifique o formato do documento ou o editor.',
+        variant: 'destructive'
+      })
+    } finally {
+      setLoading(false)
     }
+  }
+
+  const aplicarRecomendacao = (rec: any) => {
+    // Substituir primeira ocorrência do texto original pela tag sugerida no HTML
+    const tag = `{{${rec.sugestaoChave}}}`
+    setConteudoHtml(prev => prev.replace(rec.textoOriginal, tag))
+
+    // Adicionar variável extraída
+    const nova: VariavelExtraida = {
+      tag: rec.sugestaoChave,
+      label: rec.textoOriginal,
+      tipo: rec.tipo === 'cpf' ? 'cpf' : rec.tipo === 'data' ? 'data' : 'texto',
+      obrigatorio: true,
+      opcoes: [],
+      ordem: variaveis.length
+    }
+    setVariaveis([...variaveis, nova])
+
+    // Remover da lista de recomendações
+    setRecomendacoes(prev => prev.filter(r => r.textoOriginal !== rec.textoOriginal))
+
+    toast({
+      title: 'Variável Sugerida Aplicada!',
+      description: `O texto "${rec.textoOriginal}" foi substituído por ${tag}`,
+      className: 'bg-indigo-600 text-white'
+    })
   }
 
   const atualizarVariavel = (index: number, campo: keyof VariavelExtraida, valor: any) => {
@@ -268,8 +305,8 @@ function NovoModeloWizard() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-end gap-2 bg-slate-50 border-t rounded-b-lg p-4">
-            <Button variant="ghost" onClick={() => navigate({ to: '/admin/modelos' })}>Cancelar</Button>
-            <Button className="bg-[#1351B4] hover:bg-[#0f4496] text-white" onClick={avancarParaPasso2}>
+            <Button variant="ghost" type="button" onClick={() => navigate({ to: '/admin/modelos' })}>Cancelar</Button>
+            <Button type="button" className="bg-[#1351B4] hover:bg-[#0f4496] text-white" onClick={avancarParaPasso2}>
               Próximo Passo <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           </CardFooter>
@@ -339,10 +376,10 @@ function NovoModeloWizard() {
             )}
           </CardContent>
           <CardFooter className="flex justify-between bg-slate-50 border-t rounded-b-lg p-4">
-            <Button variant="outline" onClick={() => setPasso(1)}>
+            <Button variant="outline" type="button" onClick={() => setPasso(1)}>
               <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
             </Button>
-            <Button disabled={loading} className="bg-[#1351B4] hover:bg-[#0f4496] text-white" onClick={analisarERestaurarPasso3}>
+            <Button type="button" disabled={loading} className="bg-[#1351B4] hover:bg-[#0f4496] text-white" onClick={analisarERestaurarPasso3}>
               {loading ? 'Processando...' : (modoEntrada === 'upload' ? 'Extrair Texto do Arquivo' : 'Analisar Texto e Tags')} <Settings2 className="ml-2 h-4 w-4" />
             </Button>
           </CardFooter>
@@ -372,8 +409,53 @@ function NovoModeloWizard() {
           </CardHeader>
           <CardContent className="space-y-6">
             {sysTags.length > 0 && (
-              <div className="bg-blue-50 border border-blue-100 rounded-md p-3 text-sm text-blue-800">
-                <strong>Tags de sistema detectadas (Preenchimento automático):</strong> {sysTags.join(', ')}
+              <div className="bg-blue-50 border border-blue-100 rounded-md p-3 text-sm text-blue-800 animate-in fade-in duration-300">
+                <div className="flex items-center gap-2 mb-1">
+                  <Activity size={14} className="animate-pulse" />
+                  <strong className="font-black uppercase text-[10px] tracking-wider">Tags de sistema detectadas:</strong>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sysTags.map(tag => (
+                    <Badge key={tag} variant="outline" className="bg-white/50 border-blue-200 text-blue-700 font-bold text-[10px]">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {recomendacoes.length > 0 && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 animate-in slide-in-from-top-2 duration-500">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-indigo-600 flex items-center justify-center">
+                      <Sparkles size={14} className="text-white" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-[0.1em] text-indigo-900">Sugestões Doc's AI</h4>
+                      <p className="text-[10px] text-indigo-700/70 font-bold uppercase">Encontramos dados que podem ser transformados em variáveis automaticamente</p>
+                    </div>
+                  </div>
+                  <Badge className="bg-indigo-600 text-white border-0">{recomendacoes.length} sugestões</Badge>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {recomendacoes.map((rec, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-white p-1.5 pl-3 rounded-lg border border-indigo-200 shadow-sm hover:border-indigo-400 transition-all group">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-indigo-400 uppercase leading-none mb-1">{rec.tipo}</span>
+                        <span className="text-xs font-bold text-slate-700">{rec.textoOriginal}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => aplicarRecomendacao(rec)}
+                        className="h-7 w-7 p-0 rounded-full hover:bg-indigo-600 hover:text-white group-hover:scale-110 transition-all"
+                      >
+                        <Plus size={14} />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -487,10 +569,10 @@ function NovoModeloWizard() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-between bg-slate-50 border-t rounded-b-lg p-4">
-            <Button variant="outline" onClick={() => setPasso(2)}>
+            <Button variant="outline" type="button" onClick={() => setPasso(2)}>
               <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
             </Button>
-            <Button disabled={loading} className="bg-green-600 hover:bg-green-700 text-white" onClick={salvarModeloFinal}>
+            <Button type="button" disabled={loading} className="bg-green-600 hover:bg-green-700 text-white" onClick={salvarModeloFinal}>
               {loading ? 'Salvando...' : 'Finalizar e Salvar Modelo'} <Save className="ml-2 h-4 w-4" />
             </Button>
           </CardFooter>

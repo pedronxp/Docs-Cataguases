@@ -26,6 +26,15 @@ export async function GET(
                 criadoPor: {
                     select: { name: true, email: true },
                 },
+                secretaria: {
+                    select: { nome: true, sigla: true },
+                },
+                feedAtividades: {
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        autor: { select: { name: true, username: true } }
+                    }
+                }
             },
         })
 

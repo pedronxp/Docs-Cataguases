@@ -1,6 +1,5 @@
 generator client {
-  provider   = "prisma-client-js"
-  engineType = "library"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -10,15 +9,17 @@ datasource db {
 
 // O modelo User foi movido para baixo para manter as relações próximas
 
-model LivroNumeracao {
-  id            String  @id @default(cuid())
-  secretariaId  String
-  setorId       String?
-  ano           Int
-  proximoNumero Int     @default(1)
-  formato       String
-
-  @@unique([secretariaId, setorId, ano])
+model LivrosNumeracao {
+  id               String   @id @default(cuid())
+  nome             String   @unique @default("Numeração Geral Cataguases")
+  formato_base     String   @default("PORT-{N}/CATAGUASES")
+  proximo_numero   Int      @default(1)
+  numero_inicial   Int      @default(1)
+  tipos_suportados Json     @default("{\"PORTARIA\":1}")
+  logs             Json     @default("[]")
+  ativo            Boolean  @default(true)
+  criado_em        DateTime @default(now())
+  atualizado_em    DateTime @updatedAt
 }
 
 model Portaria {
@@ -45,6 +46,18 @@ model Portaria {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   atividades      FeedAtividade[]
+
+  // Controle de Revisão
+  revisorAtualId           String?
+  revisorAtual             User?           @relation("RevisorAtual", fields: [revisorAtualId], references: [id])
+  revisoesCount            Int             @default(0)
+  
+  // Controle de Assinatura Avançado
+  assinaturaStatus         String          @default("NAO_ASSINADA") // NAO_ASSINADA, ASSINADA_DIGITAL, ASSINADA_MANUAL, DISPENSADA_COM_JUSTIFICATIVA
+  assinaturaJustificativa  String?         @db.Text
+  assinaturaComprovanteUrl String?
+
+  jornalQueue              JornalQueue?
 }
 
 // Atualizar User para ter a relação inversa
@@ -65,6 +78,7 @@ model User {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   portarias       Portaria[] @relation("CriadoPor")
+  portariasRevisadas Portaria[] @relation("RevisorAtual")
   atividades      FeedAtividade[]
 }
 
@@ -136,4 +150,16 @@ model Setor {
   ativo        Boolean    @default(true)
   
   @@unique([secretariaId, sigla])
+}
+
+model JornalQueue {
+  id              String   @id @default(cuid())
+  portariaId      String   @unique // FK para Portaria
+  numeroSugerido  String?  // Ex: "007/2026" vindo do LivroNumeracao
+  numeroFinal     String?
+  status          String   @default("PENDENTE") // PENDENTE, CONCLUIDA
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  portaria        Portaria @relation(fields: [portariaId], references: [id], onDelete: Cascade)
 }

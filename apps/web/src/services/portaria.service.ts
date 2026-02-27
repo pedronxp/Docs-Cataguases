@@ -78,18 +78,36 @@ export async function tentarNovamente(portariaId: string): Promise<Result<Portar
     }
 }
 
+export async function enviarParaRevisao(portariaId: string): Promise<Result<Portaria>> {
+    try {
+        const response = await api.patch(`/api/portarias/${portariaId}/fluxo`, { action: 'ENVIAR_REVISAO' })
+        return ok(response.data.data || response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao enviar para revisão')
+    }
+}
+
+export async function assumirRevisao(portariaId: string): Promise<Result<Portaria>> {
+    try {
+        const response = await api.patch(`/api/portarias/${portariaId}/fluxo`, { action: 'ASSUMIR_REVISAO' })
+        return ok(response.data.data || response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao assumir revisão')
+    }
+}
+
 export async function aprovarPortaria(portariaId: string): Promise<Result<Portaria>> {
     try {
-        const response = await api.patch(`/api/portarias/${portariaId}/aprovar`)
+        const response = await api.patch(`/api/portarias/${portariaId}/fluxo`, { action: 'APROVAR_REVISAO' })
         return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao aprovar portaria')
     }
 }
 
-export async function rejeitarPortaria(portariaId: string): Promise<Result<Portaria>> {
+export async function rejeitarPortaria(portariaId: string, observacao: string): Promise<Result<Portaria>> {
     try {
-        const response = await api.patch(`/api/portarias/${portariaId}/rejeitar`)
+        const response = await api.patch(`/api/portarias/${portariaId}/fluxo`, { action: 'REJEITAR_REVISAO', observacao })
         return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao rejeitar portaria')
@@ -123,6 +141,15 @@ export async function validarDocumento(hash: string): Promise<Result<Portaria>> 
     }
 }
 
+export async function gerarPdf(portariaId: string): Promise<Result<{ url: string }>> {
+    try {
+        const response = await api.get(`/api/portarias/${portariaId}/pdf`)
+        return ok(response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao gerar PDF')
+    }
+}
+
 export const portariaService = {
     listarPortarias,
     buscarPortaria,
@@ -132,8 +159,11 @@ export const portariaService = {
     submeterPortaria,
     assinarLote,
     tentarNovamente,
+    enviarParaRevisao,
+    assumirRevisao,
     aprovarPortaria,
     rejeitarPortaria,
     publicarPortaria,
     validarDocumento,
+    gerarPdf,
 }

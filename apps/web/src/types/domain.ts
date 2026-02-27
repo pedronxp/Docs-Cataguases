@@ -1,8 +1,10 @@
 export const STATUS_PORTARIA = {
     RASCUNHO: 'RASCUNHO',
-    PROCESSANDO: 'PROCESSANDO',
-    PENDENTE: 'PENDENTE',
-    APROVADA: 'APROVADA',
+    EM_REVISAO_ABERTA: 'EM_REVISAO_ABERTA',
+    EM_REVISAO_ATRIBUIDA: 'EM_REVISAO_ATRIBUIDA',
+    CORRECAO_NECESSARIA: 'CORRECAO_NECESSARIA',
+    AGUARDANDO_ASSINATURA: 'AGUARDANDO_ASSINATURA',
+    PRONTO_PUBLICACAO: 'PRONTO_PUBLICACAO',
     PUBLICADA: 'PUBLICADA',
     FALHA_PROCESSAMENTO: 'FALHA_PROCESSAMENTO',
     ERRO_GERACAO: 'ERRO_GERACAO',
@@ -41,10 +43,14 @@ export interface Usuario {
 export interface Portaria {
     id: string; titulo: string; numeroOficial: string | null; status: StatusPortaria
     autorId: string; secretariaId: string; setorId: string | null; modeloId: string
-    pdfUrl: string | null; docxRascunhoUrl: string | null; hashAssinatura: string | null
+    pdfUrl: string | null; docxRascunhoUrl: string | null; hashIntegridade: string | null
+    assinaturaStatus: string; assinaturaJustificativa: string | null; assinaturaComprovanteUrl: string | null
+    revisorAtualId: string | null
+    assinadoEm: string | null; assinadoPorId: string | null; dataPublicacao: string | null
     formData: Record<string, any>
     autor?: Pick<Usuario, 'id' | 'name' | 'email'>
     secretaria?: Secretaria; createdAt: string; updatedAt: string
+    feedAtividades?: FeedAtividade[]
 }
 
 export interface ModeloDocumento {
@@ -65,10 +71,25 @@ export interface VariavelSistema {
     resolvidaAutomaticamente: boolean
 }
 
-export interface LivroNumeracao {
-    id: string; secretariaId: string; setorId: string | null
-    ano: number; proximoNumero: number; formato: string
-    secretaria?: Pick<Secretaria, 'id' | 'nome' | 'sigla'>
+export interface LivroLog {
+    numero: string
+    portaria_id: string
+    aprovador: string
+    data: string
+    ip: string
+}
+
+export interface LivrosNumeracao {
+    id: string
+    nome: string
+    formato_base: string
+    proximo_numero: number
+    numero_inicial: number
+    tipos_suportados: Record<string, number>
+    logs: LivroLog[]
+    ativo: boolean
+    criado_em: string
+    atualizado_em: string
 }
 
 export interface FeedAtividade {

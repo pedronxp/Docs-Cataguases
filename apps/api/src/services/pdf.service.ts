@@ -1,68 +1,117 @@
-import puppeteer from 'puppeteer'
-import crypto from 'crypto'
-import { Result, ok, err } from '@/lib/result'
+import CloudConvert from 'cloudconvert';
+import { ok, err, Result } from '@/lib/result';
+import fs from 'fs';
+import path from 'path';
 
 export class PdfService {
     /**
-     * Gera o hash SHA-256 de uma string de conteúdo.
+     * Busca todas as chaves configuradas no .env. (Reaproveitado do CloudConvertService)
      */
-    static gerarHash(conteudo: string): string {
-        return crypto
-            .createHash('sha256')
-            .update(conteudo)
-            .digest('hex')
-            .toUpperCase()
+    private static async getKeys(): Promise<string[]> {
+        const keys: string[] = [];
+        if (process.env.CLOUDCONVERT_API_KEY) keys.push(process.env.CLOUDCONVERT_API_KEY);
+
+        const allEnv = process.env;
+        const suffixes = Object.keys(allEnv)
+            .filter(k => k.startsWith('CLOUDCONVERT_API_KEY_'))
+            .map(k => parseInt(k.split('_').pop() || '0', 10))
+            .sort((a, b) => a - b);
+
+        for (const s of suffixes) {
+            const val = allEnv[`CLOUDCONVERT_API_KEY_${s}`];
+            if (val) keys.push(val);
+        }
+        return keys;
+    }
+
+    private static async persistActiveIndex(index: number) {
+        try {
+            const envPath = path.resolve(process.cwd(), '.env');
+            if (!fs.existsSync(envPath)) return;
+            const content = fs.readFileSync(envPath, 'utf8');
+            const lines = content.split('\n');
+            let found = false;
+            const newLine = `CLOUDCONVERT_CURRENT_KEY_INDEX=${index}`;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith('CLOUDCONVERT_CURRENT_KEY_INDEX=')) {
+                    lines[i] = newLine;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) lines.push(newLine);
+            fs.writeFileSync(envPath, lines.join('\n'));
+            process.env.CLOUDCONVERT_CURRENT_KEY_INDEX = String(index);
+        } catch (error) {
+            console.error('[PdfService] Erro ao persistir índice:', error);
+        }
     }
 
     /**
-     * Converte HTML em Buffer de PDF usando Puppeteer.
+     * Converte HTML para PDF usando CloudConvert com rotação de chaves.
      */
-    static async gerarPDF(html: string, numeroOficial: string, hash: string): Promise<Result<Buffer>> {
-        let browser;
-        try {
-            browser = await puppeteer.launch({
-                headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
-            })
+    static async htmlToPdf(html: string): Promise<Result<Buffer>> {
+        const availableKeys = await this.getKeys();
+        if (availableKeys.length === 0) return err('Nenhuma chave CloudConvert configurada.');
 
-            const page = await browser.newPage()
+        let currentIndex = parseInt(process.env.CLOUDCONVERT_CURRENT_KEY_INDEX || '0', 10);
+        let attempts = 0;
 
-            // Define o conteúdo HTML
-            await page.setContent(html, { waitUntil: 'networkidle0' })
+        while (attempts < availableKeys.length) {
+            const actualKeyIndex = currentIndex % availableKeys.length;
+            const currentKey = availableKeys[actualKeyIndex];
+            const sdk = new CloudConvert(currentKey);
 
-            // Gera o PDF com as configurações oficiais
-            const pdfBuffer = await page.pdf({
-                format: 'A4',
-                printBackground: true,
-                margin: {
-                    top: '3cm',
-                    bottom: '3cm',
-                    left: '2.5cm',
-                    right: '2.5cm'
-                },
-                displayHeaderFooter: true,
-                headerTemplate: `
-          <div style="font-size: 10px; width: 100%; text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
-            PORTARIA OFICIAL - MUNICÍPIO DE CATAGUASES - Nº ${numeroOficial}
-          </div>
-        `,
-                footerTemplate: `
-          <div style="font-size: 8px; width: 100%; text-align: center; border-top: 1px solid #ddd; padding-top: 5px;">
-            <div style="display: flex; justify-content: space-between; padding: 0 40px;">
-              <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
-              <span>Autenticidade: ${hash.substring(0, 16)}...</span>
-            </div>
-            <div style="margin-top: 5px;">Documento assinado digitalmente conforme MP nº 2.200-2/2001.</div>
-          </div>
-        `
-            })
+            try {
+                const job = await sdk.jobs.create({
+                    tasks: {
+                        'import-html': {
+                            operation: 'import/raw',
+                            file: html,
+                            filename: 'input.html'
+                        },
+                        'convert-pdf': {
+                            operation: 'convert',
+                            input: 'import-html',
+                            output_format: 'pdf',
+                            engine: 'chrome', // Melhor para HTML moderno
+                            wait_until: 'network_idle'
+                        },
+                        'export-pdf': {
+                            operation: 'export/url',
+                            input: 'convert-pdf'
+                        }
+                    }
+                });
 
-            return ok(Buffer.from(pdfBuffer))
-        } catch (error) {
-            console.error('Erro ao gerar PDF com Puppeteer:', error)
-            return err('Falha ao processar o documento PDF. Tente novamente.')
-        } finally {
-            if (browser) await browser.close()
+                const finishedJob = await sdk.jobs.wait(job.id);
+                const exportTask = finishedJob.tasks.find(t => t.operation === 'export/url' && t.status === 'finished');
+
+                if (!exportTask || !exportTask.result?.files?.[0]?.url) {
+                    throw new Error('Falha na exportação do PDF');
+                }
+
+                const res = await fetch(exportTask.result.files[0].url);
+                if (!res.ok) throw new Error('Erro ao baixar PDF');
+
+                const buffer = Buffer.from(await res.arrayBuffer());
+
+                if (actualKeyIndex !== parseInt(process.env.CLOUDCONVERT_CURRENT_KEY_INDEX || '0', 10)) {
+                    await this.persistActiveIndex(actualKeyIndex);
+                }
+
+                return ok(buffer);
+
+            } catch (error: any) {
+                const is402 = error.message?.includes('402') || error.response?.status === 402;
+                if (is402 && attempts < availableKeys.length - 1) {
+                    currentIndex++;
+                    attempts++;
+                    continue;
+                }
+                return err(error.message || 'Erro na conversão para PDF');
+            }
         }
+        return err('Todas as chaves esgotadas.');
     }
 }

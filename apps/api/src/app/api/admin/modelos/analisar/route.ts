@@ -50,6 +50,46 @@ export async function POST(req: NextRequest) {
         const matches = [...conteudoHtml.matchAll(TAG_REGEX)]
         const tagsUnicas = [...new Set(matches.map(m => m[1].trim()))]
 
+        // RECOMENDAÇÕES INTELIGENTES (Identificar padrões no texto)
+        // Limpar o HTML para análise de texto puro (removendo tags, mas mantendo o conteúdo)
+        const textoLimpo = conteudoHtml.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ')
+
+        const RECOMENDACOES_REGEX = {
+            CPF: /\d{3}\.\d{3}\.\d{3}-\d{2}/g,
+            DATA: /\d{2}\/\d{2}\/\d{4}/g,
+            // Nomes em caixa alta (ex: PEDRO HENRIQUE) - 2 ou mais nomes
+            NOME_CAPS: /\b([A-ZÀ-Ú]{3,}\s[A-ZÀ-Ú]{2,}(?:\s[A-ZÀ-Ú]{2,})*)\b/g
+        }
+
+        const recomendacoes: any[] = []
+        const inseridas = new Set<string>()
+
+        // Função auxiliar para evitar duplicatas e sugerir label
+        const sugerirRecomendacao = (texto: string, tipo: string) => {
+            if (inseridas.has(texto)) return
+            // Se já está dentro de uma tag {{...}}, ignorar
+            if (tagsUnicas.some(t => texto.includes(t))) return
+
+            recomendacoes.push({
+                textoOriginal: texto,
+                sugestaoChave: texto.toUpperCase().replace(/[^A-Z]/g, '_').substring(0, 20),
+                tipo
+            })
+            inseridas.add(texto)
+        }
+
+        // Buscar CPFs
+        const cpfs = [...textoLimpo.matchAll(RECOMENDACOES_REGEX.CPF)]
+        cpfs.forEach(m => sugerirRecomendacao(m[0], 'cpf'))
+
+        // Buscar Datas
+        const datas = [...textoLimpo.matchAll(RECOMENDACOES_REGEX.DATA)]
+        datas.forEach(m => sugerirRecomendacao(m[0], 'data'))
+
+        // Buscar Nomes
+        const nomes = [...textoLimpo.matchAll(RECOMENDACOES_REGEX.NOME_CAPS)]
+        nomes.forEach(m => sugerirRecomendacao(m[0], 'nome'))
+
         // Separar variáveis de usuário das variáveis de sistema (SYS_*)
         const variaveisUsuario = tagsUnicas.filter(
             tag => !SYS_PREFIXES.some(prefix => tag.startsWith(prefix))
@@ -77,6 +117,7 @@ export async function POST(req: NextRequest) {
                 conteudoHtml,
                 variaveis,
                 variaveisSistema,
+                recomendacoes, // Sugestões extras baseadas em padrões
                 totalTags: tagsUnicas.length
             }
         })

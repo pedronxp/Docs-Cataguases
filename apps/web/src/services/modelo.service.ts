@@ -69,6 +69,7 @@ export async function analisarModelo(conteudo: string | File): Promise<Result<{
     conteudoHtml: string;
     variaveis: { chave: string; label: string; tipo: string; obrigatorio: boolean; opcoes: string[]; ordem: number }[];
     variaveisSistema: string[];
+    recomendacoes: any[];
     totalTags: number;
 }>> {
     try {

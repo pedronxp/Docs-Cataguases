@@ -31,42 +31,14 @@ export class PortariaService {
                     secretariaId: data.secretariaId,
                     setorId: data.setorId,
                     criadoPorId: data.criadoPorId,
-                    status: data.submetido ? 'PROCESSANDO' : 'RASCUNHO',
+                    status: data.submetido ? 'PENDENTE' : 'RASCUNHO',
                 },
                 include: { modelo: true }
             })
 
-            // Se for submetida, inicia fluxo de numeração e processamento
-            if (data.submetido) {
-                const resultNum = await NumeracaoService.alocarNumero(
-                    portaria.secretariaId,
-                    portaria.setorId
-                )
-
-                if (resultNum.ok) {
-                    const portariaAtualizada = await prisma.portaria.update({
-                        where: { id: portaria.id },
-                        data: {
-                            numeroOficial: resultNum.value,
-                        },
-                    })
-
-                    await this.registrarEvento({
-                        tipo: 'PORTARIA_SUBMETIDA',
-                        mensagem: `Portaria submetida com número ${resultNum.value}`,
-                        portariaId: portaria.id,
-                        usuarioId: data.criadoPorId,
-                        secretariaId: portaria.secretariaId,
-                        setorId: portaria.setorId
-                    })
-
-                    return ok(portariaAtualizada)
-                }
-            }
-
             await this.registrarEvento({
                 tipo: 'PORTARIA_CRIADA',
-                mensagem: `Portaria "${data.titulo}" criada como rascunho`,
+                mensagem: data.submetido ? `Portaria submetida para revisão` : `Portaria "${data.titulo}" criada como rascunho`,
                 portariaId: portaria.id,
                 usuarioId: data.criadoPorId,
                 secretariaId: portaria.secretariaId,
@@ -96,7 +68,7 @@ export class PortariaService {
 
             await this.registrarEvento({
                 tipo: 'PORTARIA_APROVADA',
-                mensagem: `Portaria aprovada. ${observacao || ''}`,
+                mensagem: `Portaria aprovada pelo Secretário. Aguardando assinatura e numeração. ${observacao || ''}`,
                 portariaId: id,
                 usuarioId,
                 secretariaId: portaria.secretariaId,
@@ -106,6 +78,7 @@ export class PortariaService {
 
             return ok(atualizada)
         } catch (error) {
+            console.error('Erro ao aprovar portaria:', error)
             return err('Erro ao aprovar portaria.')
         }
     }

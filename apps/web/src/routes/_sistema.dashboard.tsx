@@ -47,59 +47,59 @@ function DashboardPage() {
 
             {/* Cards de Resumo */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
+                <Card className="border-slate-200 border-l-4 border-l-slate-400 bg-gradient-to-br from-white to-slate-50 transition-all hover:shadow-md">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
+                        <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500">
                             Rascunhos
                         </CardTitle>
-                        <PenTool className="h-4 w-4 text-slate-500" />
+                        <PenTool className="h-4 w-4 text-slate-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.rascunhos}</div>
-                        <p className="text-xs text-slate-500">
-                            Aguardando envio para revisão
+                        <div className="text-3xl font-black text-slate-900">{stats.rascunhos}</div>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">
+                            Aguardando envio
                         </p>
                     </CardContent>
                 </Card>
-                <Card>
+                <Card className="border-yellow-200 border-l-4 border-l-yellow-400 bg-gradient-to-br from-white to-yellow-50/30 transition-all hover:shadow-md">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
+                        <CardTitle className="text-xs font-black uppercase tracking-widest text-yellow-700">
                             Aguardando Revisão
                         </CardTitle>
-                        <Clock className="h-4 w-4 text-yellow-500" />
+                        <Clock className="h-4 w-4 text-yellow-500 animate-pulse" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-yellow-600">{stats.aguardandoRevisao}</div>
-                        <p className="text-xs text-slate-500">
-                            Análise pendente do gestor
+                        <div className="text-3xl font-black text-yellow-600">{stats.aguardandoRevisao}</div>
+                        <p className="text-[10px] text-yellow-600/70 font-bold uppercase mt-1">
+                            Análise pendente
                         </p>
                     </CardContent>
                 </Card>
-                <Card className="border-green-200 bg-green-50/50">
+                <Card className="border-emerald-200 border-l-4 border-l-emerald-400 bg-gradient-to-br from-white to-emerald-50/50 transition-all hover:shadow-md">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-green-800">
+                        <CardTitle className="text-xs font-black uppercase tracking-widest text-emerald-800">
                             Publicadas no Mês
                         </CardTitle>
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-green-700">{stats.publicadasMes}</div>
-                        <p className="text-xs text-green-600/80">
-                            Documentos oficiais no acervo
+                        <div className="text-3xl font-black text-emerald-700">{stats.publicadasMes}</div>
+                        <p className="text-[10px] text-emerald-600/80 font-bold uppercase mt-1">
+                            Atos oficiais no acervo
                         </p>
                     </CardContent>
                 </Card>
-                <Card className="border-gov-blue/20 bg-gov-blue/5">
+                <Card className="border-gov-blue/20 border-l-4 border-l-gov-blue bg-gradient-to-br from-white to-gov-blue/5 transition-all hover:shadow-md">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gov-blue">
+                        <CardTitle className="text-xs font-black uppercase tracking-widest text-gov-blue">
                             Assinaturas Pendentes
                         </CardTitle>
                         <FileText className="h-4 w-4 text-gov-blue" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-gov-blue">{stats.assinaturasPendentes}</div>
-                        <p className="text-xs text-gov-blue/70">
-                            Aguardando assinatura oficial
+                        <div className="text-3xl font-black text-gov-blue">{stats.assinaturasPendentes}</div>
+                        <p className="text-[10px] text-gov-blue/70 font-bold uppercase mt-1">
+                            Aguardando confirmação
                         </p>
                     </CardContent>
                 </Card>
@@ -125,22 +125,31 @@ function DashboardPage() {
                                         <p className="text-sm text-slate-500 mb-2">Nenhuma atividade recente registrada no feed.</p>
                                     </div>
                                 ) : (
-                                    feed.map((atividade) => (
-                                        <div key={atividade.id} className="flex items-start gap-4">
-                                            <Avatar className="h-9 w-9 border border-slate-200">
-                                                <AvatarFallback className="bg-gov-blue/10 text-gov-blue font-medium">
+                                    feed.map((atividade, idx) => (
+                                        <div
+                                            key={atividade.id}
+                                            className="flex items-start gap-4 p-3 rounded-xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 animate-in slide-in-from-left duration-300"
+                                            style={{ animationDelay: `${idx * 50}ms` }}
+                                        >
+                                            <Avatar className="h-10 w-10 border-2 border-white shadow-sm ring-1 ring-slate-100">
+                                                <AvatarFallback className={`font-black text-xs ${idx % 2 === 0 ? 'bg-sky-50 text-sky-700' : 'bg-indigo-50 text-indigo-700'
+                                                    }`}>
                                                     {atividade.autor?.name ? atividade.autor.name.charAt(0).toUpperCase() : 'U'}
                                                 </AvatarFallback>
                                             </Avatar>
-                                            <div className="space-y-1">
-                                                <p className="text-sm leading-none">
-                                                    <span className="font-medium">{atividade.autor?.name || 'Sistema'}</span>{' '}
-                                                    <span className="text-slate-600">{atividade.mensagem}</span>
-                                                </p>
-                                                <p className="text-xs text-slate-500">
-                                                    {atividade.createdAt
-                                                        ? formatDistanceToNow(new Date(atividade.createdAt), { addSuffix: true, locale: ptBR })
-                                                        : 'Data indisponível'}
+                                            <div className="space-y-1 flex-1">
+                                                <div className="flex justify-between items-start">
+                                                    <p className="text-sm font-bold text-slate-900">
+                                                        {atividade.autor?.name || 'Sistema'}
+                                                    </p>
+                                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">
+                                                        {atividade.createdAt
+                                                            ? formatDistanceToNow(new Date(atividade.createdAt), { addSuffix: true, locale: ptBR })
+                                                            : 'Agora'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-slate-600 leading-relaxed">
+                                                    {atividade.mensagem}
                                                 </p>
                                             </div>
                                         </div>

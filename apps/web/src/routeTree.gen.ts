@@ -14,7 +14,9 @@ import { Route as SistemaRouteImport } from './routes/_sistema'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as SistemaTutorialRouteImport } from './routes/_sistema.tutorial'
 import { Route as SistemaStatusDocumentosRouteImport } from './routes/_sistema.status-documentos'
+import { Route as SistemaJornalRouteImport } from './routes/_sistema.jornal'
 import { Route as SistemaDashboardRouteImport } from './routes/_sistema.dashboard'
+import { Route as SistemaAcompanhamentoRouteImport } from './routes/_sistema.acompanhamento'
 import { Route as SistemaAcervoRouteImport } from './routes/_sistema.acervo'
 import { Route as AuthRegistroRouteImport } from './routes/_auth.registro'
 import { Route as AuthOnboardingRouteImport } from './routes/_auth.onboarding'
@@ -28,6 +30,7 @@ import { Route as SistemaAdminOrganogramaRouteImport } from './routes/_sistema.a
 import { Route as SistemaAdminModelosRouteImport } from './routes/_sistema.admin.modelos'
 import { Route as SistemaAdminLivrosRouteImport } from './routes/_sistema.admin.livros'
 import { Route as SistemaAdminGestaoRouteImport } from './routes/_sistema.admin.gestao'
+import { Route as SistemaAdminCloudconvertRouteImport } from './routes/_sistema.admin.cloudconvert'
 import { Route as SistemaAdminAnalyticsRouteImport } from './routes/_sistema.admin.analytics'
 import { Route as SistemaAdministrativoPortariasIndexRouteImport } from './routes/_sistema.administrativo.portarias.index'
 import { Route as SistemaAdministrativoPortariasNovoRouteImport } from './routes/_sistema.administrativo.portarias.novo'
@@ -58,9 +61,19 @@ const SistemaStatusDocumentosRoute = SistemaStatusDocumentosRouteImport.update({
   path: '/status-documentos',
   getParentRoute: () => SistemaRoute,
 } as any)
+const SistemaJornalRoute = SistemaJornalRouteImport.update({
+  id: '/jornal',
+  path: '/jornal',
+  getParentRoute: () => SistemaRoute,
+} as any)
 const SistemaDashboardRoute = SistemaDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => SistemaRoute,
+} as any)
+const SistemaAcompanhamentoRoute = SistemaAcompanhamentoRouteImport.update({
+  id: '/acompanhamento',
+  path: '/acompanhamento',
   getParentRoute: () => SistemaRoute,
 } as any)
 const SistemaAcervoRoute = SistemaAcervoRouteImport.update({
@@ -130,6 +143,12 @@ const SistemaAdminGestaoRoute = SistemaAdminGestaoRouteImport.update({
   path: '/admin/gestao',
   getParentRoute: () => SistemaRoute,
 } as any)
+const SistemaAdminCloudconvertRoute =
+  SistemaAdminCloudconvertRouteImport.update({
+    id: '/admin/cloudconvert',
+    path: '/admin/cloudconvert',
+    getParentRoute: () => SistemaRoute,
+  } as any)
 const SistemaAdminAnalyticsRoute = SistemaAdminAnalyticsRouteImport.update({
   id: '/admin/analytics',
   path: '/admin/analytics',
@@ -173,10 +192,13 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthOnboardingRoute
   '/registro': typeof AuthRegistroRoute
   '/acervo': typeof SistemaAcervoRoute
+  '/acompanhamento': typeof SistemaAcompanhamentoRoute
   '/dashboard': typeof SistemaDashboardRoute
+  '/jornal': typeof SistemaJornalRoute
   '/status-documentos': typeof SistemaStatusDocumentosRoute
   '/tutorial': typeof SistemaTutorialRoute
   '/admin/analytics': typeof SistemaAdminAnalyticsRoute
+  '/admin/cloudconvert': typeof SistemaAdminCloudconvertRoute
   '/admin/gestao': typeof SistemaAdminGestaoRoute
   '/admin/livros': typeof SistemaAdminLivrosRoute
   '/admin/modelos': typeof SistemaAdminModelosRouteWithChildren
@@ -199,10 +221,13 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthOnboardingRoute
   '/registro': typeof AuthRegistroRoute
   '/acervo': typeof SistemaAcervoRoute
+  '/acompanhamento': typeof SistemaAcompanhamentoRoute
   '/dashboard': typeof SistemaDashboardRoute
+  '/jornal': typeof SistemaJornalRoute
   '/status-documentos': typeof SistemaStatusDocumentosRoute
   '/tutorial': typeof SistemaTutorialRoute
   '/admin/analytics': typeof SistemaAdminAnalyticsRoute
+  '/admin/cloudconvert': typeof SistemaAdminCloudconvertRoute
   '/admin/gestao': typeof SistemaAdminGestaoRoute
   '/admin/livros': typeof SistemaAdminLivrosRoute
   '/admin/modelos': typeof SistemaAdminModelosRouteWithChildren
@@ -227,10 +252,13 @@ export interface FileRoutesById {
   '/_auth/onboarding': typeof AuthOnboardingRoute
   '/_auth/registro': typeof AuthRegistroRoute
   '/_sistema/acervo': typeof SistemaAcervoRoute
+  '/_sistema/acompanhamento': typeof SistemaAcompanhamentoRoute
   '/_sistema/dashboard': typeof SistemaDashboardRoute
+  '/_sistema/jornal': typeof SistemaJornalRoute
   '/_sistema/status-documentos': typeof SistemaStatusDocumentosRoute
   '/_sistema/tutorial': typeof SistemaTutorialRoute
   '/_sistema/admin/analytics': typeof SistemaAdminAnalyticsRoute
+  '/_sistema/admin/cloudconvert': typeof SistemaAdminCloudconvertRoute
   '/_sistema/admin/gestao': typeof SistemaAdminGestaoRoute
   '/_sistema/admin/livros': typeof SistemaAdminLivrosRoute
   '/_sistema/admin/modelos': typeof SistemaAdminModelosRouteWithChildren
@@ -255,10 +283,13 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/registro'
     | '/acervo'
+    | '/acompanhamento'
     | '/dashboard'
+    | '/jornal'
     | '/status-documentos'
     | '/tutorial'
     | '/admin/analytics'
+    | '/admin/cloudconvert'
     | '/admin/gestao'
     | '/admin/livros'
     | '/admin/modelos'
@@ -281,10 +312,13 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/registro'
     | '/acervo'
+    | '/acompanhamento'
     | '/dashboard'
+    | '/jornal'
     | '/status-documentos'
     | '/tutorial'
     | '/admin/analytics'
+    | '/admin/cloudconvert'
     | '/admin/gestao'
     | '/admin/livros'
     | '/admin/modelos'
@@ -308,10 +342,13 @@ export interface FileRouteTypes {
     | '/_auth/onboarding'
     | '/_auth/registro'
     | '/_sistema/acervo'
+    | '/_sistema/acompanhamento'
     | '/_sistema/dashboard'
+    | '/_sistema/jornal'
     | '/_sistema/status-documentos'
     | '/_sistema/tutorial'
     | '/_sistema/admin/analytics'
+    | '/_sistema/admin/cloudconvert'
     | '/_sistema/admin/gestao'
     | '/_sistema/admin/livros'
     | '/_sistema/admin/modelos'
@@ -370,11 +407,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SistemaStatusDocumentosRouteImport
       parentRoute: typeof SistemaRoute
     }
+    '/_sistema/jornal': {
+      id: '/_sistema/jornal'
+      path: '/jornal'
+      fullPath: '/jornal'
+      preLoaderRoute: typeof SistemaJornalRouteImport
+      parentRoute: typeof SistemaRoute
+    }
     '/_sistema/dashboard': {
       id: '/_sistema/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof SistemaDashboardRouteImport
+      parentRoute: typeof SistemaRoute
+    }
+    '/_sistema/acompanhamento': {
+      id: '/_sistema/acompanhamento'
+      path: '/acompanhamento'
+      fullPath: '/acompanhamento'
+      preLoaderRoute: typeof SistemaAcompanhamentoRouteImport
       parentRoute: typeof SistemaRoute
     }
     '/_sistema/acervo': {
@@ -468,6 +519,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SistemaAdminGestaoRouteImport
       parentRoute: typeof SistemaRoute
     }
+    '/_sistema/admin/cloudconvert': {
+      id: '/_sistema/admin/cloudconvert'
+      path: '/admin/cloudconvert'
+      fullPath: '/admin/cloudconvert'
+      preLoaderRoute: typeof SistemaAdminCloudconvertRouteImport
+      parentRoute: typeof SistemaRoute
+    }
     '/_sistema/admin/analytics': {
       id: '/_sistema/admin/analytics'
       path: '/admin/analytics'
@@ -542,10 +600,13 @@ const SistemaAdminModelosRouteWithChildren =
 
 interface SistemaRouteChildren {
   SistemaAcervoRoute: typeof SistemaAcervoRoute
+  SistemaAcompanhamentoRoute: typeof SistemaAcompanhamentoRoute
   SistemaDashboardRoute: typeof SistemaDashboardRoute
+  SistemaJornalRoute: typeof SistemaJornalRoute
   SistemaStatusDocumentosRoute: typeof SistemaStatusDocumentosRoute
   SistemaTutorialRoute: typeof SistemaTutorialRoute
   SistemaAdminAnalyticsRoute: typeof SistemaAdminAnalyticsRoute
+  SistemaAdminCloudconvertRoute: typeof SistemaAdminCloudconvertRoute
   SistemaAdminGestaoRoute: typeof SistemaAdminGestaoRoute
   SistemaAdminLivrosRoute: typeof SistemaAdminLivrosRoute
   SistemaAdminModelosRoute: typeof SistemaAdminModelosRouteWithChildren
@@ -562,10 +623,13 @@ interface SistemaRouteChildren {
 
 const SistemaRouteChildren: SistemaRouteChildren = {
   SistemaAcervoRoute: SistemaAcervoRoute,
+  SistemaAcompanhamentoRoute: SistemaAcompanhamentoRoute,
   SistemaDashboardRoute: SistemaDashboardRoute,
+  SistemaJornalRoute: SistemaJornalRoute,
   SistemaStatusDocumentosRoute: SistemaStatusDocumentosRoute,
   SistemaTutorialRoute: SistemaTutorialRoute,
   SistemaAdminAnalyticsRoute: SistemaAdminAnalyticsRoute,
+  SistemaAdminCloudconvertRoute: SistemaAdminCloudconvertRoute,
   SistemaAdminGestaoRoute: SistemaAdminGestaoRoute,
   SistemaAdminLivrosRoute: SistemaAdminLivrosRoute,
   SistemaAdminModelosRoute: SistemaAdminModelosRouteWithChildren,

@@ -6,7 +6,7 @@ import { createContextualCan } from '@casl/react'
 type Actions = 'criar' | 'ler' | 'editar' | 'deletar' | 'submeter' |
     'aprovar' | 'rejeitar' | 'assinar' | 'publicar' | 'gerenciar' | 'manage' | 'visualizar'
 type Subjects = 'Portaria' | 'Usuario' | 'Modelo' | 'Secretaria' | 'Setor' |
-    'LivroNumeracao' | 'VariavelSistema' | 'FeedAtividade' | 'Analytics' | 'all' | 'PortariaGlobal'
+    'LivrosNumeracao' | 'VariavelSistema' | 'FeedAtividade' | 'Analytics' | 'all' | 'PortariaGlobal'
 
 type Conditions = {
     secretariaId?: string
