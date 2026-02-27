@@ -20,6 +20,7 @@ import { Route as AuthRegistroRouteImport } from './routes/_auth.registro'
 import { Route as AuthOnboardingRouteImport } from './routes/_auth.onboarding'
 import { Route as AuthLoginRouteImport } from './routes/_auth.login'
 import { Route as AuthAguardandoRouteImport } from './routes/_auth.aguardando'
+import { Route as SistemaAdminVariaveisDicasRouteImport } from './routes/_sistema.admin.variaveis-dicas'
 import { Route as SistemaAdminVariaveisRouteImport } from './routes/_sistema.admin.variaveis'
 import { Route as SistemaAdminUsuariosOrgaoRouteImport } from './routes/_sistema.admin.usuarios-orgao'
 import { Route as SistemaAdminUsuariosRouteImport } from './routes/_sistema.admin.usuarios'
@@ -87,6 +88,12 @@ const AuthAguardandoRoute = AuthAguardandoRouteImport.update({
   path: '/aguardando',
   getParentRoute: () => AuthRoute,
 } as any)
+const SistemaAdminVariaveisDicasRoute =
+  SistemaAdminVariaveisDicasRouteImport.update({
+    id: '/admin/variaveis-dicas',
+    path: '/admin/variaveis-dicas',
+    getParentRoute: () => SistemaRoute,
+  } as any)
 const SistemaAdminVariaveisRoute = SistemaAdminVariaveisRouteImport.update({
   id: '/admin/variaveis',
   path: '/admin/variaveis',
@@ -177,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/admin/usuarios': typeof SistemaAdminUsuariosRoute
   '/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/admin/variaveis': typeof SistemaAdminVariaveisRoute
+  '/admin/variaveis-dicas': typeof SistemaAdminVariaveisDicasRoute
   '/admin/modelos/novo': typeof SistemaAdminModelosNovoRoute
   '/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
   '/administrativo/portarias/novo': typeof SistemaAdministrativoPortariasNovoRoute
@@ -202,6 +210,7 @@ export interface FileRoutesByTo {
   '/admin/usuarios': typeof SistemaAdminUsuariosRoute
   '/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/admin/variaveis': typeof SistemaAdminVariaveisRoute
+  '/admin/variaveis-dicas': typeof SistemaAdminVariaveisDicasRoute
   '/admin/modelos/novo': typeof SistemaAdminModelosNovoRoute
   '/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
   '/administrativo/portarias/novo': typeof SistemaAdministrativoPortariasNovoRoute
@@ -229,6 +238,7 @@ export interface FileRoutesById {
   '/_sistema/admin/usuarios': typeof SistemaAdminUsuariosRoute
   '/_sistema/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/_sistema/admin/variaveis': typeof SistemaAdminVariaveisRoute
+  '/_sistema/admin/variaveis-dicas': typeof SistemaAdminVariaveisDicasRoute
   '/_sistema/admin/modelos/novo': typeof SistemaAdminModelosNovoRoute
   '/_sistema/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
   '/_sistema/administrativo/portarias/novo': typeof SistemaAdministrativoPortariasNovoRoute
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/admin/usuarios'
     | '/admin/usuarios-orgao'
     | '/admin/variaveis'
+    | '/admin/variaveis-dicas'
     | '/admin/modelos/novo'
     | '/administrativo/portarias/$id'
     | '/administrativo/portarias/novo'
@@ -281,6 +292,7 @@ export interface FileRouteTypes {
     | '/admin/usuarios'
     | '/admin/usuarios-orgao'
     | '/admin/variaveis'
+    | '/admin/variaveis-dicas'
     | '/admin/modelos/novo'
     | '/administrativo/portarias/$id'
     | '/administrativo/portarias/novo'
@@ -307,6 +319,7 @@ export interface FileRouteTypes {
     | '/_sistema/admin/usuarios'
     | '/_sistema/admin/usuarios-orgao'
     | '/_sistema/admin/variaveis'
+    | '/_sistema/admin/variaveis-dicas'
     | '/_sistema/admin/modelos/novo'
     | '/_sistema/administrativo/portarias/$id'
     | '/_sistema/administrativo/portarias/novo'
@@ -398,6 +411,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/aguardando'
       preLoaderRoute: typeof AuthAguardandoRouteImport
       parentRoute: typeof AuthRoute
+    }
+    '/_sistema/admin/variaveis-dicas': {
+      id: '/_sistema/admin/variaveis-dicas'
+      path: '/admin/variaveis-dicas'
+      fullPath: '/admin/variaveis-dicas'
+      preLoaderRoute: typeof SistemaAdminVariaveisDicasRouteImport
+      parentRoute: typeof SistemaRoute
     }
     '/_sistema/admin/variaveis': {
       id: '/_sistema/admin/variaveis'
@@ -533,6 +553,7 @@ interface SistemaRouteChildren {
   SistemaAdminUsuariosRoute: typeof SistemaAdminUsuariosRoute
   SistemaAdminUsuariosOrgaoRoute: typeof SistemaAdminUsuariosOrgaoRoute
   SistemaAdminVariaveisRoute: typeof SistemaAdminVariaveisRoute
+  SistemaAdminVariaveisDicasRoute: typeof SistemaAdminVariaveisDicasRoute
   SistemaAdministrativoPortariasIdRoute: typeof SistemaAdministrativoPortariasIdRoute
   SistemaAdministrativoPortariasNovoRoute: typeof SistemaAdministrativoPortariasNovoRoute
   SistemaAdministrativoPortariasIndexRoute: typeof SistemaAdministrativoPortariasIndexRoute
@@ -552,6 +573,7 @@ const SistemaRouteChildren: SistemaRouteChildren = {
   SistemaAdminUsuariosRoute: SistemaAdminUsuariosRoute,
   SistemaAdminUsuariosOrgaoRoute: SistemaAdminUsuariosOrgaoRoute,
   SistemaAdminVariaveisRoute: SistemaAdminVariaveisRoute,
+  SistemaAdminVariaveisDicasRoute: SistemaAdminVariaveisDicasRoute,
   SistemaAdministrativoPortariasIdRoute: SistemaAdministrativoPortariasIdRoute,
   SistemaAdministrativoPortariasNovoRoute:
     SistemaAdministrativoPortariasNovoRoute,

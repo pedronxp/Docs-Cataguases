@@ -1,0 +1,9 @@
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/_sistema/admin/organograma')({
+  component: RouteComponent,
+})
+
+function RouteComponent() {
+  return <div>Hello "/_sistema/admin/organograma"!</div>
+}

@@ -60,10 +60,35 @@ function PortariaWizardPage() {
             .every(v => formValues[v.chave]?.trim() !== '')
     }
 
+    const formatarDataPorExtenso = (dataIso: string) => {
+        if (!dataIso) return ''
+        const partes = dataIso.split('-')
+        if (partes.length !== 3) return dataIso
+        const data = new Date(parseInt(partes[0]), parseInt(partes[1]) - 1, parseInt(partes[2]))
+
+        const meses = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ]
+        return `${data.getDate()} de ${meses[data.getMonth()]} de ${data.getFullYear()}`
+    }
+
     const handleFinalizar = async () => {
         if (!selectedModelo) return
         setSubmitting(true)
-        const res = await criarRascunho(formValues)
+
+        // Formatar datas por extenso antes de enviar
+        const payload: Record<string, string> = {}
+        for (const [key, value] of Object.entries(formValues)) {
+            const varMeta = selectedModelo.variaveis.find(v => v.chave === key)
+            if (varMeta?.tipo === 'data_extenso' && value) {
+                payload[key] = formatarDataPorExtenso(value)
+            } else {
+                payload[key] = value
+            }
+        }
+
+        const res = await criarRascunho(payload)
         setSubmitting(false)
         if (res?.success) {
             toast({
@@ -133,16 +158,16 @@ function PortariaWizardPage() {
                                 <Card
                                     key={modelo.id}
                                     className={`cursor-pointer transition-all border-2 group hover:shadow-md ${selectedModelo?.id === modelo.id
-                                            ? 'border-primary ring-4 ring-primary/10 shadow-md bg-primary/5'
-                                            : 'border-slate-200 hover:border-slate-300'
+                                        ? 'border-primary ring-4 ring-primary/10 shadow-md bg-primary/5'
+                                        : 'border-slate-200 hover:border-slate-300'
                                         }`}
                                     onClick={() => setSelectedModelo(modelo)}
                                 >
                                     <CardContent className="p-5 space-y-3">
                                         <div className="flex items-start justify-between">
                                             <div className={`p-2.5 rounded-lg ${selectedModelo?.id === modelo.id
-                                                    ? 'bg-primary text-white'
-                                                    : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
+                                                ? 'bg-primary text-white'
+                                                : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
                                                 }`}>
                                                 <FileText size={20} />
                                             </div>
@@ -365,9 +390,9 @@ function DynamicField({ variavel, value, onChange }: DynamicFieldProps) {
                 />
             )}
 
-            {(variavel.tipo === 'texto' || variavel.tipo === 'numero' || variavel.tipo === 'data') && (
+            {(variavel.tipo === 'texto' || variavel.tipo === 'numero' || variavel.tipo === 'data' || variavel.tipo === 'data_extenso') && (
                 <Input
-                    type={variavel.tipo === 'numero' ? 'number' : variavel.tipo === 'data' ? 'date' : 'text'}
+                    type={variavel.tipo === 'numero' ? 'number' : (variavel.tipo === 'data' || variavel.tipo === 'data_extenso') ? 'date' : 'text'}
                     placeholder={variavel.descricao || `Digite ${variavel.label.toLowerCase()}...`}
                     value={value}
                     onChange={e => onChange(e.target.value)}
@@ -396,10 +421,10 @@ function StepIndicator({ num, active, current, label, icon: Icon }: StepIndicato
     return (
         <div className={`flex flex-col items-center gap-2 z-10 transition-colors ${active ? 'text-primary' : 'text-slate-300'}`}>
             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all ${active
-                    ? current
-                        ? 'bg-primary text-white shadow-lg shadow-primary/30 ring-4 ring-primary/20 scale-110'
-                        : 'bg-primary text-white'
-                    : 'bg-white border-2 border-slate-200 text-slate-300'
+                ? current
+                    ? 'bg-primary text-white shadow-lg shadow-primary/30 ring-4 ring-primary/20 scale-110'
+                    : 'bg-primary text-white'
+                : 'bg-white border-2 border-slate-200 text-slate-300'
                 }`}>
                 {active && !current ? <Check size={16} strokeWidth={3} /> : <Icon size={18} />}
             </div>

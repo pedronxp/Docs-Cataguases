@@ -192,4 +192,13 @@ export class ModeloService {
             return err('Erro ao salvar variável de sistema.')
         }
     }
+
+    static async excluirVariavelSistema(id: string) {
+        try {
+            await prisma.variavelSistema.delete({ where: { id } })
+            return ok(true)
+        } catch (error) {
+            return err('Erro ao excluir variável de sistema.')
+        }
+    }
 }

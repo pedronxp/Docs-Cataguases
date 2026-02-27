@@ -52,9 +52,10 @@ export interface ModeloDocumento {
     docxTemplateUrl: string; variaveis: ModeloVariavel[]; ativo: boolean
 }
 
+export type TipoVariavel = 'texto' | 'numero' | 'data' | 'cpf' | 'moeda' | 'textarea' | 'select' | 'assinatura' | 'data_extenso'
 export interface ModeloVariavel {
     id: string; modeloId: string; chave: string; label: string
-    tipo: 'texto' | 'data' | 'numero' | 'select' | 'textarea' | 'cpf' | 'moeda'
+    tipo: TipoVariavel
     opcoes: string[]; obrigatorio: boolean; ordem: number
     descricao?: string
 }

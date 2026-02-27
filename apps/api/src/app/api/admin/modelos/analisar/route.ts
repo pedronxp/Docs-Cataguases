@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
-import { z } from 'zod'
+import { CloudConvertService } from '@/services/cloudconvert.service'
 
 export const dynamic = 'force-dynamic'
 
-const analisarSchema = z.object({
-    conteudoHtml: z.string().min(1, 'Conteúdo HTML é obrigatório')
-})
-
-// Regex que captura {{TAG}} ou {{ TAG }} — igual ao padrão definido em GESTAO_MODELOS.md
+// Regex que captura {{TAG}} ou {{ TAG }}
 const TAG_REGEX = /\{\{\s*([A-Z0-9_a-z]+)\s*\}\}/g
-// Prefixos de variáveis de sistema (preenchidas automaticamente pelo backend)
+// Prefixos de variáveis de sistema
 const SYS_PREFIXES = ['SYS_']
 
 export async function POST(req: NextRequest) {
@@ -18,19 +14,43 @@ export async function POST(req: NextRequest) {
         const usuario = await getAuthUser()
         if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-        const body = await req.json()
-        const parsed = analisarSchema.safeParse(body)
-        if (!parsed.success) {
-            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+        let conteudoHtml = ''
+        const contentType = req.headers.get('content-type') || ''
+
+        if (contentType.includes('multipart/form-data')) {
+            const formData = await req.formData()
+            const file = formData.get('file') as File | null
+
+            if (!file) {
+                return NextResponse.json({ error: 'Arquivo DOCX não enviado no formulário' }, { status: 400 })
+            }
+
+            // Converte DOCX para HTML via CloudConvert
+            const arrayBuffer = await file.arrayBuffer()
+            const buffer = Buffer.from(arrayBuffer)
+
+            const extractionResult = await CloudConvertService.extractToHtml(buffer, file.name)
+
+            if (!extractionResult.ok) {
+                return NextResponse.json({ error: extractionResult.error }, { status: 500 })
+            }
+
+            conteudoHtml = extractionResult.value
+        } else {
+            // Suporte legado para JSON
+            const body = await req.json()
+            conteudoHtml = body.conteudoHtml
         }
 
-        const { conteudoHtml } = parsed.data
+        if (!conteudoHtml) {
+            return NextResponse.json({ error: 'Conteúdo para análise não encontrado' }, { status: 400 })
+        }
 
         // Extrair todas as tags únicas do HTML
         const matches = [...conteudoHtml.matchAll(TAG_REGEX)]
         const tagsUnicas = [...new Set(matches.map(m => m[1].trim()))]
 
-        // Separar variáveis de usuário (que o Wizard exibe) das variáveis de sistema (SYS_*)
+        // Separar variáveis de usuário das variáveis de sistema (SYS_*)
         const variaveisUsuario = tagsUnicas.filter(
             tag => !SYS_PREFIXES.some(prefix => tag.startsWith(prefix))
         )
@@ -38,13 +58,13 @@ export async function POST(req: NextRequest) {
             tag => SYS_PREFIXES.some(prefix => tag.startsWith(prefix))
         )
 
-        // Gerar estrutura de variáveis com defaults para o Admin configurar
+        // Gerar estrutura de variáveis
         const variaveis = variaveisUsuario.map((chave, index) => ({
             chave,
             label: chave
                 .toLowerCase()
                 .replace(/_/g, ' ')
-                .replace(/\b\w/g, l => l.toUpperCase()), // "NOME_SERVIDOR" → "Nome Servidor"
+                .replace(/\b\w/g, l => l.toUpperCase()),
             tipo: 'texto',
             obrigatorio: true,
             opcoes: [],
@@ -54,8 +74,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             success: true,
             data: {
+                conteudoHtml,
                 variaveis,
-                variaveisSistema, // Apenas para informação — não aparecem no Wizard
+                variaveisSistema,
                 totalTags: tagsUnicas.length
             }
         })

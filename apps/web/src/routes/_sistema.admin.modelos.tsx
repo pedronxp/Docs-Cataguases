@@ -23,9 +23,11 @@ function ModelosDocumentoPage() {
     const [modelos, setModelos] = useState<ModeloDocumento[]>([])
     const [loading, setLoading] = useState(true)
 
-    // Se a rota atual nao for exatamente /modelos, renderiza o filho (Outlet)
-    // Isso é pq o TanStack Router aninha admin.modelos.novo dentro de admin.modelos
-    if (location.pathname !== '/_sistema/admin/modelos') {
+    // Se a rota atual não for a base de modelos, renderiza o filho (Outlet)
+    // Usamos split para evitar problemas com prefixos de layout como /_sistema
+    const isBaseRoute = location.pathname.endsWith('/admin/modelos') || location.pathname.endsWith('/admin/modelos/')
+
+    if (!isBaseRoute) {
         return <Outlet />
     }
 
@@ -58,7 +60,7 @@ function ModelosDocumentoPage() {
                     <h2 className="text-2xl font-bold tracking-tight text-slate-800">Modelos de Documento</h2>
                     <p className="text-sm text-slate-500">Gerencie os templates textuais base para a geração de portarias e documentos.</p>
                 </div>
-                <Button onClick={() => navigate({ to: '/_sistema/admin/modelos/novo' })} className="bg-[#1351B4] hover:bg-[#0f4496] text-white w-full sm:w-auto shadow-sm">
+                <Button onClick={() => navigate({ to: '/admin/modelos/novo' })} className="bg-[#1351B4] hover:bg-[#0f4496] text-white w-full sm:w-auto shadow-sm">
                     <Plus className="mr-2 h-4 w-4" />
                     Novo Modelo
                 </Button>

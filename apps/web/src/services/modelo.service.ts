@@ -65,13 +65,23 @@ export async function uploadTemplate(file: File): Promise<Result<string>> {
  * Envia o conteúdo HTML para a API extrair as variáveis {{TAG}}.
  * Retorna variáveis de usuário (para configurar no Wizard) separadas das SYS_*.
  */
-export async function analisarModelo(conteudoHtml: string): Promise<Result<{
+export async function analisarModelo(conteudo: string | File): Promise<Result<{
+    conteudoHtml: string;
     variaveis: { chave: string; label: string; tipo: string; obrigatorio: boolean; opcoes: string[]; ordem: number }[];
     variaveisSistema: string[];
     totalTags: number;
 }>> {
     try {
-        const response = await api.post('/api/admin/modelos/analisar', { conteudoHtml })
+        let response;
+        if (conteudo instanceof File) {
+            const formData = new FormData()
+            formData.append('file', conteudo)
+            response = await api.post('/api/admin/modelos/analisar', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            })
+        } else {
+            response = await api.post('/api/admin/modelos/analisar', { conteudoHtml: conteudo })
+        }
         return ok(response.data.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao analisar variáveis do documento')
