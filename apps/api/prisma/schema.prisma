@@ -174,14 +174,26 @@ enum TipoDocumento {
 }
 
 model JornalQueue {
-  id              String        @id @default(cuid())
-  portariaId      String        @unique
-  tipoDocumento   TipoDocumento @default(PORTARIA)
-  numeroSugerido  String?
-  numeroFinal     String?
-  status          String        @default("PENDENTE") // PENDENTE, CONCLUIDA
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                  String        @id @default(cuid())
+  // Campo polimórfico: aponta para portaria, memorando, ofício ou lei
+  documentoId         String?       // Fase 3: ID genérico do documento
+  // Legacy: mantido para retrocompatibilidade — será removido na Fase 4
+  portariaId          String?       @unique
+  tipoDocumento       TipoDocumento @default(PORTARIA)
+  numeroSugerido      String?
+  numeroFinal         String?
+  status              String        @default("PENDENTE") // PENDENTE, CONCLUIDA, CANCELADA
+  prioridade          Int           @default(0)    // Ordenação: maior = mais urgente
+  metadados           Json          @default("{}") // Dados específicos do tipo de documento
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
-  portaria        Portaria      @relation(fields: [portariaId], references: [id], onDelete: Cascade)
+  portaria            Portaria?     @relation(fields: [portariaId], references: [id], onDelete: Cascade)
+
+  // Indexes para paginação cursor-based e queries filtradas
+  @@index([status, createdAt])
+  @@index([id, createdAt])
+  @@index([tipoDocumento, status, createdAt])
+  @@index([status, prioridade, createdAt])
+  @@index([documentoId])           // Fase 3: busca direta por documento
 }

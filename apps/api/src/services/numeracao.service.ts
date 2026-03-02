@@ -3,17 +3,17 @@ import { Result, ok, err } from '@/lib/result'
 
 // Formatos padrão criados automaticamente se o livro ainda não existir para o tipo
 const FORMATO_PADRAO: Record<string, string> = {
-    PORTARIA:  'PORT-{N}/CATAGUASES',
+    PORTARIA: 'PORT-{N}/CATAGUASES',
     MEMORANDO: 'MEM-{N}/{ANO}',
-    OFICIO:    'OF-{N}/{ANO}',
-    LEI:       'LEI-{N}/{ANO}',
+    OFICIO: 'OF-{N}/{ANO}',
+    LEI: 'LEI-{N}/{ANO}',
 }
 
 const NOME_PADRAO: Record<string, string> = {
-    PORTARIA:  'Portarias Cataguases',
+    PORTARIA: 'Portarias Cataguases',
     MEMORANDO: 'Memorandos Cataguases',
-    OFICIO:    'Ofícios Cataguases',
-    LEI:       'Leis Cataguases',
+    OFICIO: 'Ofícios Cataguases',
+    LEI: 'Leis Cataguases',
 }
 
 export class NumeracaoService {
@@ -45,8 +45,8 @@ export class NumeracaoService {
                 // Autocria o livro se ainda não existir para este tipo
                 if (!livro) {
                     const formato = FORMATO_PADRAO[tipoDocumento] ?? `DOC-{N}/{ANO}`
-                    const nome    = NOME_PADRAO[tipoDocumento]    ?? `Documentos ${tipoDocumento}`
-                    livro = await tx.livrosNumeracao.create({
+                    const nome = NOME_PADRAO[tipoDocumento] ?? `Documentos ${tipoDocumento}`
+                    livro = await (tx as any).livrosNumeracao.create({
                         data: {
                             nome,
                             tipoDocumento: tipoDocumento as any,
@@ -58,28 +58,28 @@ export class NumeracaoService {
                     })
                 }
 
-                const numeroAlocado  = livro.proximo_numero
-                const anoAtual       = new Date().getFullYear().toString()
+                const numeroAlocado = livro.proximo_numero
+                const anoAtual = new Date().getFullYear().toString()
                 const numeroFormatado = livro.formato_base
-                    .replace('{N}',   String(numeroAlocado).padStart(3, '0'))
+                    .replace('{N}', String(numeroAlocado).padStart(3, '0'))
                     .replace('{ANO}', anoAtual)
 
                 const novoLog = {
-                    numero:      String(numeroAlocado).padStart(3, '0'),
+                    numero: String(numeroAlocado).padStart(3, '0'),
                     portaria_id: portariaId,
-                    aprovador:   aprovadorId,
-                    data:        new Date().toISOString(),
+                    aprovador: aprovadorId,
+                    data: new Date().toISOString(),
                     ip
                 }
 
                 const logsAtuais = Array.isArray(livro.logs) ? livro.logs : []
 
-                await tx.livrosNumeracao.update({
+                await (tx as any).livrosNumeracao.update({
                     where: { id: livro.id },
                     data: {
                         proximo_numero: numeroAlocado + 1,
-                        logs:           [...logsAtuais, novoLog],
-                        atualizado_em:  new Date()
+                        logs: [...logsAtuais, novoLog],
+                        atualizado_em: new Date()
                     }
                 })
 
@@ -89,5 +89,12 @@ export class NumeracaoService {
             console.error('[NumeracaoService] Erro ao alocar número:', error)
             return err('Falha técnica ao gerar numeração oficial. Verifique o Livro de Numeração.')
         }
+    }
+
+    /**
+     * Alias para alocarNumero compatível com código legado que esperava alocarNumeroPortaria.
+     */
+    static async alocarNumeroPortaria(portariaId: string, aprovadorId: string, ip: string = '127.0.0.1') {
+        return this.alocarNumero(portariaId, 'PORTARIA', aprovadorId, ip)
     }
 }
