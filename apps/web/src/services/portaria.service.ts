@@ -59,13 +59,21 @@ export async function submeterPortaria(
     payload: SubmeterPortariaRequest
 ): Promise<Result<Portaria>> {
     try {
-        // Na API real, submeter pode ser um PATCH que muda o status ou um POST específico
-        const response = await api.patch(`/api/portarias/${payload.portariaId}`, {
-            status: 'PROCESSANDO'
+        const response = await api.post(`/api/portarias/${payload.portariaId}/submeter`, {
+            docxEditadoBase64: payload.docxEditadoBase64
         })
         return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao submeter portaria')
+    }
+}
+
+export async function downloadDocx(portariaId: string): Promise<Result<{ url: string }>> {
+    try {
+        const response = await api.get(`/api/portarias/${portariaId}/docx`)
+        return ok(response.data.data || response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao obter URL do DOCX')
     }
 }
 
@@ -114,6 +122,15 @@ export async function rejeitarPortaria(portariaId: string, observacao: string): 
     }
 }
 
+export async function transferirRevisao(portariaId: string, revisorId: string, justificativa: string): Promise<Result<Portaria>> {
+    try {
+        const response = await api.patch(`/api/portarias/${portariaId}/fluxo`, { action: 'TRANSFERIR_REVISAO', revisorId, justificativa })
+        return ok(response.data.data || response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao transferir revisão')
+    }
+}
+
 export async function publicarPortaria(portariaId: string): Promise<Result<Portaria>> {
     try {
         const response = await api.post(`/api/portarias/${portariaId}/publicar`)
@@ -157,12 +174,14 @@ export const portariaService = {
     criarPortaria,
     assinarPortaria,
     submeterPortaria,
+    downloadDocx,
     assinarLote,
     tentarNovamente,
     enviarParaRevisao,
     assumirRevisao,
     aprovarPortaria,
     rejeitarPortaria,
+    transferirRevisao,
     publicarPortaria,
     validarDocumento,
     gerarPdf,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
 import { buildAbility } from '@/lib/ability'
 import { ModeloService } from '@/services/modelo.service'
+import prisma from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,24 @@ export async function PATCH(
         const result = await ModeloService.atualizar(id, body)
         if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 })
 
-        return NextResponse.json({ success: true, data: result.value })
+        const { modelo, novaVersao } = result.value
+
+        // Notifica usuários sobre o modelo atualizado / nova versão
+        const mensagem = novaVersao
+            ? `Modelo "${modelo.nome}" foi atualizado para v${(modelo as any).versao ?? 2}`
+            : `Modelo "${modelo.nome}" foi modificado`
+        await prisma.feedAtividade.create({
+            data: {
+                tipoEvento: 'MODELO_ATUALIZADO',
+                mensagem,
+                autorId: (usuario as any).id,
+                secretariaId: modelo.secretariaId ?? null,
+                portariaId: null,
+                metadata: { modeloId: modelo.id, modeloNome: modelo.nome, novaVersao: String(novaVersao) }
+            }
+        }).catch(() => { /* não bloquear update por falha no feed */ })
+
+        return NextResponse.json({ success: true, data: modelo, novaVersao })
     } catch (error) {
         return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
     }

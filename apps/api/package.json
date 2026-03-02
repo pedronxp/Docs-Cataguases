@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "prisma:push": "prisma db push --accept-data-loss"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

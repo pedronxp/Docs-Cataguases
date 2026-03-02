@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Outlet, useLocation } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Search, FileText, Settings, Copy } from 'lucide-react'
+import { Plus, Search, FileText, Settings, Copy, BookOpen } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -60,10 +60,14 @@ function ModelosDocumentoPage() {
                     <h2 className="text-2xl font-bold tracking-tight text-slate-800">Modelos de Documento</h2>
                     <p className="text-sm text-slate-500">Gerencie os templates textuais base para a geração de portarias e documentos.</p>
                 </div>
-                <Button onClick={() => navigate({ to: '/admin/modelos/novo' })} className="bg-[#1351B4] hover:bg-[#0f4496] text-white w-full sm:w-auto shadow-sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Novo Modelo
-                </Button>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <Button variant="outline" onClick={() => navigate({ to: '/admin/modelos/tutorial' })} className="border-slate-200 text-slate-600 hover:bg-slate-50 gap-1.5">
+                        <BookOpen className="h-4 w-4" /> Como Criar
+                    </Button>
+                    <Button onClick={() => navigate({ to: '/admin/modelos/novo' })} className="bg-[#1351B4] hover:bg-[#0f4496] text-white flex-1 sm:flex-none shadow-sm">
+                        <Plus className="mr-2 h-4 w-4" /> Novo Modelo
+                    </Button>
+                </div>
             </div>
 
             <Card className="shadow-sm border-slate-200">
@@ -105,7 +109,14 @@ function ModelosDocumentoPage() {
                                                     <FileText className="h-4 w-4" />
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="font-semibold text-slate-800">{modelo.nome}</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="font-semibold text-slate-800">{modelo.nome}</span>
+                                                        {(modelo.versao ?? 1) > 1 && (
+                                                            <Badge className="text-[10px] px-1 py-0 h-4 bg-amber-100 text-amber-700 border-amber-300 font-mono">
+                                                                v{modelo.versao}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
                                                     <span className="text-xs text-slate-500 line-clamp-1 mt-0.5">{modelo.descricao}</span>
                                                 </div>
                                             </div>
@@ -130,7 +141,7 @@ function ModelosDocumentoPage() {
                                                 <Button onClick={() => handleAcao('Duplicar')} variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Duplicar">
                                                     <Copy className="h-4 w-4" />
                                                 </Button>
-                                                <Button onClick={() => handleAcao('Configurar')} variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Configurar">
+                                                <Button onClick={() => navigate({ to: '/admin/modelos/$id', params: { id: modelo.id } })} variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Configurar / Editar">
                                                     <Settings className="h-4 w-4" />
                                                 </Button>
                                             </div>

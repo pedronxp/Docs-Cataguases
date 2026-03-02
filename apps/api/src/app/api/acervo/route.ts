@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
+import { buildAbility } from '@/lib/ability'
 import { AcervoService, FiltrosAcervo } from '@/services/acervo.service'
 
 export const dynamic = 'force-dynamic'
@@ -8,8 +9,6 @@ export async function GET(request: Request) {
     try {
         const session = await getSession()
 
-        // Na fase atual, permitimos que apenas usuários logados vejam o acervo completo.
-        // Em uma fase futura, poderíamos permitir busca pública de documentos ASSINADOS.
         if (!session) {
             return NextResponse.json(
                 { success: false, error: 'Acesso restrito ao funcionalismo.' },
@@ -17,11 +16,17 @@ export async function GET(request: Request) {
             )
         }
 
+        const ability = buildAbility(session as any)
+        const podeVerTudo = ability.can('manage', 'all') || ability.can('visualizar' as any, 'PortariaGlobal' as any)
+
         const { searchParams } = new URL(request.url)
 
         const filtros: FiltrosAcervo = {
             termo: searchParams.get('q') || undefined,
-            secretariaId: searchParams.get('secretariaId') || undefined,
+            // ABAC: se não tem permissão global, ignora secretariaId do querystring e força a do usuário
+            secretariaId: podeVerTudo
+                ? (searchParams.get('secretariaId') || undefined)
+                : (session.secretariaId ?? undefined),
             setorId: searchParams.get('setorId') || undefined,
             status: searchParams.get('status') || undefined,
             ano: searchParams.get('ano') ? parseInt(searchParams.get('ano')!) : undefined,

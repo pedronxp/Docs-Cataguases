@@ -93,9 +93,9 @@ function PortariaWizardPage() {
         if (res?.success) {
             toast({
                 title: '✅ Rascunho gerado com sucesso!',
-                description: 'A portaria foi criada e enviada para revisão.',
+                description: 'Baixe o modelo, edite no Word e faça o upload.',
             })
-            navigate({ to: '/administrativo/portarias' })
+            navigate({ to: '/administrativo/portarias/revisao/$id', params: { id: res.data.id } })
         } else {
             toast({ title: 'Erro ao gerar rascunho', description: 'Tente novamente.', variant: 'destructive' })
         }

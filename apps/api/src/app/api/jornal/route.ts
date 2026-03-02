@@ -6,7 +6,7 @@ import { NumeracaoService } from '@/services/numeracao.service'
 export const dynamic = 'force-dynamic'
 
 /**
- * GET: Retorna as portarias pendentes de numeração no Diário Oficial.
+ * GET: Retorna fila de pendentes + métricas do dashboard do Jornal.
  */
 export async function GET(request: Request) {
     try {
@@ -15,20 +15,54 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 })
         }
 
-        // @ts-ignore - Dependemos da geração do Prisma
-        const fila = await (prisma as any).jornalQueue.findMany({
-            where: { status: 'PENDENTE' },
-            include: {
-                portaria: {
-                    include: {
-                        secretaria: true
-                    }
-                }
-            },
-            orderBy: { createdAt: 'asc' }
-        })
+        const hoje = new Date()
+        hoje.setHours(0, 0, 0, 0)
+        const inicioAno = new Date(hoje.getFullYear(), 0, 1)
 
-        return NextResponse.json({ success: true, data: fila })
+        const [fila, publicadasHoje, totalAno, livroAtivo] = await Promise.all([
+            (prisma as any).jornalQueue.findMany({
+                where: { status: 'PENDENTE' },
+                include: {
+                    portaria: {
+                        include: { secretaria: true }
+                    }
+                },
+                orderBy: { createdAt: 'asc' }
+            }),
+            prisma.portaria.count({
+                where: {
+                    status: 'PUBLICADA',
+                    dataPublicacao: { gte: hoje }
+                }
+            }),
+            prisma.portaria.count({
+                where: {
+                    status: 'PUBLICADA',
+                    dataPublicacao: { gte: inicioAno }
+                }
+            }),
+            (prisma as any).livrosNumeracao.findFirst({
+                where: { ativo: true },
+                orderBy: { criado_em: 'asc' }
+            })
+        ])
+
+        const proximoNumero = livroAtivo
+            ? livroAtivo.formato_base.replace('{N}', String(livroAtivo.proximo_numero).padStart(4, '0'))
+            : null
+
+        return NextResponse.json({
+            success: true,
+            data: {
+                fila,
+                metricas: {
+                    pendentes: fila.length,
+                    publicadasHoje,
+                    totalAno,
+                    proximoNumero
+                }
+            }
+        })
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message || 'Erro ao buscar fila do jornal' }, { status: 500 })
     }
@@ -51,7 +85,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'queueId é obrigatório' }, { status: 400 })
         }
 
-        // @ts-ignore - Dependemos da geração do Prisma
+        // @ts-ignore
         const filaItem = await (prisma as any).jornalQueue.findUnique({
             where: { id: String(queueId) },
             include: { portaria: true }
@@ -94,7 +128,7 @@ export async function POST(request: Request) {
             await tx.feedAtividade.create({
                 data: {
                     tipoEvento: 'PUBLICACAO_JORNAL',
-                    mensagem: `📜 Documento oficializado com o número ${numeroOficial} e publicado no Diário Oficial.`,
+                    mensagem: `Documento oficializado com o número ${numeroOficial} e publicado no Diário Oficial.`,
                     portariaId: filaItem.portariaId,
                     autorId: session.id,
                     secretariaId: filaItem.portaria.secretariaId

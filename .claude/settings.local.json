@@ -1,0 +1,20 @@
+{
+  "env": {
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000",
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
+    "DISABLE_COST_WARNINGS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(xargs ls -la)",
+      "Bash(npx claude-code-templates@latest --skill=development/senior-architect --yes)",
+      "Bash(wc -l \"C:\\\\Users\\\\User\\\\Desktop\\\\Projeto\\\\Doc''s prefeitura/apps/api/src/services\"/*.ts)",
+      "Bash(curl -s http://localhost:3000/api/admin/livros -H \"Authorization: Bearer test\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "WebFetch(domain:www.prisma.io)",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(grep -v \"//\")",
+      "Bash(xargs grep -l \"SYS_\")"
+    ]
+  }
+}

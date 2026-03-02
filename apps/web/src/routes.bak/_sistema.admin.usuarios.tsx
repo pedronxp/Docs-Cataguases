@@ -25,12 +25,12 @@ const ROLE_LABELS: Record<RoleUsuario, string> = {
     ADMIN_GERAL: 'Administrador Geral',
     PREFEITO: 'Prefeito',
     SECRETARIO: 'Secretário',
-    GESTOR_SETOR: 'Gestor de Setor',
+    REVISOR: 'Revisor',
     OPERADOR: 'Operador',
     PENDENTE: 'Aguardando Liberação',
 }
 
-const ROLES_AVAILABLE: RoleUsuario[] = ['ADMIN_GERAL', 'PREFEITO', 'SECRETARIO', 'GESTOR_SETOR', 'OPERADOR']
+const ROLES_AVAILABLE: RoleUsuario[] = ['ADMIN_GERAL', 'PREFEITO', 'SECRETARIO', 'REVISOR', 'OPERADOR']
 
 const PERMISSOES_AVAILABLE = [
     { value: 'deletar:Portaria', label: 'Deletar Portarias' },

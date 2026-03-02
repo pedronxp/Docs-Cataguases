@@ -11,6 +11,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { NotificationBell } from '@/components/shared/NotificationBell'
+import { useNotificationsSSE } from '@/hooks/use-notifications-sse'
 
 interface AppHeaderProps {
     title: string
@@ -29,6 +31,8 @@ export function AppHeader({ title, actions }: AppHeaderProps) {
 
     const initials = usuario?.name.substring(0, 2).toUpperCase() || 'US'
 
+    useNotificationsSSE()
+
     return (
         <header className="h-14 border-b border-slate-200 bg-white px-6 flex items-center justify-between shrink-0 sticky top-0 z-10 transition-all duration-300">
             <div className="flex items-center gap-4">
@@ -44,6 +48,8 @@ export function AppHeader({ title, actions }: AppHeaderProps) {
             </div>
             <div className="flex items-center gap-4">
                 {actions && <div className="flex items-center gap-2">{actions}</div>}
+
+                <NotificationBell />
 
                 <div className="h-6 w-px bg-slate-200 mx-2" />
 

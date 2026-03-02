@@ -4,7 +4,8 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import {
     LayoutDashboard, FileText, Users, Settings, BookOpen,
     Braces, Archive, Building2, BarChart2, Network,
-    Newspaper, Activity, CloudLightning, ChevronLeft, ChevronRight
+    Newspaper, Activity, CloudLightning, ChevronLeft, ChevronRight,
+    ClipboardList, ClipboardCheck, GraduationCap, ScrollText
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useUIStore } from '@/hooks/use-ui'
@@ -25,7 +26,9 @@ const NAV_GROUPS: { label: string, items: NavItem[] }[] = [
         items: [
             { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, action: 'ler', subject: 'FeedAtividade' },
             { to: '/administrativo/portarias', label: 'Portarias', icon: FileText, action: 'ler', subject: 'Portaria' },
-            { to: '/acompanhamento', label: 'Acompanhamento', icon: Activity, action: 'ler', subject: 'Portaria' },
+            { to: '/revisao/fila', label: 'Fila de Revisão', icon: ClipboardList, action: 'claim', subject: 'Revisao' },
+            { to: '/revisao/minhas', label: 'Minhas Revisões', icon: ClipboardCheck, action: 'transferir', subject: 'Revisao' },
+            { to: '/acompanhamento', label: 'Acompanhamento', icon: Activity, action: 'publicar', subject: 'Portaria' },
             { to: '/jornal', label: 'Diário Oficial', icon: Newspaper, action: 'ler', subject: 'Portaria' },
         ]
     },
@@ -34,20 +37,21 @@ const NAV_GROUPS: { label: string, items: NavItem[] }[] = [
         items: [
             { to: '/acervo', label: 'Acervo Documental', icon: Archive, action: 'ler', subject: 'Portaria' },
             { to: '/admin/modelos', label: 'Modelos', icon: BookOpen, action: 'gerenciar', subject: 'Modelo' },
-            { to: '/tutorial', label: 'Tutorial', icon: BookOpen, action: 'ler', subject: 'Portaria' },
+            { to: '/tutorial', label: 'Tutorial', icon: GraduationCap, action: 'ler', subject: 'Portaria' },
         ]
     },
     {
         label: 'Administração',
         items: [
             { to: '/admin/gestao', label: 'Institucional', icon: Building2, action: 'gerenciar', subject: 'Secretaria' },
-            { to: '/admin/organograma', label: 'Órgãos e Setores', icon: Building2, action: 'gerenciar', subject: 'Secretaria' },
+            { to: '/admin/organograma', label: 'Secretarias e Setores', icon: Building2, action: 'gerenciar', subject: 'Secretaria' },
             { to: '/admin/variaveis', label: 'Variáveis Globais', icon: Braces, action: 'gerenciar', subject: 'VariavelSistema' },
+            { to: '/admin/logs', label: 'Logs de Auditoria', icon: ScrollText, action: 'gerenciar', subject: 'all' },
             { to: '/admin/cloudconvert', label: 'Config. Cloud', icon: CloudLightning, action: 'gerenciar', subject: 'Configuracoes' },
             { to: '/admin/livros', label: 'Numeração/Livros', icon: Settings, action: 'gerenciar', subject: 'LivroNumeracao' },
-            { to: '/admin/analytics', label: 'Painel Analytics', icon: BarChart2, action: 'gerenciar', subject: 'Usuario' },
+            { to: '/admin/analytics', label: 'Painel Analytics', icon: BarChart2, action: 'ler', subject: 'Analytics' },
             { to: '/admin/usuarios', label: 'Usuários', icon: Users, action: 'gerenciar', subject: 'Usuario' },
-            { to: '/admin/usuarios-orgao', label: 'Permissões Órgão', icon: Network, action: 'gerenciar', subject: 'Usuario' },
+            { to: '/admin/usuarios-orgao', label: 'Lotação', icon: Network, action: 'gerenciar', subject: 'Usuario' },
         ]
     }
 ]

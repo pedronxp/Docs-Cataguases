@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useDashboard } from '@/hooks/use-dashboard'
+import { useState, useEffect } from 'react'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -7,15 +8,119 @@ import { DataTableSkeleton } from '@/components/shared/DataTableSkeleton'
 import { Can } from '@casl/react'
 import { useAbility } from '@casl/react'
 import { AbilityContext } from '@/lib/ability'
+import { useAuthStore } from '@/store/auth.store'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { FileText, Clock, CheckCircle2, PenTool, LayoutDashboard, PlusCircle, Activity } from 'lucide-react'
+import { FileText, Clock, CheckCircle2, PenTool, LayoutDashboard, PlusCircle, Activity, BookOpen, X, Sparkles, ArrowRight } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useNotificationsStore } from '@/store/notifications.store'
+
+const BANNER_KEY = 'docs_tutorial_banner_dismissed'
 
 export const Route = createFileRoute('/_sistema/dashboard')({
     component: DashboardPage,
 })
+
+function WelcomeBanner() {
+    const usuario = useAuthStore(s => s.usuario)
+    const [visivel, setVisivel] = useState(false)
+
+    useEffect(() => {
+        const dismissed = localStorage.getItem(BANNER_KEY)
+        if (!dismissed) setVisivel(true)
+    }, [])
+
+    function dispensar() {
+        localStorage.setItem(BANNER_KEY, '1')
+        setVisivel(false)
+    }
+
+    if (!visivel) return null
+
+    const primeiroNome = usuario?.name?.split(' ')[0] ?? 'Servidor'
+
+    return (
+        <div className="bg-[#e8f0fb] border border-[#1351b4] border-l-4 border-l-[#1351b4] px-5 py-4 flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+                <BookOpen className="h-5 w-5 text-[#1351b4] mt-0.5 shrink-0" />
+                <div>
+                    <p className="text-sm font-bold text-[#071D41]">
+                        Bem-vindo ao Doc's Cataguases, {primeiroNome}!
+                    </p>
+                    <p className="text-sm text-[#333333] mt-0.5">
+                        É a sua primeira vez aqui? Leia o guia do sistema para entender como funciona o fluxo de portarias e o seu papel.
+                    </p>
+                    <Link
+                        to="/tutorial"
+                        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#1351b4] hover:underline mt-2"
+                        onClick={dispensar}
+                    >
+                        Abrir guia do sistema →
+                    </Link>
+                </div>
+            </div>
+            <button
+                onClick={dispensar}
+                className="shrink-0 text-[#555555] hover:text-[#333333] mt-0.5"
+                title="Dispensar"
+            >
+                <X className="h-4 w-4" />
+            </button>
+        </div>
+    )
+}
+
+/** Banner de novo/atualizado modelo — aparece quando há notificações não lidas de modelo */
+function ModeloBanner() {
+    const navigate = useNavigate()
+    const { notificacoes, marcarTodasLidas } = useNotificationsStore()
+
+    const naoLidasModelo = notificacoes.filter(
+        n => !n.lida && (n.tipoEvento === 'MODELO_CRIADO' || n.tipoEvento === 'MODELO_ATUALIZADO')
+    )
+
+    if (naoLidasModelo.length === 0) return null
+
+    const mais_recente = naoLidasModelo[0]
+    const isNovo = mais_recente.tipoEvento === 'MODELO_CRIADO'
+
+    function dispensar() {
+        // Marca apenas as notificações de modelo como lidas
+        useNotificationsStore.setState(state => ({
+            notificacoes: state.notificacoes.map(n =>
+                n.tipoEvento === 'MODELO_CRIADO' || n.tipoEvento === 'MODELO_ATUALIZADO'
+                    ? { ...n, lida: true }
+                    : n
+            ),
+            naoLidas: Math.max(0, state.naoLidas - naoLidasModelo.length),
+        }))
+    }
+
+    return (
+        <div className={`border-l-4 px-5 py-4 flex items-start justify-between gap-4 animate-in slide-in-from-top-2 duration-300 ${isNovo ? 'bg-indigo-50 border-indigo-500' : 'bg-amber-50 border-amber-500'}`}>
+            <div className="flex items-start gap-3">
+                <Sparkles className={`h-5 w-5 mt-0.5 shrink-0 ${isNovo ? 'text-indigo-600' : 'text-amber-600'}`} />
+                <div>
+                    <p className={`text-sm font-bold ${isNovo ? 'text-indigo-900' : 'text-amber-900'}`}>
+                        {naoLidasModelo.length > 1
+                            ? `${naoLidasModelo.length} atualizações de modelos de documento`
+                            : mais_recente.mensagem}
+                    </p>
+                    <button
+                        onClick={() => { dispensar(); navigate({ to: '/admin/modelos' }) }}
+                        className={`inline-flex items-center gap-1 text-sm font-bold hover:underline mt-1 ${isNovo ? 'text-indigo-600' : 'text-amber-700'}`}
+                    >
+                        Ver modelos disponíveis <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                </div>
+            </div>
+            <button onClick={dispensar} className="shrink-0 text-slate-400 hover:text-slate-600 mt-0.5" title="Dispensar">
+                <X className="h-4 w-4" />
+            </button>
+        </div>
+    )
+}
 
 function DashboardPage() {
     const { stats, feed, loading } = useDashboard()
@@ -31,6 +136,8 @@ function DashboardPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+            <WelcomeBanner />
+            <ModeloBanner />
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight text-slate-900">Visão Geral</h2>

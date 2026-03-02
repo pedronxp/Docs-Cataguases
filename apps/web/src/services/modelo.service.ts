@@ -30,10 +30,10 @@ export async function criarModelo(payload: any): Promise<Result<ModeloDocumento>
     }
 }
 
-export async function atualizarModelo(id: string, payload: any): Promise<Result<ModeloDocumento>> {
+export async function atualizarModelo(id: string, payload: any): Promise<Result<{ modelo: ModeloDocumento; novaVersao: boolean }>> {
     try {
         const response = await api.patch(`/api/admin/modelos/${id}`, payload)
-        return ok(response.data.data)
+        return ok({ modelo: response.data.data, novaVersao: response.data.novaVersao ?? false })
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao atualizar modelo')
     }

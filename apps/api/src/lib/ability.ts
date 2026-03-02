@@ -5,13 +5,13 @@ import { User, Portaria } from '@prisma/client'
  * Ações permitidas no sistema.
  */
 type Actions = 'criar' | 'ler' | 'editar' | 'deletar' | 'submeter' |
-    'aprovar' | 'rejeitar' | 'assinar' | 'publicar' | 'gerenciar' | 'manage'
+    'aprovar' | 'rejeitar' | 'assinar' | 'publicar' | 'gerenciar' | 'manage' | 'transferir' | 'claim'
 
 /**
  * Entidades (Subjects) protegidas.
  */
 type Subjects = 'Portaria' | 'User' | 'ModeloDocumento' | 'Modelo' | 'Secretaria' | 'Setor' |
-    'LivrosNumeracao' | 'VariavelSistema' | 'FeedAtividade' | 'Analytics' | 'all'
+    'LivrosNumeracao' | 'VariavelSistema' | 'FeedAtividade' | 'Analytics' | 'all' | 'Revisao'
 
 /**
  * Definição de condições para filtragem de objetos.
@@ -56,11 +56,15 @@ export function buildAbility(user: User): AppAbility {
         can('ler', 'FeedAtividade', { secretariaId: user.secretariaId } as any)
     }
 
-    // 4. GESTOR_SETOR: Gestão do próprio setor
-    if (user.role === 'GESTOR_SETOR' && user.setorId) {
-        can('ler', 'Portaria', { setorId: user.setorId } as any)
-        can('editar', 'Portaria', { setorId: user.setorId, status: 'RASCUNHO' } as any)
-        can('aprovar', 'Portaria', { setorId: user.setorId } as any)
+    // 4. REVISOR: Revisão claim-based de portarias da secretaria
+    if (user.role === 'REVISOR' && user.secretariaId) {
+        can('ler', 'Portaria', { secretariaId: user.secretariaId } as any)
+        can('aprovar', 'Portaria', { secretariaId: user.secretariaId } as any)
+        can('rejeitar', 'Portaria', { secretariaId: user.secretariaId } as any)
+        can('ler', 'FeedAtividade', { secretariaId: user.secretariaId } as any)
+        can('claim', 'Revisao')
+        can('transferir', 'Revisao')
+        can('ler', 'Revisao')
     }
 
     // 5. OPERADOR: Criação e visualização das próprias portarias
@@ -70,14 +74,17 @@ export function buildAbility(user: User): AppAbility {
         can('editar', 'Portaria', { criadoPorId: user.id, status: 'RASCUNHO' } as any)
         can('submeter', 'Portaria', { criadoPorId: user.id } as any)
         cannot('deletar', 'Portaria')
+        can('ler', 'FeedAtividade')
     }
 
     // 6. Permissões granuladas dinâmicas (permissoesExtra)
-    // Formato no banco: "acao:Subject" (ex: "deletar:Portaria")
+    // Formato: "acao:Subject" (global) ou "acao:Subject:secretaria" (escopado à secretaria do usuário)
     for (const permissao of user.permissoesExtra) {
-        const parts = permissao.split(':')
-        if (parts.length === 2) {
-            const [action, subject] = parts as [Actions, Subjects]
+        const [action, subject, escopo] = permissao.split(':') as [Actions, Subjects, string?]
+        if (!action || !subject) continue
+        if (escopo === 'secretaria' && user.secretariaId) {
+            can(action, subject, { secretariaId: user.secretariaId } as any)
+        } else {
             can(action, subject)
         }
     }

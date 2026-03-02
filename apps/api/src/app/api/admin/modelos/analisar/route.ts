@@ -61,6 +61,16 @@ export async function POST(req: NextRequest) {
             NOME_CAPS: /\b([A-ZÀ-Ú]{3,}\s[A-ZÀ-Ú]{2,}(?:\s[A-ZÀ-Ú]{2,})*)\b/g
         }
 
+        // Palavras institucionais que não devem ser sugeridas como variáveis de nome
+        const STOPWORDS_INSTITUCIONAIS = new Set([
+            'PREFEITURA', 'MUNICIPAL', 'SECRETARIA', 'DEPARTAMENTO', 'CONSIDERANDO',
+            'RESOLVE', 'DECRETO', 'PORTARIA', 'RESOLUCAO', 'LEI', 'ARTIGO', 'PARAGRAFO',
+            'INCISO', 'ESTADO', 'CATAGUASES', 'REPUBLICA', 'FEDERATIVA', 'BRASIL',
+            'MINAS', 'GERAIS', 'GABINETE', 'PREFEITO', 'VICE', 'CIDADE', 'MUNICIPIO',
+            'ADMINISTRACAO', 'GOVERNO', 'PODER', 'EXECUTIVO', 'LEGISLATIVO', 'JUDICIARIO',
+            'CONTRATO', 'CONVENIO', 'PROCESSO', 'EDITAL', 'LICITACAO', 'CONCURSO'
+        ])
+
         const recomendacoes: any[] = []
         const inseridas = new Set<string>()
 
@@ -70,9 +80,18 @@ export async function POST(req: NextRequest) {
             // Se já está dentro de uma tag {{...}}, ignorar
             if (tagsUnicas.some(t => texto.includes(t))) return
 
+            // Fix: manter dígitos na sugestaoChave (ex: CPF fica legível)
+            const sugestaoChave = texto
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '')
+                .substring(0, 25)
+
             recomendacoes.push({
                 textoOriginal: texto,
-                sugestaoChave: texto.toUpperCase().replace(/[^A-Z]/g, '_').substring(0, 20),
+                sugestaoChave,
                 tipo
             })
             inseridas.add(texto)
@@ -86,9 +105,13 @@ export async function POST(req: NextRequest) {
         const datas = [...textoLimpo.matchAll(RECOMENDACOES_REGEX.DATA)]
         datas.forEach(m => sugerirRecomendacao(m[0], 'data'))
 
-        // Buscar Nomes
+        // Buscar Nomes — filtrar stopwords institucionais para evitar ruído
         const nomes = [...textoLimpo.matchAll(RECOMENDACOES_REGEX.NOME_CAPS)]
-        nomes.forEach(m => sugerirRecomendacao(m[0], 'nome'))
+        nomes.forEach(m => {
+            const palavras = m[0].split(/\s+/)
+            const temStopword = palavras.some(p => STOPWORDS_INSTITUCIONAIS.has(p))
+            if (!temStopword) sugerirRecomendacao(m[0], 'nome')
+        })
 
         // Separar variáveis de usuário das variáveis de sistema (SYS_*)
         const variaveisUsuario = tagsUnicas.filter(

@@ -1,4 +1,4 @@
-import CloudConvert from 'cloudconvert';
+import axios from 'axios';
 import { ok, err, Result } from '@/lib/result';
 import fs from 'fs';
 import path from 'path';
@@ -60,10 +60,8 @@ export class PdfService {
         while (attempts < availableKeys.length) {
             const actualKeyIndex = currentIndex % availableKeys.length;
             const currentKey = availableKeys[actualKeyIndex];
-            const sdk = new CloudConvert(currentKey);
-
             try {
-                const job = await sdk.jobs.create({
+                const jobRes = await axios.post('https://api.cloudconvert.com/v2/jobs', {
                     tasks: {
                         'import-html': {
                             operation: 'import/raw',
@@ -82,19 +80,33 @@ export class PdfService {
                             input: 'convert-pdf'
                         }
                     }
+                }, {
+                    headers: { 'Authorization': `Bearer ${currentKey}` },
+                    timeout: 30000
                 });
 
-                const finishedJob = await sdk.jobs.wait(job.id);
-                const exportTask = finishedJob.tasks.find(t => t.operation === 'export/url' && t.status === 'finished');
+                const job = jobRes.data.data;
+
+                const waitRes = await axios.get(`https://api.cloudconvert.com/v2/jobs/${job.id}/wait`, {
+                    headers: { 'Authorization': `Bearer ${currentKey}` },
+                    timeout: 120000
+                });
+
+                const finishedJob = waitRes.data.data;
+                const exportTask = finishedJob.tasks.find((t: any) => t.operation === 'export/url' && t.status === 'finished');
 
                 if (!exportTask || !exportTask.result?.files?.[0]?.url) {
                     throw new Error('Falha na exportação do PDF');
                 }
 
-                const res = await fetch(exportTask.result.files[0].url);
-                if (!res.ok) throw new Error('Erro ao baixar PDF');
+                const res = await axios.get(exportTask.result.files[0].url, {
+                    responseType: 'arraybuffer',
+                    timeout: 30000
+                });
 
-                const buffer = Buffer.from(await res.arrayBuffer());
+                if (res.status !== 200) throw new Error('Erro ao baixar PDF');
+
+                const buffer = Buffer.from(res.data);
 
                 if (actualKeyIndex !== parseInt(process.env.CLOUDCONVERT_CURRENT_KEY_INDEX || '0', 10)) {
                     await this.persistActiveIndex(actualKeyIndex);

@@ -1,7 +1,11 @@
-import CloudConvert from 'cloudconvert';
+import axios from 'axios';
 import { ok, err, Result } from '@/lib/result';
 import fs from 'fs';
 import path from 'path';
+import dns from 'dns';
+
+// Forçar resolução IPv4 antes de IPv6 para evitar ConnectTimeoutError no Node 18+ (undici/fetch)
+dns.setDefaultResultOrder('ipv4first');
 
 export class CloudConvertService {
     /**
@@ -86,10 +90,8 @@ export class CloudConvertService {
 
             console.log(`[CloudConvert] Tentando conversão com chave índice ${actualKeyIndex}...`);
 
-            const sdk = new CloudConvert(currentKey);
-
             try {
-                const job = await sdk.jobs.create({
+                const jobRes = await axios.post('https://api.cloudconvert.com/v2/jobs', {
                     tasks: {
                         'upload-my-file': {
                             operation: 'import/upload'
@@ -105,25 +107,53 @@ export class CloudConvertService {
                             input: 'convert-my-file'
                         }
                     }
+                }, {
+                    headers: { 'Authorization': `Bearer ${currentKey}` },
+                    timeout: 30000
                 });
 
-                const uploadTask = job.tasks.find(task => task.name === 'upload-my-file');
-                if (!uploadTask) throw new Error('Falha ao criar task de upload');
+                const job = jobRes.data.data;
 
-                await sdk.tasks.upload(uploadTask, Buffer.from(fileBuffer), fileName);
+                const uploadTask = job.tasks.find((task: any) => task.name === 'upload-my-file');
+                if (!uploadTask || !uploadTask.result?.form) throw new Error('Falha ao criar task de upload');
 
-                const finishedJob = await sdk.jobs.wait(job.id);
-                const exportTask = finishedJob.tasks.find(task => task.operation === 'export/url' && task.status === 'finished');
+                const { url: uploadUrl, parameters } = uploadTask.result.form;
+                const formData = new FormData();
+                for (const [key, value] of Object.entries(parameters)) {
+                    formData.append(key, value as string);
+                }
+
+                // Node.js 18+ FormData. fileBuffer is passed as Uint8Array to satisfy BlobPart interface
+                const blob = new Blob([new Uint8Array(fileBuffer)]);
+                formData.append('file', blob, fileName);
+
+                await axios.post(uploadUrl, formData, {
+                    timeout: 60000
+                });
+
+                const waitRes = await axios.get(`https://api.cloudconvert.com/v2/jobs/${job.id}/wait`, {
+                    headers: { 'Authorization': `Bearer ${currentKey}` },
+                    timeout: 120000
+                });
+
+                const finishedJob = waitRes.data.data;
+                const exportTask = finishedJob.tasks.find((task: any) => task.operation === 'export/url' && task.status === 'finished');
 
                 if (!exportTask || !exportTask.result?.files?.[0]?.url) {
                     throw new Error('Erro ao exportar resultado');
                 }
 
                 const url = exportTask.result.files[0].url;
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('Erro ao baixar HTML convertido');
 
-                const htmlContent = await response.text();
+                // Usando axios para maior controle de timeout e evitar erros do fetch nativo (undici)
+                const response = await axios.get(url, {
+                    responseType: 'text',
+                    timeout: 30000 // 30 segundos de timeout
+                });
+
+                if (response.status !== 200) throw new Error('Erro ao baixar HTML convertido');
+
+                const htmlContent = response.data;
 
                 // Se mudamos de chave, persiste a nova
                 if (actualKeyIndex !== parseInt(process.env.CLOUDCONVERT_CURRENT_KEY_INDEX || '0', 10)) {

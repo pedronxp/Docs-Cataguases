@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, BookOpen, KeyRound, Type, Hash, Calendar, CalendarDays, FileDigit, Coins, FileSignature, List, Info } from 'lucide-react'
+import { ArrowLeft, BookOpen, KeyRound, Type, Hash, Calendar, CalendarDays, FileDigit, Coins, FileSignature, List, Info, Sparkles } from 'lucide-react'
 
 export const Route = createFileRoute('/_sistema/admin/variaveis-dicas')({
   component: VariaveisTutorialPage,
@@ -136,8 +136,8 @@ function VariaveisTutorialPage() {
                 <ol className="list-decimal list-inside text-slate-600 space-y-2 text-sm ml-2">
                   <li>Você cadastra a variável global <code>{'{'}{'{'}SYS_NOME_PREFEITO{'}'}{'}'}</code> com o valor <strong>"João da Silva"</strong>.</li>
                   <li>Você insere essa tag dentro de 50 modelos de documentos diferentes.</li>
-                  <li>Ano que vem as eleições acontecem e o prefeito agora é o "Pedro".</li>
-                  <li>Você altera em apenas 1 lugar na tela de Variáveis Globais. Automaticamente, todos os 50 modelos de documentos passam a usar "Pedro".</li>
+                  <li>Você altera em apenas 1 lugar na tela de Variáveis Globais. Todas as novas portarias criadas passarão a usar o nome "Pedro".</li>
+                  <li className="text-sky-700 font-medium">Os documentos criados em 2026 permanecerão intactos, preservando a identidade em PDF do Prefeito na época.</li>
                 </ol>
               </div>
             </CardContent>
@@ -149,25 +149,33 @@ function VariaveisTutorialPage() {
           <Card className="shadow-sm border-blue-100 bg-white">
             <CardContent className="p-6 space-y-4">
               <p className="text-slate-600">
-                Quando você escolhe o tipo <strong>"Lista Redirecionada (Select)"</strong> no Passo 3 do criador de Modelo, você precisa informar ao sistema quais são as opções que o usuário poderá escolher.
+                A <strong>Lista Redirecionada (Select)</strong> é excelente para forçar o preenchimento de opções padronizadas. O usuário que gerar a Portaria não precisará digitar, apenas clicará em uma das opções predefinidas que você criar.
               </p>
               <div className="bg-slate-50 p-4 border rounded-md">
-                <p className="font-semibold text-slate-800 mb-2">Como preencher as opções:</p>
+                <p className="font-semibold text-slate-800 mb-2">Siga estes 3 passos simples para criá-la no Passo 3 do seu Modelo:</p>
                 <ol className="list-decimal list-inside text-slate-600 space-y-3 text-sm ml-2">
-                  <li>No Passo 3, altere o "TIPO DE DADO" da variável para <strong>"Lista Redirecionada"</strong>.</li>
-                  <li>Um novo campo chamado <strong>"OPÇÕES DA LISTA"</strong> vai aparecer logo abaixo.</li>
+                  <li>Encontre o Card da sua Variável (Ex: <code>{'{'}{'{'}ESTADO_CIVIL{'}'}{'}'}</code>) e clique no campo <strong>TIPO DE DADO</strong>.</li>
+                  <li>Mude de "Texto Curto" para <strong>"Lista Redirecionada"</strong>.</li>
                   <li>
-                    Digite os itens separados por <strong>vírgula</strong>.<br />
-                    <span className="inline-block mt-2 font-mono text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-100">
-                      Solteiro, Casado, Divorciado, Viúvo
-                    </span>
-                  </li>
-                  <li>Se precisar que a Lista também preencha outra coisa baseada no que foi selecionado, use o formato <code>VALOR_NA_TELA|DADO_INVISIVEL</code> separados por <strong>pipe (|)</strong>.<br />
-                    <span className="inline-block mt-2 font-mono text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-100">
-                      Secretaria da Saúde|Av. Principal 100, Secretaria de Obras|Rua das Flores 200
+                    Abaixo dele abrirá o campo novo <strong>"OPÇÕES DA LISTA"</strong>. Digite as opções separadas por <strong>vírgula</strong>.<br />
+                    <span className="inline-block mt-2 font-mono text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-100 shadow-sm">
+                      Solteiro(a), Casado(a), Divorciado(a), Viúvo(a)
                     </span>
                   </li>
                 </ol>
+              </div>
+
+              <div className="bg-indigo-50/50 p-4 border border-indigo-100 rounded-md">
+                <p className="font-semibold text-indigo-900 mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-indigo-500" />
+                  Truque Avançado: Valor Visível x Valor Invisível
+                </p>
+                <p className="text-sm text-indigo-800/80 mb-2">
+                  E se você quiser que o usuário escolha "Secretaria da Saúde", mas no texto do ofício imprima "Rua das Flores 100, Centro"? Use o formato <code>VALOR_NA_TELA | VALOR_IMPRESSO</code> unidos por um caractere Pipe ( <strong>|</strong> ):
+                </p>
+                <span className="inline-block font-mono text-indigo-700 bg-indigo-100/50 px-2 py-1 rounded border border-indigo-200 text-xs shadow-sm">
+                  Secretaria da Saúde | Rua das Flores 100, Secretaria de Obras | Av. Principal 200
+                </span>
               </div>
             </CardContent>
           </Card>

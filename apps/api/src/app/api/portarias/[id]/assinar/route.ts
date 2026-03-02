@@ -1,28 +1,47 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { StorageService } from '@/services/storage.service'
 
 export const dynamic = 'force-dynamic'
+
+interface SessionPayload {
+    id: string
+    role: string
+    name?: string
+    username?: string
+    secretariaId?: string
+}
 
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getSession()
-        if (!session || !['SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'].includes(session.role)) {
-            return NextResponse.json({ success: false, error: 'Não autorizado a assinar' }, { status: 403 })
+        const rawSession = await getSession()
+        if (!rawSession) {
+            return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 })
+        }
+        const session = rawSession as unknown as SessionPayload
+
+        if (!['SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'].includes(session.role)) {
+            return NextResponse.json({ success: false, error: 'Sem permissão para registrar assinatura' }, { status: 403 })
         }
 
         const body = await request.json()
-        const { tipoAssinatura, justificativa, comprovanteUrl } = body
+        const { tipoAssinatura, justificativa, comprovanteBase64, comprovanteNome } = body
         const { id } = await params
 
         const portaria = await prisma.portaria.findUnique({ where: { id } })
-        if (!portaria) return NextResponse.json({ success: false, error: 'Portaria não encontrada' }, { status: 404 })
+        if (!portaria) {
+            return NextResponse.json({ success: false, error: 'Portaria não encontrada' }, { status: 404 })
+        }
 
         if (portaria.status !== 'AGUARDANDO_ASSINATURA') {
-            return NextResponse.json({ success: false, error: 'A portaria não está aguardando assinatura' }, { status: 400 })
+            return NextResponse.json({
+                success: false,
+                error: 'A portaria não está aguardando assinatura'
+            }, { status: 400 })
         }
 
         const validTypes = ['DIGITAL', 'MANUAL', 'DISPENSADA']
@@ -30,39 +49,74 @@ export async function POST(
             return NextResponse.json({ success: false, error: 'Tipo de assinatura inválido' }, { status: 400 })
         }
 
-        if (tipoAssinatura === 'MANUAL' || tipoAssinatura === 'DISPENSADA') {
-            if (!justificativa) return NextResponse.json({ success: false, error: 'Justificativa é obrigatória para este tipo' }, { status: 400 })
+        // Justificativa obrigatória para exceções
+        if ((tipoAssinatura === 'MANUAL' || tipoAssinatura === 'DISPENSADA') && !justificativa?.trim()) {
+            return NextResponse.json({
+                success: false,
+                error: 'Justificativa é obrigatória para assinatura manual ou dispensada'
+            }, { status: 400 })
         }
 
-        let dbStatus = 'NAO_ASSINADA'
-        let msgLog = ''
+        // Comprovante obrigatório para assinatura manual
+        if (tipoAssinatura === 'MANUAL' && !comprovanteBase64) {
+            return NextResponse.json({
+                success: false,
+                error: 'O anexo do documento assinado é obrigatório para assinatura manual'
+            }, { status: 400 })
+        }
+
+        const nomeResponsavel = session.name || session.username || 'Responsável'
+
+        // Upload do comprovante para Supabase Storage (se fornecido)
+        let comprovanteUrl: string | undefined
+        if (comprovanteBase64 && comprovanteNome) {
+            try {
+                const ext = comprovanteNome.split('.').pop()?.toLowerCase() || 'pdf'
+                const contentType = ext === 'pdf' ? 'application/pdf' : `image/${ext}`
+                const path = `portarias/${id}/comprovante-assinatura-${Date.now()}.${ext}`
+                const buffer = Buffer.from(comprovanteBase64, 'base64')
+                await StorageService.uploadBuffer(path, buffer, contentType)
+                comprovanteUrl = path
+            } catch (uploadErr: any) {
+                console.error('[/assinar] Erro ao fazer upload do comprovante:', uploadErr.message)
+                // Não bloqueia o fluxo — registra sem o comprovante
+            }
+        }
+
+        // Define status e mensagem de log por tipo
+        let assinaturaStatus: string
+        let msgLog: string
 
         if (tipoAssinatura === 'DIGITAL') {
-            dbStatus = 'ASSINADA_DIGITAL'
-            msgLog = `Assinada digitalmente por ${session.name || session.username}`
+            assinaturaStatus = 'ASSINADA_DIGITAL'
+            msgLog = `Portaria assinada digitalmente por ${nomeResponsavel} (${session.role}) em ${new Date().toLocaleString('pt-BR')}.`
         } else if (tipoAssinatura === 'MANUAL') {
-            dbStatus = 'ASSINADA_MANUAL'
-            msgLog = `Assinatura manual registrada por ${session.name || session.username}. Justificativa: '${justificativa}'.${comprovanteUrl ? ' Arquivo anexado.' : ''}`
+            assinaturaStatus = 'ASSINADA_MANUAL'
+            msgLog = `Portaria marcada como assinada manualmente. Responsável pelo registro: ${nomeResponsavel} (${session.role}). Justificativa: "${justificativa}".${comprovanteUrl ? ' Comprovante digitalizado anexado.' : ' Nenhum comprovante anexado.'}`
         } else {
-            dbStatus = 'DISPENSADA_COM_JUSTIFICATIVA'
-            msgLog = `Assinatura dispensada por ${session.name || session.username}. Justificativa: '${justificativa}'.`
+            assinaturaStatus = 'DISPENSADA_COM_JUSTIFICATIVA'
+            msgLog = `Assinatura dispensada por decisão formal. Registrado por: ${nomeResponsavel} (${session.role}). Justificativa: "${justificativa}".${comprovanteUrl ? ' Despacho/ato formal anexado.' : ''}`
         }
 
         const atualizada = await prisma.$transaction(async (tx) => {
             const p = await tx.portaria.update({
                 where: { id },
                 data: {
-                    assinaturaStatus: dbStatus,
-                    assinaturaJustificativa: justificativa,
-                    assinaturaComprovanteUrl: comprovanteUrl,
+                    assinaturaStatus,
+                    assinaturaJustificativa: justificativa || null,
+                    assinaturaComprovanteUrl: comprovanteUrl || null,
                     status: 'PRONTO_PUBLICACAO',
-                    assinadoPorId: tipoAssinatura === 'DIGITAL' ? session.id : null,
+                    // Para assinatura digital: registra o signatário; para manual/dispensada: quem registrou
+                    assinadoPorId: session.id,
                     assinadoEm: new Date()
                 }
             })
 
-            await tx.jornalQueue.create({
-                data: { portariaId: id }
+            // Cria entrada na fila do Jornal (upsert para evitar duplicata)
+            await tx.jornalQueue.upsert({
+                where: { portariaId: id },
+                create: { portariaId: id },
+                update: { status: 'PENDENTE', updatedAt: new Date() }
             })
 
             await tx.feedAtividade.create({
@@ -71,14 +125,24 @@ export async function POST(
                     mensagem: msgLog,
                     portariaId: id,
                     autorId: session.id,
-                    secretariaId: portaria.secretariaId
+                    secretariaId: portaria.secretariaId,
+                    metadata: {
+                        tipoAssinatura,
+                        temComprovante: !!comprovanteUrl,
+                        registradoPor: session.id
+                    }
                 }
             })
+
             return p
         })
 
         return NextResponse.json({ success: true, data: atualizada })
     } catch (error: any) {
-        return NextResponse.json({ success: false, error: error.message || 'Erro ao assinar' }, { status: 500 })
+        console.error('[/assinar]', error)
+        return NextResponse.json(
+            { success: false, error: error.message || 'Erro ao registrar assinatura' },
+            { status: 500 }
+        )
     }
 }
