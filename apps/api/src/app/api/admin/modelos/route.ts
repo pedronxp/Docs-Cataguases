@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { buildAbility } from '@/lib/ability'
 import { ModeloService } from '@/services/modelo.service'
 import { z } from 'zod'
+import prisma from '@/lib/prisma'
 
 const modeloSchema = z.object({
     nome: z.string().min(1),
@@ -19,7 +20,10 @@ const modeloSchema = z.object({
         tipo: z.string().default('texto'),
         opcoes: z.array(z.string()).optional(),
         obrigatorio: z.boolean().default(true),
-        ordem: z.number().default(0)
+        ordem: z.number().default(0),
+        valorPadrao: z.string().optional().nullable(),
+        grupo: z.string().optional().nullable(),
+        regraCondicional: z.object({ dependeDe: z.string(), valor: z.string() }).optional().nullable()
     })).default([])
 })
 
@@ -57,7 +61,20 @@ export async function POST(req: NextRequest) {
         const result = await ModeloService.criar(parsed.data)
         if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 })
 
-        return NextResponse.json({ success: true, data: result.value }, { status: 201 })
+        const modelo = result.value
+        // Notifica usuários relevantes sobre o novo modelo
+        await prisma.feedAtividade.create({
+            data: {
+                tipoEvento: 'MODELO_CRIADO',
+                mensagem: `Novo modelo de documento disponível: "${modelo.nome}"`,
+                autorId: (usuario as any).id,
+                secretariaId: modelo.secretariaId ?? null,
+                portariaId: null,
+                metadata: { modeloId: modelo.id, modeloNome: modelo.nome }
+            }
+        }).catch(() => { /* não bloquear criação por falha no feed */ })
+
+        return NextResponse.json({ success: true, data: modelo }, { status: 201 })
     } catch (error) {
         return NextResponse.json({ error: 'Erro interno ao criar modelo' }, { status: 500 })
     }

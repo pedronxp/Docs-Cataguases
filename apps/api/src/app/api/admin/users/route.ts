@@ -8,12 +8,6 @@ export async function GET(request: Request) {
     try {
         const session = await getAuthUser()
 
-        // DEBUG: Log session to a file since terminal output is hard to read
-        try {
-            const fs = require('fs')
-            fs.appendFileSync('auth_debug.log', `[${new Date().toISOString()}] Session: ${JSON.stringify(session)}\n`)
-        } catch (e) { }
-
         // Apenas admins podem listar todos os usuários
         if (!session || session.role !== 'ADMIN_GERAL') {
             return NextResponse.json(
@@ -30,10 +24,12 @@ export async function GET(request: Request) {
         const role = searchParams.get('role')
         const ativo = searchParams.get('ativo')
         const busca = searchParams.get('busca')
+        const secretariaId = searchParams.get('secretariaId')
 
         const where: any = {}
         if (role) where.role = role
         if (ativo) where.ativo = ativo === 'true'
+        if (secretariaId) where.secretariaId = secretariaId
         if (busca) {
             where.OR = [
                 { name: { contains: busca, mode: 'insensitive' } },
@@ -53,6 +49,9 @@ export async function GET(request: Request) {
                 secretariaId: true,
                 setorId: true,
                 permissoesExtra: true,
+                createdAt: true,
+                secretaria: { select: { id: true, nome: true, sigla: true } },
+                setor: { select: { id: true, nome: true } },
             },
         })
 

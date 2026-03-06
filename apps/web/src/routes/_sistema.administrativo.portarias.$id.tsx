@@ -4,10 +4,11 @@ import { portariaService } from '@/services/portaria.service'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
 import {
-    FileText, CheckCircle2, AlertCircle,
-    ChevronLeft, FileDown, PenTool, ShieldCheck, Download, AlertTriangle, Loader2,
-    Clock, Eye, XCircle
+    FileText, CheckCircle2, AlertCircle, UserPlus,
+    ChevronLeft, PenTool, ShieldCheck, Download, AlertTriangle, Loader2,
+    Clock, Eye, XCircle, FileSignature, Send
 } from 'lucide-react'
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -19,6 +20,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { Portaria } from '@/types/domain'
 import { STATUS_PORTARIA } from '@/types/domain'
 import { AbilityContext } from '@/lib/ability'
+import { useAuthStore } from '@/store/auth.store'
+import { AssinaturaModal } from '@/components/portarias/AssinaturaModal'
 
 export const Route = createFileRoute('/_sistema/administrativo/portarias/$id')({
     component: PortariaDetalhesPage,
@@ -28,68 +31,73 @@ function PortariaDetalhesPage() {
     const { id } = Route.useParams()
     const { toast } = useToast()
     const ability = useContext(AbilityContext)
+    const { usuario } = useAuthStore()
     const [loading, setLoading] = useState(true)
     const [portaria, setPortaria] = useState<Portaria | null>(null)
     const [actionLoading, setActionLoading] = useState(false)
+    const [observacaoRejeicao, setObservacaoRejeicao] = useState('')
+    const [isAssinaturaModalOpen, setIsAssinaturaModalOpen] = useState(false)
+    const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null)
 
     useEffect(() => {
-        async function load() {
-            setLoading(true)
-            const res = await portariaService.buscarPortaria(id)
-            if (res.success) setPortaria(res.data)
-            setLoading(false)
-        }
-        load()
+        loadPortaria()
     }, [id])
 
-    const handleAprovar = async () => {
+    async function loadPortaria() {
+        setLoading(true)
+        setPdfViewerUrl(null)
+        const res = await portariaService.buscarPortaria(id)
+        if (res.success) {
+            setPortaria(res.data)
+            if (res.data.pdfUrl) {
+                const pdfRes = await portariaService.gerarPdf(id)
+                if (pdfRes.success) setPdfViewerUrl(pdfRes.data.url)
+            }
+        }
+        setLoading(false)
+    }
+
+    const handleAction = async (actionFn: () => Promise<any>, successMsg: string) => {
         setActionLoading(true)
-        const res = await portariaService.aprovarPortaria(id)
+        const res = await actionFn()
         setActionLoading(false)
         if (res.success) {
             setPortaria(res.data)
-            toast({ title: '✅ Portaria aprovada!', description: 'O documento foi enviado para assinatura.' })
+            toast({ title: 'Sucesso', description: successMsg })
+        } else {
+            toast({ title: 'Erro', description: res.error, variant: 'destructive' })
         }
     }
 
-    const handleRejeitar = async () => {
+    const handleAssumirRevisao = () => handleAction(() => portariaService.assumirRevisao(id), 'Você assumiu a revisão desta portaria.')
+    const handleAprovar = () => handleAction(() => portariaService.aprovarPortaria(id), 'Portaria aprovada para assinatura.')
+
+    const handleRejeitar = () => {
+        if (!observacaoRejeicao.trim()) {
+            toast({ title: 'Atenção', description: 'Informe o motivo da rejeição.', variant: 'destructive' })
+            return
+        }
+        handleAction(() => portariaService.rejeitarPortaria(id, observacaoRejeicao), 'Portaria devolvida para correção.')
+    }
+
+    const handleDownloadPdf = async () => {
         setActionLoading(true)
-        const res = await portariaService.rejeitarPortaria(id)
+        const res = await portariaService.gerarPdf(id)
         setActionLoading(false)
+
         if (res.success) {
-            setPortaria(res.data)
-            toast({ title: 'Portaria rejeitada', description: 'O documento voltou para rascunho para correção.' })
+            window.open(res.data.url, '_blank')
+            toast({ title: 'Sucesso', description: 'PDF pronto para download.' })
+        } else {
+            toast({
+                title: 'Erro ao gerar PDF',
+                description: res.error,
+                variant: 'destructive'
+            })
         }
     }
 
-    const handleAssinar = async () => {
-        setActionLoading(true)
-        const res = await portariaService.assinarPortaria(id)
-        setActionLoading(false)
-        if (res.success) {
-            setPortaria(res.data)
-            toast({ title: '🖊️ Assinado e Publicado!', description: `Portaria ${res.data.numeroOficial} publicada com sucesso.` })
-        }
-    }
-
-    const handleDownloadPdf = () => {
-        toast({ title: 'Simulando download...', description: 'Em produção, o PDF oficial seria baixado do storage.' })
-    }
-
-    if (loading) {
-        return (
-            <div className="space-y-6 max-w-6xl">
-                <Skeleton className="h-8 w-48" />
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    <div className="lg:col-span-8"><Skeleton className="h-[700px] rounded-lg" /></div>
-                    <div className="lg:col-span-4 space-y-4">
-                        <Skeleton className="h-64 rounded-lg" />
-                        <Skeleton className="h-48 rounded-lg" />
-                    </div>
-                </div>
-            </div>
-        )
-    }
+    if (loading) return <PortariaSkeleton />
 
     if (!portaria) {
         return (
@@ -102,11 +110,17 @@ function PortariaDetalhesPage() {
     }
 
     const isPublicada = portaria.status === STATUS_PORTARIA.PUBLICADA
-    const isPendente = portaria.status === STATUS_PORTARIA.PENDENTE
-    const isAprovada = portaria.status === STATUS_PORTARIA.APROVADA
+    const isProntoPublicacao = portaria.status === STATUS_PORTARIA.PRONTO_PUBLICACAO
+    const isAguardandoAssinatura = portaria.status === STATUS_PORTARIA.AGUARDANDO_ASSINATURA
+    const isRevisaoAberta = portaria.status === STATUS_PORTARIA.EM_REVISAO_ABERTA
+    const isRevisaoAtribuida = portaria.status === STATUS_PORTARIA.EM_REVISAO_ATRIBUIDA
+
+
     const dadosLista = Object.entries(portaria.formData || {})
     const canSign = ability.can('assinar', 'Portaria')
     const canApprove = ability.can('aprovar', 'Portaria')
+    const canEdit = ability.can('criar', 'Portaria')
+    const isMyReview = portaria.revisorAtualId === usuario?.id
 
     return (
         <div className="space-y-5 animate-in fade-in duration-500 max-w-6xl">
@@ -153,11 +167,26 @@ function PortariaDetalhesPage() {
                                 {isPublicada ? 'PDF Oficial' : 'Pré-visualização'}
                             </Badge>
                         </CardHeader>
-                        <CardContent className="p-6 flex items-start justify-center bg-slate-100 min-h-[700px]">
-                            {/* Mock documento A4 */}
-                            <div className="bg-white w-full max-w-[600px] shadow-xl border border-slate-200 p-14 space-y-8 flex flex-col">
+                        <CardContent className="p-0 bg-slate-100 min-h-[700px] flex flex-col">
+                            {/* PDF real via iframe quando disponível */}
+                            {pdfViewerUrl ? (
+                                <iframe
+                                    src={pdfViewerUrl}
+                                    className="w-full flex-1 min-h-[700px] border-0"
+                                    title="Visualização do Documento PDF"
+                                />
+                            ) : (
+                            <div className="p-6 flex flex-col items-start justify-center gap-4 min-h-[700px]">
+                            <div className="bg-white w-full max-w-[600px] mx-auto shadow-xl border border-slate-200 p-14 space-y-8 flex flex-col relative">
+                                {/* D'Água de Rascunho se não for publicada */}
+                                {!isPublicada && !isProntoPublicacao && (
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none overflow-hidden">
+                                        <div className="text-8xl font-black rotate-45 tracking-widest text-slate-900">RASCUNHO</div>
+                                    </div>
+                                )}
+
                                 {/* Cabeçalho doc */}
-                                <div className="flex flex-col items-center gap-3 text-center pb-6 border-b border-slate-100">
+                                <div className="flex flex-col items-center gap-3 text-center pb-6 border-b border-slate-100 relative z-10">
                                     <div className="w-14 h-14 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
                                         <ShieldCheck className="h-7 w-7 text-slate-400" />
                                     </div>
@@ -168,7 +197,7 @@ function PortariaDetalhesPage() {
                                 </div>
 
                                 {/* Corpo */}
-                                <div className="text-center space-y-3">
+                                <div className="text-center space-y-3 relative z-10">
                                     <h1 className="text-base font-black text-slate-900 uppercase tracking-tight">
                                         Portaria nº {portaria.numeroOficial ?? '___/____'}
                                     </h1>
@@ -177,7 +206,7 @@ function PortariaDetalhesPage() {
                                     </p>
                                 </div>
 
-                                <div className="text-xs text-slate-700 leading-relaxed space-y-3 text-justify font-medium">
+                                <div className="text-xs text-slate-700 leading-relaxed space-y-3 text-justify font-medium relative z-10">
                                     <p>O PREFEITO MUNICIPAL DE CATAGUASES, no uso de suas atribuições legais e em conformidade com o Art. 68 da Lei Orgânica Municipal:</p>
                                     <p><strong>RESOLVE:</strong></p>
                                     <p><strong>Art. 1º</strong> {portaria.titulo} nos termos da legislação vigente.</p>
@@ -188,29 +217,49 @@ function PortariaDetalhesPage() {
                                 </div>
 
                                 {/* Assinatura */}
-                                <div className="flex flex-col items-center gap-2 pt-10 border-t border-slate-100 mt-auto">
+                                <div className="flex flex-col items-center gap-2 pt-10 border-t border-slate-100 mt-auto relative z-10">
                                     <div className="w-44 h-px bg-slate-400" />
                                     <p className="text-[10px] font-black text-slate-900 uppercase">Prefeito Municipal</p>
                                     <p className="text-[9px] text-slate-500 font-medium">
-                                        Cataguases/MG, {new Date(portaria.updatedAt).toLocaleDateString('pt-BR')}
+                                        Cataguases/MG, {isPublicada && portaria.dataPublicacao ? new Date(portaria.dataPublicacao).toLocaleDateString('pt-BR') : '__/__/____'}
                                     </p>
                                 </div>
 
-                                {/* Selo de Autenticidade (publicada) */}
-                                {isPublicada && (
-                                    <div className="pt-4 border-t border-emerald-100 bg-emerald-50 -mx-14 -mb-14 px-14 pb-6">
+                                {/* Selos de Autenticidade (publicada) */}
+                                {(isPublicada || isProntoPublicacao) && portaria.assinaturaStatus === 'ASSINADA_DIGITAL' && (
+                                    <div className="pt-4 border-t border-emerald-100 bg-emerald-50 -mx-14 -mb-14 px-14 pb-6 mt-4 relative z-10">
                                         <div className="flex items-center gap-3">
                                             <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded border border-emerald-200">
                                                 <ShieldCheck size={14} />
                                             </div>
                                             <div>
                                                 <p className="text-[9px] font-black text-emerald-800 uppercase tracking-wider">Assinado Digitalmente</p>
-                                                <p className="text-[8px] text-emerald-600 font-mono">{portaria.hashAssinatura ?? 'hash-pendente'}</p>
+                                                <p className="text-[8px] text-emerald-600 font-mono">{portaria.hashIntegridade ?? 'hash-gerado'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {(isPublicada || isProntoPublicacao) && portaria.assinaturaStatus === 'DISPENSADA_COM_JUSTIFICATIVA' && (
+                                    <div className="pt-4 border-t border-amber-100 bg-amber-50 -mx-14 -mb-14 px-14 pb-6 mt-4 relative z-10">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-1.5 bg-amber-100 text-amber-600 rounded border border-amber-200">
+                                                <AlertTriangle size={14} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-black text-amber-800 uppercase tracking-wider">Assinatura Excepcional - Dispensada</p>
+                                                <p className="text-[8px] text-amber-600 font-mono">Consulte a timeline para justificativa</p>
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
+                            {!portaria.pdfUrl && (
+                                <p className="text-xs text-slate-400 text-center mt-2 pb-4">
+                                    Pré-visualização dos dados. O PDF oficial será gerado após a submissão do documento.
+                                </p>
+                            )}
+                            </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -224,8 +273,8 @@ function PortariaDetalhesPage() {
                         </CardHeader>
                         <CardContent className="p-4 space-y-3">
                             <InfoRow label="Protocolo" value={`#${id.substring(0, 8).toUpperCase()}`} />
-                            <InfoRow label="Modelo" value={portaria.modeloId} />
-                            <InfoRow label="Secretaria" value={portaria.secretariaId} />
+                            <InfoRow label="Modelo" value={(portaria as any).modelo?.nome || '—'} />
+                            <InfoRow label="Secretaria" value={portaria.secretaria?.nome || '—'} />
                             <InfoRow label="Registro" value={new Date(portaria.createdAt).toLocaleDateString('pt-BR')} />
                             {portaria.numeroOficial && (
                                 <InfoRow label="Número Oficial" value={portaria.numeroOficial} />
@@ -233,61 +282,129 @@ function PortariaDetalhesPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Dados do Formulário */}
-                    {dadosLista.length > 0 && (
-                        <Card className="border-slate-200 shadow-sm">
-                            <CardHeader className="bg-slate-50 border-b border-slate-100 p-4">
-                                <CardTitle className="text-xs font-black text-slate-500 uppercase tracking-widest">Dados Preenchidos</CardTitle>
+                    {/* ACTIONS: RASCUNHO → ir para elaboração */}
+                    {portaria.status === STATUS_PORTARIA.RASCUNHO && canEdit && (
+                        <Card className="border-slate-300 bg-slate-50 shadow-md">
+                            <CardHeader className="p-4 pb-2">
+                                <div className="flex items-center gap-2 text-slate-700">
+                                    <FileText size={16} />
+                                    <CardTitle className="text-sm font-black uppercase tracking-tight">Documento em Elaboração</CardTitle>
+                                </div>
                             </CardHeader>
-                            <CardContent className="p-0 divide-y divide-slate-100">
-                                {dadosLista.map(([chave, valor]) => (
-                                    <div key={chave} className="px-4 py-2.5">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{chave.replace(/_/g, ' ')}</p>
-                                        <p className="text-sm font-semibold text-slate-800 mt-0.5">{valor}</p>
-                                    </div>
-                                ))}
+                            <CardContent className="p-4 space-y-3">
+                                <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                                    Baixe o modelo gerado pelo sistema, edite no Word com os dados corretos e faça o upload do arquivo final para enviar ao revisor.
+                                </p>
+                                <Button
+                                    asChild
+                                    className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold h-10 shadow-md"
+                                >
+                                    <Link to="/administrativo/portarias/revisao/$id" params={{ id }}>
+                                        <PenTool className="mr-2 h-4 w-4" /> Elaborar Documento
+                                    </Link>
+                                </Button>
                             </CardContent>
                         </Card>
                     )}
 
-                    {/* Card de Ação — PENDENTE (Revisor aprova/rejeita) */}
-                    {isPendente && canApprove && (
+                    {/* ACTIONS: CORRECAO_NECESSARIA → corrigir e reenviar */}
+                    {portaria.status === STATUS_PORTARIA.CORRECAO_NECESSARIA && canEdit && (
+                        <Card className="border-rose-300 bg-rose-50 shadow-md">
+                            <CardHeader className="p-4 pb-2">
+                                <div className="flex items-center gap-2 text-rose-700">
+                                    <AlertCircle size={16} />
+                                    <CardTitle className="text-sm font-black uppercase tracking-tight">Correção Necessária</CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-3">
+                                <p className="text-xs text-rose-700 font-medium leading-relaxed">
+                                    O revisor devolveu este documento com observações. Consulte o histórico abaixo, corrija o arquivo e reenvie.
+                                </p>
+                                <Button
+                                    asChild
+                                    className="w-full bg-rose-700 hover:bg-rose-800 text-white font-bold h-10 shadow-md"
+                                >
+                                    <Link to="/administrativo/portarias/revisao/$id" params={{ id }}>
+                                        <PenTool className="mr-2 h-4 w-4" /> Corrigir e Reenviar
+                                    </Link>
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* ACTIONS: EM_REVISAO_ABERTA -> ASSUMIR REVISÃO */}
+                    {isRevisaoAberta && canApprove && (
                         <Card className="border-amber-200 bg-amber-50 shadow-md">
                             <CardHeader className="p-4 pb-2">
                                 <div className="flex items-center gap-2 text-amber-700">
                                     <AlertCircle size={16} />
-                                    <CardTitle className="text-sm font-black uppercase tracking-tight">Aguardando Revisão</CardTitle>
+                                    <CardTitle className="text-sm font-black uppercase tracking-tight">Revisão Pendente</CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-4 space-y-3">
                                 <p className="text-xs text-amber-700 font-medium leading-relaxed">
-                                    Revise o documento e aprove para envio à assinatura ou rejeite para correção.
+                                    Este documento aguarda análise. Assuma a revisão para bloquear edições de parceiros.
+                                </p>
+                                <Button
+                                    onClick={handleAssumirRevisao}
+                                    disabled={actionLoading}
+                                    variant="outline"
+                                    className="w-full h-10 border-amber-300 text-amber-700 hover:bg-amber-100 font-bold bg-white"
+                                >
+                                    {actionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                                    Assumir Revisão
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* ACTIONS: EM_REVISAO_ATRIBUIDA -> APROVAR/REJEITAR */}
+                    {isRevisaoAtribuida && canApprove && isMyReview && (
+                        <Card className="border-blue-200 bg-blue-50 shadow-md">
+                            <CardHeader className="p-4 pb-2">
+                                <div className="flex items-center gap-2 text-blue-700">
+                                    <Eye size={16} />
+                                    <CardTitle className="text-sm font-black uppercase tracking-tight">Em Minha Revisão</CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-3">
+                                <p className="text-xs text-blue-700 font-medium leading-relaxed">
+                                    Revise o documento. Se estiver correto, aprove para coletar a assinatura do responsável.
                                 </p>
                                 <Button
                                     onClick={handleAprovar}
                                     disabled={actionLoading}
-                                    className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-10 shadow-md shadow-primary/20"
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 shadow-md"
                                 >
                                     {actionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
                                     Aprovar Documento
                                 </Button>
+
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                         <Button variant="outline" className="w-full h-9 border-red-200 text-red-600 hover:bg-red-50 font-semibold text-sm">
-                                            <XCircle className="mr-2 h-4 w-4" /> Solicitar Correção
+                                            <XCircle className="mr-2 h-4 w-4" /> Devolver para Correção
                                         </Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                         <AlertDialogHeader>
-                                            <AlertDialogTitle>Rejeitar documento?</AlertDialogTitle>
+                                            <AlertDialogTitle>Devolver documento para o Operador</AlertDialogTitle>
                                             <AlertDialogDescription>
-                                                O documento voltará ao status de Rascunho para o operador realizar as correções necessárias.
+                                                O documento voltará ao status de Rascunho. O autor será notificado de que deve realizar as edições solicitadas.
                                             </AlertDialogDescription>
                                         </AlertDialogHeader>
+                                        <div className="py-2">
+                                            <Textarea
+                                                placeholder="Descreva o que está errado e o que deve ser corrigido..."
+                                                value={observacaoRejeicao}
+                                                onChange={e => setObservacaoRejeicao(e.target.value)}
+                                                rows={3}
+                                            />
+                                        </div>
                                         <AlertDialogFooter>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                             <AlertDialogAction onClick={handleRejeitar} className="bg-red-600 hover:bg-red-700 text-white">
-                                                Confirmar Rejeição
+                                                Confirmar Devolução
                                             </AlertDialogAction>
                                         </AlertDialogFooter>
                                     </AlertDialogContent>
@@ -296,8 +413,15 @@ function PortariaDetalhesPage() {
                         </Card>
                     )}
 
-                    {/* Card de Ação — APROVADA (Prefeito assina) */}
-                    {isAprovada && canSign && (
+                    {/* Alerta se está atribuido pra outro revisor */}
+                    {isRevisaoAtribuida && canApprove && !isMyReview && (
+                        <div className="bg-slate-100 border border-slate-200 rounded p-3 text-xs text-slate-500 font-medium text-center">
+                            Portaria sob revisão de outro usuário.
+                        </div>
+                    )}
+
+                    {/* ACTIONS: AGUARDANDO_ASSINATURA -> ASSINAR */}
+                    {isAguardandoAssinatura && canSign && (
                         <Card className="border-primary/30 bg-primary/5 shadow-lg ring-2 ring-primary/10">
                             <CardHeader className="p-4 pb-2">
                                 <div className="flex items-center gap-2 text-primary">
@@ -307,54 +431,69 @@ function PortariaDetalhesPage() {
                             </CardHeader>
                             <CardContent className="p-4 space-y-3">
                                 <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                                    Este documento foi aprovado. Ao assinar, ele será convertido em PDF oficial e publicado no acervo.
+                                    O documento foi aprovado. Proceda com a assinatura para encaminhá-lo ao Diário Oficial.
                                 </p>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-11 shadow-md shadow-primary/20">
-                                            <PenTool className="mr-2 h-4 w-4" /> Assinar e Publicar
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Confirmar assinatura digital?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                Ao confirmar, o documento será publicado oficialmente com a sua assinatura digital e um hash único de autenticidade. Esta ação não pode ser desfeita.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={handleAssinar} disabled={actionLoading}>
-                                                {actionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                                Confirmar e Publicar
-                                            </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
+                                <Button
+                                    className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-11 shadow-md shadow-primary/20"
+                                    onClick={() => setIsAssinaturaModalOpen(true)}
+                                >
+                                    <FileSignature className="mr-2 h-4 w-4" /> Assinar Documento
+                                </Button>
                             </CardContent>
                         </Card>
                     )}
 
-                    {/* Arquivo */}
-                    {portaria.pdfUrl && (
-                        <div className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors" onClick={handleDownloadPdf}>
-                            <div className="p-2 bg-slate-100 text-slate-500 rounded">
-                                <FileDown size={16} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-slate-800 truncate">portaria-{portaria.numeroOficial?.replace('/', '-') ?? id}.pdf</p>
-                                <p className="text-[10px] text-slate-400 font-medium">PDF Oficial</p>
-                            </div>
-                            <Download size={14} className="text-slate-400 shrink-0" />
-                        </div>
+                    {isProntoPublicacao && (
+                        <Card className="border-emerald-300 bg-emerald-50 shadow-md">
+                            <CardHeader className="p-4 pb-2">
+                                <div className="flex items-center gap-2 text-emerald-700">
+                                    <CheckCircle2 size={16} />
+                                    <CardTitle className="text-sm font-black uppercase tracking-tight">Pronto para Publicação</CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-3">
+                                {/* Badge de assinatura */}
+                                <AssinaturaStatusInfo
+                                    status={portaria.assinaturaStatus}
+                                    justificativa={portaria.assinaturaJustificativa}
+                                    comprovanteUrl={portaria.assinaturaComprovanteUrl}
+                                />
+                                <p className="text-xs text-emerald-700 font-medium leading-relaxed">
+                                    Publique para alocar o número oficial e registrar no Diário Oficial.
+                                </p>
+                                {ability.can('publicar', 'Portaria') && (
+                                    <Button
+                                        onClick={() => handleAction(() => portariaService.publicarPortaria(id), `Portaria publicada com sucesso!`)}
+                                        disabled={actionLoading}
+                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 shadow-md"
+                                    >
+                                        {actionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                        Publicar Portaria
+                                    </Button>
+                                )}
+                                {!ability.can('publicar', 'Portaria') && (
+                                    <p className="text-xs text-emerald-600 font-medium text-center">
+                                        Aguardando publicação pelo responsável.
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
                     )}
                 </div>
             </div>
+
+            <AssinaturaModal
+                isOpen={isAssinaturaModalOpen}
+                onOpenChange={setIsAssinaturaModalOpen}
+                portariaId={id}
+                onSigned={loadPortaria}
+            />
         </div>
     )
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
+    if (!value) return null
     return (
         <div className="flex justify-between items-start gap-4">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 mt-0.5">{label}</span>
@@ -367,13 +506,87 @@ function StatusBadge({ status }: { status: string }) {
     switch (status) {
         case STATUS_PORTARIA.PUBLICADA:
             return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-bold"><CheckCircle2 size={11} className="mr-1" /> Publicada</Badge>
-        case STATUS_PORTARIA.PENDENTE:
-            return <Badge className="bg-amber-100 text-amber-700 border-amber-200 font-bold"><Clock size={11} className="mr-1" /> Aguardando Revisão</Badge>
-        case STATUS_PORTARIA.APROVADA:
+        case STATUS_PORTARIA.PRONTO_PUBLICACAO:
+            return <Badge className="bg-emerald-50 text-emerald-600 border-emerald-200 font-bold"><CheckCircle2 size={11} className="mr-1" /> Aguardando Diário Oficial</Badge>
+        case STATUS_PORTARIA.EM_REVISAO_ABERTA:
+        case STATUS_PORTARIA.EM_REVISAO_ATRIBUIDA:
+            return <Badge className="bg-amber-100 text-amber-700 border-amber-200 font-bold"><Clock size={11} className="mr-1" /> Em Revisão</Badge>
+        case STATUS_PORTARIA.AGUARDANDO_ASSINATURA:
             return <Badge className="bg-primary/10 text-primary border-primary/20 font-bold"><PenTool size={11} className="mr-1" /> Aguardando Assinatura</Badge>
         case STATUS_PORTARIA.RASCUNHO:
             return <Badge variant="outline" className="text-slate-500 border-slate-300 font-bold"><FileText size={11} className="mr-1" /> Rascunho</Badge>
+        case STATUS_PORTARIA.CORRECAO_NECESSARIA:
+            return <Badge className="bg-rose-100 text-rose-700 border-rose-200 font-bold"><AlertCircle size={11} className="mr-1" /> Correção Necessária</Badge>
         default:
-            return <Badge variant="outline" className="font-bold text-rose-600 border-rose-200">{status}</Badge>
+            return <Badge variant="outline" className="font-bold text-slate-600 border-slate-200">{status}</Badge>
     }
+}
+
+function AssinaturaStatusInfo({
+    status,
+    justificativa,
+    comprovanteUrl
+}: {
+    status?: string
+    justificativa?: string | null
+    comprovanteUrl?: string | null
+}) {
+    if (!status || status === 'NAO_ASSINADA') return null
+
+    if (status === 'ASSINADA_DIGITAL') {
+        return (
+            <div className="flex items-start gap-2 p-2.5 bg-emerald-100 border border-emerald-200 rounded-md">
+                <ShieldCheck size={14} className="text-emerald-700 shrink-0 mt-0.5" />
+                <p className="text-xs text-emerald-800 font-medium">Assinada digitalmente</p>
+            </div>
+        )
+    }
+
+    if (status === 'ASSINADA_MANUAL') {
+        return (
+            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md space-y-1">
+                <div className="flex items-center gap-1.5">
+                    <PenTool size={13} className="text-amber-700 shrink-0" />
+                    <p className="text-xs text-amber-800 font-bold">Assinatura manual registrada</p>
+                </div>
+                {justificativa && (
+                    <p className="text-[11px] text-amber-700 leading-relaxed pl-4">{justificativa}</p>
+                )}
+                {comprovanteUrl && (
+                    <p className="text-[10px] text-amber-600 pl-4 font-medium">✓ Comprovante digitalizado anexado</p>
+                )}
+            </div>
+        )
+    }
+
+    if (status === 'DISPENSADA_COM_JUSTIFICATIVA') {
+        return (
+            <div className="p-2.5 bg-slate-100 border border-slate-300 rounded-md space-y-1">
+                <div className="flex items-center gap-1.5">
+                    <AlertCircle size={13} className="text-slate-600 shrink-0" />
+                    <p className="text-xs text-slate-700 font-bold">Assinatura dispensada com justificativa</p>
+                </div>
+                {justificativa && (
+                    <p className="text-[11px] text-slate-600 leading-relaxed pl-4">{justificativa}</p>
+                )}
+            </div>
+        )
+    }
+
+    return null
+}
+
+function PortariaSkeleton() {
+    return (
+        <div className="space-y-6 max-w-6xl">
+            <Skeleton className="h-8 w-48" />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="lg:col-span-8"><Skeleton className="h-[700px] rounded-lg" /></div>
+                <div className="lg:col-span-4 space-y-4">
+                    <Skeleton className="h-64 rounded-lg" />
+                    <Skeleton className="h-48 rounded-lg" />
+                </div>
+            </div>
+        </div>
+    )
 }

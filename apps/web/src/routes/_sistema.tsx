@@ -17,6 +17,8 @@ const ROUTE_TITLES: Record<string, string> = {
     '/admin/modelos': 'Modelos de Documento',
     '/admin/variaveis': 'Variáveis Globais',
     '/admin/livros': 'Livros de Numeração',
+    '/revisao/fila': 'Fila de Revisão',
+    '/revisao/minhas': 'Minhas Revisões',
 }
 
 // Ability vazia tipada para o estado transitório antes do login ser reconhecido

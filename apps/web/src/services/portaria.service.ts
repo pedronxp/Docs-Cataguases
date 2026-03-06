@@ -59,13 +59,21 @@ export async function submeterPortaria(
     payload: SubmeterPortariaRequest
 ): Promise<Result<Portaria>> {
     try {
-        // Na API real, submeter pode ser um PATCH que muda o status ou um POST específico
-        const response = await api.patch(`/api/portarias/${payload.portariaId}`, {
-            status: 'PROCESSANDO'
+        const response = await api.post(`/api/portarias/${payload.portariaId}/submeter`, {
+            docxEditadoBase64: payload.docxEditadoBase64
         })
         return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao submeter portaria')
+    }
+}
+
+export async function downloadDocx(portariaId: string): Promise<Result<{ url: string }>> {
+    try {
+        const response = await api.get(`/api/portarias/${portariaId}/docx`)
+        return ok(response.data.data || response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao obter URL do DOCX')
     }
 }
 
@@ -78,21 +86,48 @@ export async function tentarNovamente(portariaId: string): Promise<Result<Portar
     }
 }
 
+export async function enviarParaRevisao(portariaId: string): Promise<Result<Portaria>> {
+    try {
+        const response = await api.patch(`/api/portarias/${portariaId}/fluxo`, { action: 'ENVIAR_REVISAO' })
+        return ok(response.data.data || response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao enviar para revisão')
+    }
+}
+
+export async function assumirRevisao(portariaId: string): Promise<Result<Portaria>> {
+    try {
+        const response = await api.patch(`/api/portarias/${portariaId}/fluxo`, { action: 'ASSUMIR_REVISAO' })
+        return ok(response.data.data || response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao assumir revisão')
+    }
+}
+
 export async function aprovarPortaria(portariaId: string): Promise<Result<Portaria>> {
     try {
-        const response = await api.patch(`/api/portarias/${portariaId}/aprovar`)
+        const response = await api.patch(`/api/portarias/${portariaId}/fluxo`, { action: 'APROVAR_REVISAO' })
         return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao aprovar portaria')
     }
 }
 
-export async function rejeitarPortaria(portariaId: string): Promise<Result<Portaria>> {
+export async function rejeitarPortaria(portariaId: string, observacao: string): Promise<Result<Portaria>> {
     try {
-        const response = await api.patch(`/api/portarias/${portariaId}/rejeitar`)
+        const response = await api.patch(`/api/portarias/${portariaId}/fluxo`, { action: 'REJEITAR_REVISAO', observacao })
         return ok(response.data.data || response.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao rejeitar portaria')
+    }
+}
+
+export async function transferirRevisao(portariaId: string, revisorId: string, justificativa: string): Promise<Result<Portaria>> {
+    try {
+        const response = await api.patch(`/api/portarias/${portariaId}/fluxo`, { action: 'TRANSFERIR_REVISAO', revisorId, justificativa })
+        return ok(response.data.data || response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao transferir revisão')
     }
 }
 
@@ -123,6 +158,15 @@ export async function validarDocumento(hash: string): Promise<Result<Portaria>> 
     }
 }
 
+export async function gerarPdf(portariaId: string): Promise<Result<{ url: string }>> {
+    try {
+        const response = await api.get(`/api/portarias/${portariaId}/pdf`)
+        return ok(response.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao gerar PDF')
+    }
+}
+
 export const portariaService = {
     listarPortarias,
     buscarPortaria,
@@ -130,10 +174,15 @@ export const portariaService = {
     criarPortaria,
     assinarPortaria,
     submeterPortaria,
+    downloadDocx,
     assinarLote,
     tentarNovamente,
+    enviarParaRevisao,
+    assumirRevisao,
     aprovarPortaria,
     rejeitarPortaria,
+    transferirRevisao,
     publicarPortaria,
     validarDocumento,
+    gerarPdf,
 }

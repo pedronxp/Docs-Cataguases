@@ -1,0 +1,24 @@
+# Plano de Implementação: Transição Real e Testes de Estresse
+
+Este plano conclui as implementações de base do sistema oficializando a integração frontend-backend e validando a segurança de dados concorrentes.
+
+## Objetivos
+1. Desligar os serviços `.mock.ts` do frontend de forma global.
+2. Validar que o banco de dados suporta criação paralela de numeração de portarias.
+
+## Propostos
+
+### 1. [Frontend] Migração para API Real
+- **Alvo Principal**: Editar todos os arquivos em `apps/web/src/services/` que ainda estão exportando funções mockadas.
+- **`portaria.service.ts`**: Atualizar chamadas para a API oficial Vercel/NextJS (`api.get`, `api.post`, etc.).
+- **`modelo.service.ts`**: Conectar à API de Modelos real.
+- **Configuração Global**: Em `apps/web/.env`, certificar-se de definir `VITE_ENABLE_MOCKS=false` (ou equivalente no design pattern atual do frontend).
+
+### 2. [Testes] Concorrência de Numeração Atômica
+- **Alvo Principal**: `apps/api/src/tests/numeracao.test.ts` (ou similar adaptado ao padrão atual de setup do projeto).
+- **Conteúdo**: Script em Node/TSX que executa um loop `Promise.all` com 10 a 20 requisições simultâneas para o endpoint de assinatura/jornal (o que dispara o `NumeracaoService.alocarNumeroPortaria`).
+- **Validação**: Garantir que as linhas na tabela `JornalQueue` ou `Portaria` recebam números incrementais sem duplicidade nem falha, confirmando o funcionamento do `FOR UPDATE`.
+
+## Verificação
+- Após as mudanças de serviço, o frontend deverá rodar localmente apontando para `http://localhost:3001` e conseguir puxar dados reais, criando rotas fim-a-fim.
+- O teste de concorrência emitirá um log final sem erros.

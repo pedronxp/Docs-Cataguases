@@ -9,6 +9,9 @@ export default defineConfig({
     TanStackRouterVite(),
     react()
   ],
+  server: {
+    host: true,
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -1,24 +1,24 @@
 generator client {
-  provider   = "prisma-client-js"
-  engineType = "library"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // O modelo User foi movido para baixo para manter as relações próximas
 
-model LivroNumeracao {
-  id            String  @id @default(cuid())
-  secretariaId  String
-  setorId       String?
-  ano           Int
-  proximoNumero Int     @default(1)
-  formato       String
-
-  @@unique([secretariaId, setorId, ano])
+model LivrosNumeracao {
+  id               String        @id @default(cuid())
+  nome             String        @unique
+  tipoDocumento    TipoDocumento @unique @default(PORTARIA)
+  formato_base     String        @default("PORT-{N}/CATAGUASES")
+  proximo_numero   Int           @default(1)
+  numero_inicial   Int           @default(1)
+  logs             Json          @default("[]")
+  ativo            Boolean       @default(true)
+  criado_em        DateTime      @default(now())
+  atualizado_em    DateTime      @updatedAt
 }
 
 model Portaria {
@@ -40,56 +40,79 @@ model Portaria {
   hashIntegridade String?  @unique // SHA-256 do conteúdo
   assinadoEm      DateTime?
   assinadoPorId   String?
+  assinadoPor     User?           @relation("AssinadoPor", fields: [assinadoPorId], references: [id])
   dataPublicacao  DateTime?
   formData        Json     @default("{}")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   atividades      FeedAtividade[]
+
+  // Controle de Revisão
+  revisorAtualId           String?
+  revisorAtual             User?           @relation("RevisorAtual", fields: [revisorAtualId], references: [id])
+  revisoesCount            Int             @default(0)
+  
+  // Controle de Assinatura Avançado
+  assinaturaStatus         String          @default("NAO_ASSINADA") // NAO_ASSINADA, ASSINADA_DIGITAL, ASSINADA_MANUAL, DISPENSADA_COM_JUSTIFICATIVA
+  assinaturaJustificativa  String?         @db.Text
+  assinaturaComprovanteUrl String?
+
+  jornalQueue              JornalQueue?
 }
 
 // Atualizar User para ter a relação inversa
 model User {
-  id              String   @id @default(cuid())
-  name            String
+  id            String    @id @default(cuid())
+  name          String?
   username        String   @unique
-  email           String   @unique
+  email         String?   @unique
   password        String
   cpf             String?  @unique
-  role            String   @default("OPERADOR")
+  emailVerified DateTime?
+  image         String?
+  role          String    @default("USER")             // ADMIN_GERAL, ADMIN_SETORIAL, USER
   ativo           Boolean  @default(true)
   permissoesExtra String[] @default([])
-  secretariaId    String?
-  setorId         String?
-  secretaria      Secretaria?     @relation(fields: [secretariaId], references: [id])
-  setor           Setor?          @relation(fields: [setorId], references: [id])
+  setorId       String?
+  secretariaId  String?
+  setor         Setor?    @relation(fields: [setorId], references: [id])
+  secretaria    Secretaria? @relation("MembrosSecretaria", fields: [secretariaId], references: [id])
+  secretariasTitular Secretaria[] @relation("SecretarioTitular")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  portarias       Portaria[] @relation("CriadoPor")
+  portarias          Portaria[] @relation("CriadoPor")
+  portariasRevisadas Portaria[] @relation("RevisorAtual")
+  portariasAssinadas Portaria[] @relation("AssinadoPor")
   atividades      FeedAtividade[]
 }
 
 model FeedAtividade {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   tipoEvento   String
-  mensagem     String   @db.Text
-  portariaId   String
+  mensagem     String    @db.Text
+  portariaId   String?
   autorId      String
-  secretariaId String
+  secretariaId String?
   setorId      String?
-  portaria     Portaria @relation(fields: [portariaId], references: [id])
-  autor        User     @relation(fields: [autorId], references: [id])
-  metadata     Json     @default("{}")
-  createdAt    DateTime @default(now())
+  portaria     Portaria? @relation(fields: [portariaId], references: [id])
+  autor        User      @relation(fields: [autorId], references: [id])
+  metadata     Json      @default("{}")
+  createdAt    DateTime  @default(now())
 }
 
 model ModeloDocumento {
   id              String           @id @default(cuid())
   nome            String
   descricao       String
+  tipoDocumento   TipoDocumento    @default(PORTARIA)
   secretariaId    String?
   docxTemplateUrl String
   conteudoHtml    String           @default("") @db.Text
   ativo           Boolean          @default(true)
+  versao          Int              @default(1)
+  modeloPaiId     String?
+  modeloPai       ModeloDocumento?  @relation("Versoes", fields: [modeloPaiId], references: [id])
+  versoes         ModeloDocumento[] @relation("Versoes")
   variaveis       ModeloVariavel[]
   portarias       Portaria[]
 }
@@ -104,6 +127,9 @@ model ModeloVariavel {
   opcoes      String[]        @default([])
   obrigatorio Boolean         @default(true)
   ordem       Int             @default(0)
+  valorPadrao String?         // B1: valor pré-preenchido no formulário de portaria
+  grupo            String?         // B3: agrupa campos em seções no formulário de portaria
+  regraCondicional Json?           // B2: { dependeDe: "CHAVE", valor: "valor" } — exibe campo só se condição satisfeita
 }
 
 model VariavelSistema {
@@ -115,14 +141,16 @@ model VariavelSistema {
 }
 
 model Secretaria {
-  id      String   @id @default(cuid())
-  nome    String
-  sigla   String   @unique
-  cor     String   @default("#6366f1")
-  setores Setor[]
-  usuarios User[]
+  id        String   @id @default(cuid())
+  nome      String
+  sigla     String   @unique
+  cor       String   @default("#6366f1")
+  titularId String?
+  titular   User?    @relation("SecretarioTitular", fields: [titularId], references: [id])
+  setores   Setor[]
+  usuarios  User[]   @relation("MembrosSecretaria")
   portarias Portaria[]
-  ativo   Boolean  @default(true)
+  ativo     Boolean  @default(true)
 }
 
 model Setor {
@@ -136,4 +164,36 @@ model Setor {
   ativo        Boolean    @default(true)
   
   @@unique([secretariaId, sigla])
+}
+
+enum TipoDocumento {
+  PORTARIA
+  MEMORANDO
+  OFICIO
+  LEI
+}
+
+model JornalQueue {
+  id                  String        @id @default(cuid())
+  // Campo polimórfico: aponta para portaria, memorando, ofício ou lei
+  documentoId         String?       // Fase 3: ID genérico do documento
+  // Legacy: mantido para retrocompatibilidade — será removido na Fase 4
+  portariaId          String?       @unique
+  tipoDocumento       TipoDocumento @default(PORTARIA)
+  numeroSugerido      String?
+  numeroFinal         String?
+  status              String        @default("PENDENTE") // PENDENTE, CONCLUIDA, CANCELADA
+  prioridade          Int           @default(0)    // Ordenação: maior = mais urgente
+  metadados           Json          @default("{}") // Dados específicos do tipo de documento
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  portaria            Portaria?     @relation(fields: [portariaId], references: [id], onDelete: Cascade)
+
+  // Indexes para paginação cursor-based e queries filtradas
+  @@index([status, createdAt])
+  @@index([id, createdAt])
+  @@index([tipoDocumento, status, createdAt])
+  @@index([status, prioridade, createdAt])
+  @@index([documentoId])           // Fase 3: busca direta por documento
 }

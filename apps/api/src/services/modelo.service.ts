@@ -61,6 +61,7 @@ export class ModeloService {
     static async criar(data: {
         nome: string;
         descricao: string;
+        tipoDocumento?: string;
         categoria?: string;
         secretariaId?: string | null;
         docxTemplateUrl?: string | null;
@@ -72,29 +73,34 @@ export class ModeloService {
             opcoes?: string[];
             obrigatorio?: boolean;
             ordem?: number;
+            valorPadrao?: string | null;
+            grupo?: string | null;
+            regraCondicional?: { dependeDe: string; valor: string } | null;
         }[]
     }) {
         try {
-            const modelo = await prisma.modeloDocumento.create({
-                data: {
-                    nome: data.nome,
-                    descricao: data.descricao,
-                    secretariaId: data.secretariaId ?? null,
-                    docxTemplateUrl: data.docxTemplateUrl ?? '',
-                    conteudoHtml: data.conteudoHtml,
-                    variaveis: {
-                        create: data.variaveis.map(v => ({
-                            chave: v.chave,
-                            label: v.label,
-                            tipo: v.tipo,
-                            opcoes: v.opcoes || [],
-                            obrigatorio: v.obrigatorio ?? true,
-                            ordem: v.ordem ?? 0
-                        }))
-                    }
-                },
-                include: { variaveis: true }
-            })
+            const createData: any = {
+                nome: data.nome,
+                descricao: data.descricao,
+                tipoDocumento: data.tipoDocumento ?? 'PORTARIA',
+                secretariaId: data.secretariaId ?? null,
+                docxTemplateUrl: data.docxTemplateUrl ?? '',
+                conteudoHtml: data.conteudoHtml,
+                variaveis: {
+                    create: data.variaveis.map(v => ({
+                        chave: v.chave,
+                        label: v.label,
+                        tipo: v.tipo,
+                        opcoes: v.opcoes || [],
+                        obrigatorio: v.obrigatorio ?? true,
+                        ordem: v.ordem ?? 0,
+                        valorPadrao: v.valorPadrao ?? null,
+                        grupo: v.grupo ?? null,
+                        regraCondicional: v.regraCondicional ? (v.regraCondicional as any) : undefined
+                    }))
+                }
+            }
+            const modelo = await prisma.modeloDocumento.create({ data: createData, include: { variaveis: true } })
             return ok(modelo)
         } catch (error) {
             console.error('Erro ao criar modelo:', error)
@@ -104,9 +110,53 @@ export class ModeloService {
 
     /**
      * Atualiza um modelo existente.
+     *
+     * Se o modelo já tem portarias vinculadas, cria uma nova versão (fork):
+     *  - desativa o modelo atual
+     *  - cria novo com versao+1 e modeloPaiId apontando para o atual
+     *
+     * Retorna { modelo, novaVersao: boolean }.
      */
     static async atualizar(id: string, data: any) {
         try {
+            const modeloAtual = await prisma.modeloDocumento.findUnique({ where: { id } })
+            if (!modeloAtual) return err('Modelo não encontrado.')
+
+            const portariasVinculadas = await prisma.portaria.count({ where: { modeloId: id } })
+
+            const variavelData = data.variaveis?.map((v: any) => ({
+                chave: v.chave,
+                label: v.label,
+                tipo: v.tipo,
+                opcoes: v.opcoes || [],
+                obrigatorio: v.obrigatorio ?? true,
+                ordem: v.ordem ?? 0,
+                valorPadrao: v.valorPadrao ?? null,
+                grupo: v.grupo ?? null,
+                regraCondicional: v.regraCondicional ? (v.regraCondicional as any) : undefined
+            }))
+
+            // Fork: modelo em uso → cria nova versão, desativa a antiga
+            if (portariasVinculadas > 0 && data.variaveis) {
+                const { variaveis, ...modeloData } = data
+                const novoModelo = await prisma.modeloDocumento.create({
+                    data: {
+                        ...modeloData,
+                        versao: (modeloAtual.versao ?? 1) + 1,
+                        modeloPaiId: id,
+                        variaveis: { create: variavelData }
+                    },
+                    include: { variaveis: true }
+                })
+                // Desativa versão anterior
+                await prisma.modeloDocumento.update({
+                    where: { id },
+                    data: { ativo: false }
+                })
+                return ok({ modelo: novoModelo, novaVersao: true })
+            }
+
+            // Atualização direta (sem portarias vinculadas)
             if (data.variaveis) {
                 await prisma.modeloVariavel.deleteMany({ where: { modeloId: id } })
                 const { variaveis, ...modeloData } = data
@@ -114,20 +164,11 @@ export class ModeloService {
                     where: { id },
                     data: {
                         ...modeloData,
-                        variaveis: {
-                            create: variaveis.map((v: any) => ({
-                                chave: v.chave,
-                                label: v.label,
-                                tipo: v.tipo,
-                                opcoes: v.opcoes || [],
-                                obrigatorio: v.obrigatorio ?? true,
-                                ordem: v.ordem ?? 0
-                            }))
-                        }
+                        variaveis: { create: variavelData }
                     },
                     include: { variaveis: true }
                 })
-                return ok(modelo)
+                return ok({ modelo, novaVersao: false })
             }
 
             const modelo = await prisma.modeloDocumento.update({
@@ -135,7 +176,7 @@ export class ModeloService {
                 data,
                 include: { variaveis: true }
             })
-            return ok(modelo)
+            return ok({ modelo, novaVersao: false })
         } catch (error) {
             return err('Erro ao atualizar modelo.')
         }
@@ -143,7 +184,7 @@ export class ModeloService {
 
     /**
      * Soft delete de um modelo.
-     * Bloqueia se houver portarias vinculadas ao modelo.
+     * Bloqueia se houver portarias vinculadas ou versões derivadas ativas.
      */
     static async desativar(id: string) {
         try {
@@ -154,6 +195,16 @@ export class ModeloService {
             if (portariasVinculadas > 0) {
                 return err(
                     `Não é possível desativar este modelo pois há ${portariasVinculadas} portaria(s) vinculada(s) a ele.`
+                )
+            }
+
+            const versoesAtivas = await prisma.modeloDocumento.count({
+                where: { modeloPaiId: id, ativo: true }
+            })
+
+            if (versoesAtivas > 0) {
+                return err(
+                    `Não é possível excluir este modelo pois ele possui ${versoesAtivas} versão(ões) derivada(s) ativa(s).`
                 )
             }
 
@@ -180,16 +231,25 @@ export class ModeloService {
         }
     }
 
-    static async salvarVariavelSistema(data: { chave: string, valor: string, descricao: string }) {
+    static async salvarVariavelSistema(data: { chave: string, valor: string, descricao?: string }) {
         try {
             const v = await prisma.variavelSistema.upsert({
                 where: { chave: data.chave },
-                update: { valor: data.valor, descricao: data.descricao },
-                create: { chave: data.chave, valor: data.valor, descricao: data.descricao }
+                update: { valor: data.valor, descricao: data.descricao ?? '' },
+                create: { chave: data.chave, valor: data.valor, descricao: data.descricao ?? '' }
             })
             return ok(v)
         } catch (error) {
             return err('Erro ao salvar variável de sistema.')
+        }
+    }
+
+    static async excluirVariavelSistema(id: string) {
+        try {
+            await prisma.variavelSistema.delete({ where: { id } })
+            return ok(true)
+        } catch (error) {
+            return err('Erro ao excluir variável de sistema.')
         }
     }
 }

@@ -30,7 +30,7 @@ export class FeedService {
                 if (secretariaId) {
                     where.secretariaId = secretariaId
                 }
-                if (setorId && role === 'GESTOR_SETOR') {
+                if (setorId && role === 'REVISOR') {
                     where.setorId = setorId
                 }
             }
@@ -75,7 +75,7 @@ export class FeedService {
         tipoEvento: string;
         mensagem: string;
         autorId: string;
-        secretariaId: string;
+        secretariaId?: string | null;
         setorId?: string | null;
         portariaId?: string | null;
         metadata?: any;
@@ -83,10 +83,13 @@ export class FeedService {
         try {
             const evento = await prisma.feedAtividade.create({
                 data: {
-                    ...data,
-                    setorId: data.setorId || (null as any),
-                    portariaId: data.portariaId || (null as any),
-                    metadata: data.metadata || {}
+                    tipoEvento: data.tipoEvento,
+                    mensagem: data.mensagem,
+                    autorId: data.autorId,
+                    secretariaId: data.secretariaId ?? null,
+                    setorId: data.setorId ?? null,
+                    portariaId: data.portariaId ?? null,
+                    metadata: data.metadata ?? {}
                 }
             })
             return ok(evento)

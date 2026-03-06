@@ -22,6 +22,15 @@ export async function criarSecretaria(dados: Omit<Secretaria, 'id'>): Promise<Re
     }
 }
 
+export async function editarSecretaria(id: string, dados: Partial<Omit<Secretaria, 'id'>>): Promise<Result<Secretaria>> {
+    try {
+        const response = await api.patch(`/api/admin/config/secretarias/${id}`, dados)
+        return ok(response.data.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao editar secretaria')
+    }
+}
+
 export async function deletarSecretaria(id: string): Promise<Result<void>> {
     try {
         await api.delete(`/api/admin/config/secretarias/${id}`)
@@ -56,6 +65,15 @@ export async function criarSetor(secretariaId: string, dados: { nome: string; si
         return ok(response.data.data)
     } catch (error: any) {
         return err(error.response?.data?.error || 'Erro ao criar setor')
+    }
+}
+
+export async function editarSetor(secretariaId: string, setorId: string, dados: { nome?: string; sigla?: string }): Promise<Result<Setor>> {
+    try {
+        const response = await api.patch(`/api/admin/config/secretarias/${secretariaId}/setores/${setorId}`, dados)
+        return ok(response.data.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao editar setor')
     }
 }
 

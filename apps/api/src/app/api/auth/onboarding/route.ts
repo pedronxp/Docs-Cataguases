@@ -6,8 +6,8 @@ import { UsuarioService } from '@/services/usuario.service'
 export const dynamic = 'force-dynamic'
 
 const onboardingSchema = z.object({
-    secretariaId: z.string().uuid('ID da secretaria inválido'),
-    setorId: z.string().uuid('ID do setor inválido').optional()
+    secretariaId: z.string().min(1, 'ID da secretaria é obrigatório'),
+    setorId: z.string().min(1).optional()
 })
 
 export async function PATCH(request: NextRequest) {

@@ -4,9 +4,9 @@ import type { Usuario } from '@/types/domain'
 import { createContextualCan } from '@casl/react'
 
 type Actions = 'criar' | 'ler' | 'editar' | 'deletar' | 'submeter' |
-    'aprovar' | 'rejeitar' | 'assinar' | 'publicar' | 'gerenciar' | 'manage' | 'visualizar'
+    'aprovar' | 'rejeitar' | 'assinar' | 'publicar' | 'gerenciar' | 'manage' | 'visualizar' | 'transferir' | 'claim'
 type Subjects = 'Portaria' | 'Usuario' | 'Modelo' | 'Secretaria' | 'Setor' |
-    'LivroNumeracao' | 'VariavelSistema' | 'FeedAtividade' | 'Analytics' | 'all' | 'PortariaGlobal'
+    'LivrosNumeracao' | 'VariavelSistema' | 'FeedAtividade' | 'Analytics' | 'all' | 'PortariaGlobal' | 'Revisao'
 
 type Conditions = {
     secretariaId?: string
@@ -39,13 +39,18 @@ export function buildAbility(user: Usuario): AppAbility {
         can('ler', 'Portaria', { secretariaId: user.secretariaId! })
         can('aprovar', 'Portaria', { secretariaId: user.secretariaId! })
         can('rejeitar', 'Portaria', { secretariaId: user.secretariaId! })
+        can('publicar', 'Portaria', { secretariaId: user.secretariaId! })
         can('ler', 'FeedAtividade', { secretariaId: user.secretariaId! })
     }
 
-    if (user.role === 'GESTOR_SETOR') {
-        can('ler', 'Portaria', { setorId: user.setorId! })
-        can('editar', 'Portaria', { setorId: user.setorId!, status: 'RASCUNHO' })
-        can('aprovar', 'Portaria', { setorId: user.setorId! })
+    if (user.role === 'REVISOR') {
+        can('ler', 'Portaria', { secretariaId: user.secretariaId! })
+        can('aprovar', 'Portaria', { secretariaId: user.secretariaId! })
+        can('rejeitar', 'Portaria', { secretariaId: user.secretariaId! })
+        can('ler', 'FeedAtividade', { secretariaId: user.secretariaId! })
+        can('claim', 'Revisao')
+        can('transferir', 'Revisao')
+        can('ler', 'Revisao')
     }
 
     if (user.role === 'OPERADOR') {
@@ -55,13 +60,17 @@ export function buildAbility(user: Usuario): AppAbility {
         can('submeter', 'Portaria', { autorId: user.id })
         cannot('deletar', 'Portaria')
         cannot('publicar', 'Portaria')
+        can('ler', 'FeedAtividade')
     }
 
     // Permissões granulares dinâmicas
+    // Formato: "acao:Subject" (global) ou "acao:Subject:secretaria" (escopado à secretaria do usuário)
     for (const permissao of user.permissoesExtra) {
-        const parts = permissao.split(':')
-        if (parts.length === 2) {
-            const [action, subject] = parts as [Actions, Subjects]
+        const [action, subject, escopo] = permissao.split(':') as [Actions, Subjects, string?]
+        if (!action || !subject) continue
+        if (escopo === 'secretaria' && user.secretariaId) {
+            can(action, subject, { secretariaId: user.secretariaId! })
+        } else {
             can(action, subject)
         }
     }
