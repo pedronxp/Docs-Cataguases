@@ -4,6 +4,7 @@ import { AbilityContext, buildAbility, type AppAbility } from '@/lib/ability'
 import { useAuthStore } from '@/store/auth.store'
 import { useMemo } from 'react'
 import { createMongoAbility } from '@casl/ability'
+import { FloatingChat } from '@/components/chat/FloatingChat'
 
 export const Route = createFileRoute('/_sistema')({
     component: SistemaLayout,
@@ -40,6 +41,7 @@ function SistemaLayout() {
             <PageLayout title={title}>
                 <Outlet />
             </PageLayout>
+            <FloatingChat />
         </AbilityContext.Provider>
     )
 }

@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/table'
 import {
     Search, Plus, FileText, AlertCircle, CheckCircle2,
-    Clock, Eye, FileDown, MoreVertical, Filter, PenTool, HelpCircle
+    Clock, Eye, FileDown, MoreVertical, Filter, PenTool, HelpCircle, Trash2
 } from 'lucide-react'
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -21,6 +21,16 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { DataTableSkeleton } from '@/components/shared/DataTableSkeleton'
 import type { StatusPortaria } from '@/types/domain'
 import { useState } from 'react'
@@ -30,6 +40,7 @@ import { BatchActionBar } from '@/components/portarias/batch-action-bar'
 import { SignatureModal } from '@/components/portarias/signature-modal'
 import { portariaService } from '@/services/portaria.service'
 import { useAuthStore } from '@/store/auth.store'
+import { useToast } from '@/hooks/use-toast'
 
 export const Route = createFileRoute('/_sistema/administrativo/portarias/')({
     component: PortariasListPage,
@@ -49,9 +60,32 @@ function PortariasListPage() {
     const { portarias, loading, filters, updateFilters, refresh } = usePortarias()
     const [selectedIds, setSelectedIds] = useState<string[]>([])
     const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false)
+    const [deleteId, setDeleteId] = useState<string | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
     const { usuario } = useAuthStore()
+    const { toast } = useToast()
 
     const canSignBatch = usuario?.role === 'PREFEITO' || usuario?.role === 'ADMIN_GERAL'
+    const canDelete = usuario?.role === 'ADMIN' || usuario?.role === 'GESTOR' || usuario?.role === 'ADMIN_GERAL'
+
+    const handleConfirmDelete = async () => {
+        if (!deleteId) return
+        setIsDeleting(true)
+        try {
+            const res = await portariaService.deletar(deleteId)
+            if (!res.success) {
+                toast({ title: 'Erro', description: res.error || 'Erro ao excluir portaria', variant: 'destructive' })
+            } else {
+                toast({ title: 'Portaria excluída com sucesso' })
+                setDeleteId(null)
+                refresh()
+            }
+        } catch (e: any) {
+            toast({ title: 'Erro', description: e?.response?.data?.error || 'Erro ao excluir portaria', variant: 'destructive' })
+        } finally {
+            setIsDeleting(false)
+        }
+    }
 
     const handleBatchSign = async (password: string) => {
         // Simulando validação de senha
@@ -203,7 +237,7 @@ function PortariasListPage() {
                                             <TableCell>
                                                 <div className="flex flex-col">
                                                     <span className="font-bold text-slate-800 leading-tight line-clamp-1">{doc.titulo}</span>
-                                                    <span className="text-xs text-slate-400 font-medium">Modelo: {doc.modeloId}</span>
+                                                    <span className="text-xs text-slate-400 font-medium">Modelo: {doc.modelo?.nome ?? '—'}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -233,11 +267,21 @@ function PortariasListPage() {
                                                                 </Link>
                                                             </DropdownMenuItem>
                                                         )}
-                                                        <DropdownMenuSeparator />
                                                         {doc.status === 'FALHA_PROCESSAMENTO' && (
                                                             <DropdownMenuItem className="text-rose-600 font-bold">
                                                                 <AlertCircle className="mr-2 h-4 w-4" /> Tentar Novamente
                                                             </DropdownMenuItem>
+                                                        )}
+                                                        {canDelete && (doc.status === 'RASCUNHO' || doc.status === 'FALHA_PROCESSAMENTO') && (
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    className="text-red-600 font-bold cursor-pointer focus:text-red-600 focus:bg-red-50"
+                                                                    onClick={() => setDeleteId(doc.id)}
+                                                                >
+                                                                    <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                                                                </DropdownMenuItem>
+                                                            </>
                                                         )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -266,6 +310,27 @@ function PortariasListPage() {
                     // Success is handled in handleBatchSign toast
                 }}
             />
+
+            <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null) }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir Portaria</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tem certeza que deseja excluir esta portaria? Esta ação não pode ser desfeita. Apenas rascunhos e documentos com falha de processamento podem ser excluídos.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmDelete}
+                            disabled={isDeleting}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            {isDeleting ? 'Excluindo...' : 'Sim, excluir'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

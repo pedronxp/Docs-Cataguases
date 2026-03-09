@@ -33,6 +33,7 @@ export async function GET(
                     select: {
                         id: true,
                         nome: true,
+                        conteudoHtml: true,
                         variaveis: {
                             orderBy: { ordem: 'asc' },
                             select: { chave: true, label: true, tipo: true, ordem: true }
@@ -134,7 +135,7 @@ export async function DELETE(
     try {
         const session = await getSession()
 
-        if (!session || session.role !== 'ADMIN_GERAL') {
+        if (!session || !['ADMIN', 'GESTOR'].includes(session.role)) {
             return NextResponse.json(
                 { success: false, error: 'Não autorizado' },
                 { status: 401 }
@@ -143,14 +144,23 @@ export async function DELETE(
 
         const { id } = await params
 
-        await prisma.portaria.delete({
-            where: { id },
-        })
+        // Só permite excluir rascunhos e documentos com falha — nunca publicados
+        const portaria = await prisma.portaria.findUnique({ where: { id }, select: { status: true } })
+        if (!portaria) {
+            return NextResponse.json({ success: false, error: 'Portaria não encontrada' }, { status: 404 })
+        }
 
-        return NextResponse.json({
-            success: true,
-            message: 'Portaria excluída com sucesso',
-        })
+        const statusPermitidos = ['RASCUNHO', 'FALHA_PROCESSAMENTO']
+        if (!statusPermitidos.includes(portaria.status)) {
+            return NextResponse.json(
+                { success: false, error: `Portarias com status "${portaria.status}" não podem ser excluídas. Documentos publicados ou em fluxo são registros oficiais.` },
+                { status: 422 }
+            )
+        }
+
+        await prisma.portaria.delete({ where: { id } })
+
+        return NextResponse.json({ success: true, message: 'Portaria excluída com sucesso' })
     } catch (error) {
         return NextResponse.json(
             { success: false, error: 'Erro ao excluir portaria' },
