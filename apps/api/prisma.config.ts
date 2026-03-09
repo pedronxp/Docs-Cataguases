@@ -7,9 +7,11 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
-    // directUrl: process.env["DIRECT_URL"],
+    // DIRECT_URL (porta 5432, conexão direta) para db push/migrate
+    // DATABASE_URL (porta 6543, pgBouncer) é usado apenas pelo runtime em lib/prisma.ts
+    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
   },
 });

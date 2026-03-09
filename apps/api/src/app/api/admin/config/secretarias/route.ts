@@ -11,12 +11,29 @@ export async function GET() {
         const secretarias = await prisma.secretaria.findMany({
             where: { ativo: true },
             orderBy: { nome: 'asc' },
-            include: { _count: { select: { setores: true, usuarios: true } } },
+            include: {
+                _count: { select: { setores: true, usuarios: true } },
+            },
         })
 
-        return NextResponse.json({ success: true, data: secretarias })
-    } catch (error) {
-        return NextResponse.json({ success: false, error: 'Erro ao listar secretarias' }, { status: 500 })
+        // Join manual de titulares para evitar erro de client desatualizado no Next dev
+        const titularIds = secretarias.map(s => s.titularId).filter(Boolean) as string[]
+        const titulares = titularIds.length > 0
+            ? await prisma.user.findMany({
+                where: { id: { in: titularIds } },
+                select: { id: true, name: true, image: true, email: true }
+            })
+            : []
+
+        const data = secretarias.map(sec => ({
+            ...sec,
+            titular: titulares.find(t => t.id === sec.titularId) || null
+        }))
+
+        return NextResponse.json({ success: true, data })
+    } catch (error: any) {
+        console.error('ERRO LISTAR SECRETARIAS:', error)
+        return NextResponse.json({ success: false, error: 'Erro ao listar secretarias', message: error.message }, { status: 500 })
     }
 }
 

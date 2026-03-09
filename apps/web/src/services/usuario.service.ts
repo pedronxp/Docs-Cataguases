@@ -23,6 +23,24 @@ export async function atualizarUsuario(
     }
 }
 
+export async function listarUsuariosPorSecretaria(secretariaId: string): Promise<Result<Usuario[]>> {
+    try {
+        const response = await api.get(`/api/admin/users?secretariaId=${secretariaId}&ativo=true`)
+        return ok(response.data.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao listar usuários da secretaria')
+    }
+}
+
+export async function buscarUsuario(id: string): Promise<Result<Usuario>> {
+    try {
+        const response = await api.get(`/api/admin/users/${id}`)
+        return ok(response.data.data)
+    } catch (error: any) {
+        return err(error.response?.data?.error || 'Erro ao buscar usuário')
+    }
+}
+
 export async function toggleAtivo(id: string): Promise<Result<Usuario>> {
     try {
         const response = await api.patch(`/api/admin/users/${id}/toggle-status`)

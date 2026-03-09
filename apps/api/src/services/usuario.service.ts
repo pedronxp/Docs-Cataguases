@@ -92,14 +92,18 @@ export class UsuarioService {
         role?: string;
         ativo?: boolean;
         permissoesExtra?: string[];
+        secretariaId?: string | null;
+        setorId?: string | null;
     }): Promise<Result<any>> {
         try {
             const usuario = await prisma.user.update({
                 where: { id },
                 data: {
-                    role: data.role as any,
-                    ativo: data.ativo,
-                    permissoesExtra: data.permissoesExtra
+                    ...(data.role !== undefined && { role: data.role as any }),
+                    ...(data.ativo !== undefined && { ativo: data.ativo }),
+                    ...(data.permissoesExtra !== undefined && { permissoesExtra: data.permissoesExtra }),
+                    ...('secretariaId' in data && { secretariaId: data.secretariaId }),
+                    ...('setorId' in data && { setorId: data.setorId }),
                 }
             })
 

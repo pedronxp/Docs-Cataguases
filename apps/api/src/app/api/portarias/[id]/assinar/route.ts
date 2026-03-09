@@ -1,47 +1,147 @@
 import { NextResponse } from 'next/server'
+import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
-import { AssinaturaService } from '@/services/assinatura.service'
+import { StorageService } from '@/services/storage.service'
 
 export const dynamic = 'force-dynamic'
+
+interface SessionPayload {
+    id: string
+    role: string
+    name?: string
+    username?: string
+    secretariaId?: string
+}
 
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getSession()
+        const rawSession = await getSession()
+        if (!rawSession) {
+            return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 })
+        }
+        const session = rawSession as unknown as SessionPayload
 
-        if (!session) {
-            return NextResponse.json(
-                { success: false, error: 'Não autorizado' },
-                { status: 401 }
-            )
+        if (!['SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'].includes(session.role)) {
+            return NextResponse.json({ success: false, error: 'Sem permissão para registrar assinatura' }, { status: 403 })
         }
 
+        const body = await request.json()
+        const { tipoAssinatura, justificativa, comprovanteBase64, comprovanteNome } = body
         const { id } = await params
 
-        const result = await AssinaturaService.assinarDocumento(
-            id,
-            session.id as string,
-            session.role as string
-        )
-
-        if (result.ok) {
-            return NextResponse.json({
-                success: true,
-                data: result.value,
-                message: 'Documento assinado com sucesso.'
-            })
+        const portaria = await prisma.portaria.findUnique({ where: { id } })
+        if (!portaria) {
+            return NextResponse.json({ success: false, error: 'Portaria não encontrada' }, { status: 404 })
         }
 
+        if (portaria.status !== 'AGUARDANDO_ASSINATURA') {
+            return NextResponse.json({
+                success: false,
+                error: 'A portaria não está aguardando assinatura'
+            }, { status: 400 })
+        }
+
+        const validTypes = ['DIGITAL', 'MANUAL', 'DISPENSADA']
+        if (!validTypes.includes(tipoAssinatura)) {
+            return NextResponse.json({ success: false, error: 'Tipo de assinatura inválido' }, { status: 400 })
+        }
+
+        // Justificativa obrigatória para exceções
+        if ((tipoAssinatura === 'MANUAL' || tipoAssinatura === 'DISPENSADA') && !justificativa?.trim()) {
+            return NextResponse.json({
+                success: false,
+                error: 'Justificativa é obrigatória para assinatura manual ou dispensada'
+            }, { status: 400 })
+        }
+
+        // Comprovante obrigatório para assinatura manual
+        if (tipoAssinatura === 'MANUAL' && !comprovanteBase64) {
+            return NextResponse.json({
+                success: false,
+                error: 'O anexo do documento assinado é obrigatório para assinatura manual'
+            }, { status: 400 })
+        }
+
+        const nomeResponsavel = session.name || session.username || 'Responsável'
+
+        // Upload do comprovante para Supabase Storage (se fornecido)
+        let comprovanteUrl: string | undefined
+        if (comprovanteBase64 && comprovanteNome) {
+            try {
+                const ext = comprovanteNome.split('.').pop()?.toLowerCase() || 'pdf'
+                const contentType = ext === 'pdf' ? 'application/pdf' : `image/${ext}`
+                const path = `portarias/${id}/comprovante-assinatura-${Date.now()}.${ext}`
+                const buffer = Buffer.from(comprovanteBase64, 'base64')
+                await StorageService.uploadBuffer(path, buffer, contentType)
+                comprovanteUrl = path
+            } catch (uploadErr: any) {
+                console.error('[/assinar] Erro ao fazer upload do comprovante:', uploadErr.message)
+                // Não bloqueia o fluxo — registra sem o comprovante
+            }
+        }
+
+        // Define status e mensagem de log por tipo
+        let assinaturaStatus: string
+        let msgLog: string
+
+        if (tipoAssinatura === 'DIGITAL') {
+            assinaturaStatus = 'ASSINADA_DIGITAL'
+            msgLog = `Portaria assinada digitalmente por ${nomeResponsavel} (${session.role}) em ${new Date().toLocaleString('pt-BR')}.`
+        } else if (tipoAssinatura === 'MANUAL') {
+            assinaturaStatus = 'ASSINADA_MANUAL'
+            msgLog = `Portaria marcada como assinada manualmente. Responsável pelo registro: ${nomeResponsavel} (${session.role}). Justificativa: "${justificativa}".${comprovanteUrl ? ' Comprovante digitalizado anexado.' : ' Nenhum comprovante anexado.'}`
+        } else {
+            assinaturaStatus = 'DISPENSADA_COM_JUSTIFICATIVA'
+            msgLog = `Assinatura dispensada por decisão formal. Registrado por: ${nomeResponsavel} (${session.role}). Justificativa: "${justificativa}".${comprovanteUrl ? ' Despacho/ato formal anexado.' : ''}`
+        }
+
+        const atualizada = await prisma.$transaction(async (tx) => {
+            const p = await tx.portaria.update({
+                where: { id },
+                data: {
+                    assinaturaStatus,
+                    assinaturaJustificativa: justificativa || null,
+                    assinaturaComprovanteUrl: comprovanteUrl || null,
+                    status: 'PRONTO_PUBLICACAO',
+                    // Para assinatura digital: registra o signatário; para manual/dispensada: quem registrou
+                    assinadoPorId: session.id,
+                    assinadoEm: new Date()
+                }
+            })
+
+            // Cria entrada na fila do Jornal (upsert para evitar duplicata)
+            await tx.jornalQueue.upsert({
+                where: { portariaId: id },
+                create: { portariaId: id },
+                update: { status: 'PENDENTE', updatedAt: new Date() }
+            })
+
+            await tx.feedAtividade.create({
+                data: {
+                    tipoEvento: `ASSINATURA_${tipoAssinatura}`,
+                    mensagem: msgLog,
+                    portariaId: id,
+                    autorId: session.id,
+                    secretariaId: portaria.secretariaId,
+                    metadata: {
+                        tipoAssinatura,
+                        temComprovante: !!comprovanteUrl,
+                        registradoPor: session.id
+                    }
+                }
+            })
+
+            return p
+        })
+
+        return NextResponse.json({ success: true, data: atualizada })
+    } catch (error: any) {
+        console.error('[/assinar]', error)
         return NextResponse.json(
-            { success: false, error: result.error },
-            { status: 400 }
-        )
-    } catch (error) {
-        console.error('Erro no endpoint de assinatura:', error)
-        return NextResponse.json(
-            { success: false, error: 'Erro interno ao processar assinatura' },
+            { success: false, error: error.message || 'Erro ao registrar assinatura' },
             { status: 500 }
         )
     }
