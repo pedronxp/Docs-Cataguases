@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { UsuarioService } from '@/services/usuario.service'
+import { signToken } from '@/lib/jwt'
 
 const registroSchema = z.object({
     name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -32,9 +33,18 @@ export async function POST(request: NextRequest) {
             }, { status: 400 })
         }
 
+        // Gerar token JWT para o novo usuário
+        const token = await signToken({
+            id: result.value.id,
+            email: result.value.email,
+            role: result.value.role,
+            name: result.value.name
+        })
+
         return NextResponse.json({
             success: true,
-            data: result.value
+            data: result.value,
+            token
         })
     } catch (error) {
         console.error('Erro no endpoint de registro:', error)

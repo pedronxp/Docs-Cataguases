@@ -55,25 +55,32 @@ function RegistroPage() {
 
             if (response.data.success) {
                 const usuarioData = response.data.data
+                const token = response.data.token
 
-                // Em um cenário real, o backend já retornaria o JWT. Se não retornar, podemos forçar o login ou registrar a store assim:
+                if (!token) {
+                    setServerError('Erro: Token não retornado pelo servidor.')
+                    return
+                }
+
+                // Salvar token no localStorage para o interceptador Axios
+                localStorage.setItem('auth-token', token)
+
                 setSession(
                     {
                         id: usuarioData.id,
                         name: usuarioData.name,
                         email: usuarioData.email,
-                        role: usuarioData.role, // Vai ser retornado 'PENDENTE' da API
+                        role: usuarioData.role,
                         ativo: usuarioData.ativo,
                         permissoesExtra: usuarioData.permissoesExtra || [],
                         secretariaId: usuarioData.secretariaId,
                         setorId: usuarioData.setorId,
                         createdAt: usuarioData.createdAt
                     },
-                    // Caso o endpoint apenas registre e não gere token instantâneo, a UX dita forçar navegação pro login para gerar o ticket de sessão longo de verdade, ou mandamos pra onboarding
-                    response.data.token || 'temp-registration-token'
+                    token
                 )
 
-                // Transição baseada no banco: Se PENDENTE sem secretaria, o Route Guard em root.tsx deverá arrastar para /onboarding
+                // Navegar para onboarding para que o usuário complete seu cadastro
                 navigate({ to: '/_auth/onboarding' })
             } else {
                 setServerError(response.data.error || 'Falha desconhecida no registro.')

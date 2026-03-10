@@ -14,7 +14,15 @@
       "WebFetch(domain:www.prisma.io)",
       "Bash(sort -t: -k2 -rn)",
       "Bash(grep -v \"//\")",
-      "Bash(xargs grep -l \"SYS_\")"
+      "Bash(xargs grep -l \"SYS_\")",
+      "SlashCommand(/senior-architect)",
+      "SlashCommand(/brainstorming)",
+      "Bash(curl -X POST http://localhost:3000/api/auth/registro -H \"Content-Type: application/json\" -d \"{\"\"name\"\":\"\"Teste Usuario\"\",\"\"username\"\":\"\"teste.user\"\",\"\"email\"\":\"\"teste@example.com\"\",\"\"password\"\":\"\"senha123\"\"}\")",
+      "Bash(curl -X POST http://localhost:3000/api/auth/registro -H \"Content-Type: application/json\" -d \"{\"\"name\"\":\"\"Test User\"\",\"\"username\"\":\"\"test.user\"\",\"\"email\"\":\"\"test@example.com\"\",\"\"password\"\":\"\"123456\"\"}\")",
+      "Bash(curl -X POST http://localhost:3000/api/auth/registro -H \"Content-Type: application/json\" -d \"{\"\"name\"\":\"\"Novo Usuario Teste\"\",\"\"username\"\":\"\"novo.teste123\"\",\"\"email\"\":\"\"novoteste123@example.com\"\",\"\"password\"\":\"\"123456\"\"}\")",
+      "Bash(npm run dev)",
+      "Bash(curl -X POST http://localhost:3000/api/auth/registro -H \"Content-Type: application/json\" -d \"{\"\"name\"\":\"\"Usuario Teste Final\"\",\"\"username\"\":\"\"teste.final\"\",\"\"email\"\":\"\"testefinal@example.com\"\",\"\"password\"\":\"\"senha123\"\"}\")",
+      "Bash(curl -X OPTIONS http://localhost:3000/api/auth/registro -H \"Origin: http://localhost:5173\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: Content-Type\" -v)"
     ]
   }
 }

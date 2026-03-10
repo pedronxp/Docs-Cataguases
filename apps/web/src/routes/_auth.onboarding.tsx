@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Building2, MapPin, ChevronRight, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { completarOnboarding } from '@/services/auth.service'
-import { listarSecretarias } from '@/services/secretaria.service'
+import { listarSecretarias, listarSetores, type Setor } from '@/services/secretaria.service'
 import { useToast } from '@/hooks/use-toast'
 import type { Secretaria } from '@/types/domain'
 
@@ -22,6 +22,8 @@ function OnboardingPage() {
   const [loading, setLoading] = useState(false)
   const [loadData, setLoadData] = useState(true)
   const [secretarias, setSecretarias] = useState<Secretaria[]>([])
+  const [setores, setSetores] = useState<Setor[]>([])
+  const [loadingSetores, setLoadingSetores] = useState(false)
   const [selectedSec, setSelectedSec] = useState<string>('')
   const [selectedSetor, setSelectedSetor] = useState<string>('')
 
@@ -33,6 +35,20 @@ function OnboardingPage() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    if (!selectedSec) {
+      setSetores([])
+      setSelectedSetor('')
+      return
+    }
+    setLoadingSetores(true)
+    setSelectedSetor('')
+    listarSetores(selectedSec).then(res => {
+      if (res.success) setSetores(res.data)
+      setLoadingSetores(false)
+    })
+  }, [selectedSec])
 
   const handleFinalizar = async () => {
     if (!selectedSec) return
@@ -94,14 +110,18 @@ function OnboardingPage() {
                 <Label className="text-sm text-slate-700 font-semibold flex items-center gap-1.5">
                   <MapPin size={12} className="text-primary" /> Setor (Opcional)
                 </Label>
-                <Select onValueChange={setSelectedSetor} value={selectedSetor}>
+                <Select onValueChange={setSelectedSetor} value={selectedSetor} disabled={!selectedSec || loadingSetores}>
                   <SelectTrigger className="h-10 border-slate-200 rounded-lg bg-slate-50/50 focus:ring-primary text-sm">
-                    <SelectValue placeholder="Selecione seu setor..." />
+                    <SelectValue placeholder={loadingSetores ? "Carregando..." : "Selecione seu setor..."} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="setor-dp" className="text-sm">Departamento de Pessoal</SelectItem>
-                    <SelectItem value="setor-comunicacao" className="text-sm">Comunicação Social</SelectItem>
-                    <SelectItem value="setor-juridico" className="text-sm">Procuradoria Jurídica</SelectItem>
+                    {setores.length === 0 && selectedSec && !loadingSetores ? (
+                      <SelectItem value="none" disabled className="text-sm">Nenhum setor encontrado</SelectItem>
+                    ) : (
+                      setores.map(setor => (
+                        <SelectItem key={setor.id} value={setor.id} className="text-sm">{setor.nome}</SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
