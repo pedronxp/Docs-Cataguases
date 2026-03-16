@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doc's Cataguases — Plano de Implementação</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<style>
+  :root { --primary: #1351b4; --bg: #f8fafc; --card: #fff; --border: #e2e8f0; --text: #1e293b; --muted: #64748b; --green: #10b981; --amber: #f59e0b; --red: #ef4444; --violet: #8b5cf6; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+  h1 { font-size: 2rem; font-weight: 900; color: var(--primary); margin-bottom: 0.25rem; }
+  h1 small { display: block; font-size: 0.9rem; font-weight: 600; color: var(--muted); margin-top: 0.25rem; }
+  h2 { font-size: 1.3rem; font-weight: 800; color: var(--text); margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--primary); }
+  h3 { font-size: 1.05rem; font-weight: 700; margin: 1.5rem 0 0.5rem; }
+  .badge { display: inline-block; font-size: 0.7rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .badge-critical { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
+  .badge-high { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+  .badge-medium { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+  .badge-low { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; margin: 1rem 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+  .card-header .num { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800; flex-shrink: 0; }
+  .card-title { font-weight: 700; font-size: 1rem; }
+  .card p, .card li { font-size: 0.9rem; color: var(--muted); }
+  .card ul { padding-left: 1.25rem; margin: 0.5rem 0; }
+  .card li { margin: 0.25rem 0; }
+  .card li strong { color: var(--text); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+  .status-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 1rem 0; }
+  .status-table th { background: var(--primary); color: #fff; padding: 0.6rem 0.75rem; text-align: left; font-weight: 700; }
+  .status-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+  .status-table tr:hover td { background: #f1f5f9; }
+  .mermaid { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin: 1rem 0; overflow-x: auto; }
+  .audit-item { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9; }
+  .audit-item:last-child { border-bottom: none; }
+  .audit-icon { width: 8px; height: 8px; border-radius: 50%; margin-top: 0.5rem; flex-shrink: 0; }
+  .audit-icon.red { background: var(--red); }
+  .audit-icon.amber { background: var(--amber); }
+  .audit-icon.green { background: var(--green); }
+  .audit-icon.violet { background: var(--violet); }
+  .phase { border-left: 3px solid var(--primary); padding-left: 1.25rem; margin: 1.5rem 0; }
+  .phase-title { font-weight: 800; font-size: 1.1rem; color: var(--primary); }
+  .phase-time { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+  .tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px; margin-right: 0.25rem; }
+  .tag-api { background: #dbeafe; color: #1d4ed8; }
+  .tag-web { background: #fce7f3; color: #be185d; }
+  .tag-db { background: #d1fae5; color: #065f46; }
+  .summary-box { background: linear-gradient(135deg, #1351b4 0%, #0d3f8f 100%); color: #fff; border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; }
+  .summary-box h3 { color: #fff; margin-top: 0; }
+  .summary-box p { color: rgba(255,255,255,0.85); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Plano de Implementação — Doc's Cataguases
+<small>Auditoria completa + Roadmap de melhorias · Março 2026</small>
+</h1>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>1. Diagnóstico Atual (Auditoria)</h2>
+
+<div class="card">
+<h3>Problemas identificados por área:</h3>
+
+<div class="audit-item">
+  <div class="audit-icon red"></div>
+  <div><strong>Notificações globais, não por usuário</strong> — O SSE filtra por secretaria/setor mas NÃO filtra por destinatário específico. Todos da mesma secretaria veem tudo. Não há notificação "para você" (ex: "sua portaria foi rejeitada").</div>
+</div>
+
+<div class="audit-item">
+  <div class="audit-icon red"></div>
+  <div><strong>Sidebar sem badges dinâmicos</strong> — A navbar lateral tem suporte a <code>badge?: number</code> mas nenhum item usa. Revisão não mostra contagem de itens pendentes.</div>
+</div>
+
+<div class="audit-item">
+  <div class="audit-icon amber"></div>
+  <div><strong>Assinatura trust-based (mock)</strong> — O sistema marca portarias como "assinadas" sem verificação criptográfica real. SHA-256 usado apenas para integridade do PDF, não prova de assinatura. Sem ICP-Brasil.</div>
+</div>
+
+<div class="audit-item">
+  <div class="audit-icon amber"></div>
+  <div><strong>Tela "Aguardando Aprovação" incompleta</strong> — A rota <code>/aguardando</code> existe mas falta: polling para verificar se foi aprovado, feedback visual do status, e redirecionamento automático após aprovação.</div>
+</div>
+
+<div class="audit-item">
+  <div class="audit-icon red"></div>
+  <div><strong>Sem auto-refresh (F5 obrigatório)</strong> — Dashboard, lista de portarias e fila de revisão fazem apenas 1 load no mount. Nenhum polling, nenhum refetch automático, nenhuma invalidação de cache.</div>
+</div>
+
+<div class="audit-item">
+  <div class="audit-icon violet"></div>
+  <div><strong>Fluxo completo funcional mas com gaps</strong> — State machine bem estruturada, mas: sem rollback de PRONTO_PUBLICACAO, transferência limitada a REVISOR, sem timeout/SLA.</div>
+</div>
+
+<div class="audit-item">
+  <div class="audit-icon red"></div>
+  <div><strong>Chatbot IA: Failover silencioso troca modelo sem aviso</strong> — Quando Cerebras dá rate limit, o sistema faz fallback automático para Groq trocando o modelo (llama-3.3-70b → llama-3.3-70b-versatile) sem avisar o usuário. Tokens são consumidos no Groq mas o seletor mostra Cerebras. O usuário precisa ficar alternando manualmente.</div>
+</div>
+
+<div class="audit-item">
+  <div class="audit-icon red"></div>
+  <div><strong>IA sem treinamento personalizado</strong> — O system prompt está hardcoded em <code>llm-system-prompt.ts</code>. Não existe interface para admins adicionarem/editarem prompts de treinamento. Todas as LLMs usam o mesmo prompt fixo, sem possibilidade de customização pelo frontend.</div>
+</div>
+
+<div class="audit-item">
+  <div class="audit-icon amber"></div>
+  <div><strong>Mensagens de erro genéricas sem identidade</strong> — Erros do assistente não mencionam o nome do sistema "Doc's Cataguases". Falta branding nas mensagens de erro e feedback ao usuário.</div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>2. Fluxograma Completo da Portaria</h2>
+
+<div class="mermaid">
+stateDiagram-v2
+    [*] --> RASCUNHO: Operador cria portaria
+    RASCUNHO --> EM_REVISAO_ABERTA: Submeter p/ revisão<br/>(autor ou ADMIN)
+
+    EM_REVISAO_ABERTA --> EM_REVISAO_ATRIBUIDA: Revisor assume<br/>(REVISOR/SEC/ADMIN)
+
+    EM_REVISAO_ATRIBUIDA --> AGUARDANDO_ASSINATURA: Aprovar revisão<br/>(revisor atual ou ADMIN)
+    EM_REVISAO_ATRIBUIDA --> CORRECAO_NECESSARIA: Rejeitar revisão<br/>(com motivo obrigatório)
+    EM_REVISAO_ATRIBUIDA --> EM_REVISAO_ATRIBUIDA: Transferir revisor<br/>(mesmo secretaria)
+
+    CORRECAO_NECESSARIA --> EM_REVISAO_ABERTA: Resubmeter após correção<br/>(autor)
+
+    AGUARDANDO_ASSINATURA --> PRONTO_PUBLICACAO: Assinar<br/>(PREFEITO/SEC/ADMIN)<br/>Digital, Manual ou Dispensada
+
+    PRONTO_PUBLICACAO --> PUBLICADA: Publicar<br/>(aloca nº + PDF + hash)
+
+    PUBLICADA --> [*]: Estado final
+
+    RASCUNHO --> FALHA_PROCESSAMENTO: Erro no processamento
+    PRONTO_PUBLICACAO --> FALHA_PROCESSAMENTO: Falha na geração PDF
+    FALHA_PROCESSAMENTO --> PRONTO_PUBLICACAO: Reprocessar<br/>(número preservado)
+</div>
+
+<div class="card">
+<h3>Papéis por etapa:</h3>
+<table class="status-table">
+<thead><tr><th>Transição</th><th>Roles permitidos</th><th>Validações</th></tr></thead>
+<tbody>
+<tr><td>Criar portaria</td><td>OPERADOR, SECRETARIO, ADMIN</td><td>Modelo + Secretaria obrigatórios</td></tr>
+<tr><td>Submeter p/ revisão</td><td>Autor da portaria ou ADMIN</td><td>Status = RASCUNHO ou CORRECAO</td></tr>
+<tr><td>Assumir revisão</td><td>REVISOR, SECRETARIO, ADMIN, PREFEITO</td><td>revisorAtualId = null (race protection)</td></tr>
+<tr><td>Aprovar revisão</td><td>Revisor atual ou ADMIN</td><td>Status = EM_REVISAO_ATRIBUIDA</td></tr>
+<tr><td>Rejeitar revisão</td><td>Revisor atual ou ADMIN</td><td>Observação obrigatória</td></tr>
+<tr><td>Transferir revisão</td><td>Revisor atual ou ADMIN</td><td>Destino = REVISOR ativo da mesma secretaria</td></tr>
+<tr><td>Assinar</td><td>PREFEITO, SECRETARIO, ADMIN</td><td>Status = AGUARDANDO_ASSINATURA</td></tr>
+<tr><td>Publicar</td><td>ADMIN, SECRETARIO, PREFEITO</td><td>assinaturaStatus ≠ NAO_ASSINADA</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>3. Fluxograma do Cadastro de Usuário</h2>
+
+<div class="mermaid">
+flowchart TD
+    A[Usuário acessa /registro] --> B[Preenche: nome, email, senha, CPF]
+    B --> C{Validação}
+    C -->|Email/username já existe| D[Erro: já cadastrado]
+    C -->|Válido| E[Cria user com role=PENDENTE, ativo=false]
+    E --> F[Redireciona para /onboarding]
+    F --> G[Seleciona secretaria + setor]
+    G --> H[Completa onboarding: role=OPERADOR, ativo=true]
+    H --> I[Redireciona para /aguardando]
+    I --> J{Admin aprova?}
+    J -->|Sim| K[Admin muda role + ativa no painel]
+    K --> L[Próximo login: acesso liberado]
+    J -->|Não| M[Usuário fica bloqueado]
+
+    style A fill:#dbeafe,stroke:#1d4ed8
+    style E fill:#fef3c7,stroke:#d97706
+    style I fill:#fce7f3,stroke:#be185d
+    style L fill:#d1fae5,stroke:#059669
+    style M fill:#fef2f2,stroke:#dc2626
+</div>
+
+<div class="card" style="border-left: 3px solid var(--red);">
+<h3>⚠️ Problema atual no cadastro:</h3>
+<p>A tela <code>/aguardando</code> é estática. O usuário não sabe se foi aprovado sem fazer F5 ou re-login. Falta: polling automático do status, notificação por email ao ser aprovado, e redirecionamento automático.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>4. Plano de Implementação (Fases)</h2>
+
+<div class="summary-box">
+<h3>Visão Geral</h3>
+<p>6 módulos de melhoria divididos em 3 fases. Priorizados por impacto no usuário final. Cada fase é independente e entregável.</p>
+</div>
+
+<!-- FASE 1 -->
+<div class="phase">
+<div class="phase-title">FASE 1 — Auto-Refresh + Notificações Inteligentes</div>
+<div class="phase-time">Prioridade: CRÍTICA · Impacto: Todos os usuários</div>
+</div>
+
+<div class="grid-2">
+<div class="card">
+<div class="card-header">
+  <div class="num">1</div>
+  <div class="card-title">Sistema de Notificações por Usuário</div>
+</div>
+<span class="badge badge-critical">Crítico</span>
+<span class="tag tag-api">API</span> <span class="tag tag-web">Web</span> <span class="tag tag-db">DB</span>
+<ul>
+  <li><strong>Criar tabela <code>Notificacao</code></strong> no Prisma com: id, userId (destinatário), tipo, mensagem, lida, portariaId, createdAt</li>
+  <li><strong>Gerar notificações direcionadas:</strong>
+    <ul>
+      <li>Portaria rejeitada → notifica o <em>autor</em></li>
+      <li>Portaria submetida → notifica <em>revisores da secretaria</em></li>
+      <li>Revisão aprovada → notifica o <em>autor</em></li>
+      <li>Aguardando assinatura → notifica <em>PREFEITO/SECRETARIO</em></li>
+      <li>Publicada → notifica o <em>autor</em></li>
+      <li>Usuário aprovado → notifica o <em>próprio usuário</em></li>
+    </ul>
+  </li>
+  <li><strong>API:</strong> <code>GET /api/notifications?userId=X</code> com paginação</li>
+  <li><strong>SSE:</strong> Filtrar por <code>userId</code> no polling, não apenas secretariaId</li>
+  <li><strong>Frontend:</strong> Painel de notificações com mark-as-read, link direto p/ portaria</li>
+</ul>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <div class="num">2</div>
+  <div class="card-title">Auto-Refresh (eliminar F5)</div>
+</div>
+<span class="badge badge-critical">Crítico</span>
+<span class="tag tag-web">Web</span>
+<ul>
+  <li><strong>React Query <code>refetchInterval</code></strong> em hooks chave:
+    <ul>
+      <li><code>use-dashboard.ts</code> → polling 30s</li>
+      <li><code>use-portarias.ts</code> (listagem) → polling 15s</li>
+      <li>Fila de revisão → polling 10s</li>
+      <li>Detalhe da portaria → polling 20s</li>
+    </ul>
+  </li>
+  <li><strong>SSE-driven invalidation:</strong> Quando SSE recebe evento relevante (ex: PORTARIA_SUBMETIDA), invalidar queries React Query via <code>queryClient.invalidateQueries()</code></li>
+  <li><strong>Tela /aguardando:</strong> Polling a cada 10s verificando se role mudou de PENDENTE</li>
+  <li><strong>Window focus refetch:</strong> <code>refetchOnWindowFocus: true</code> no React Query global</li>
+</ul>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <div class="num">3</div>
+  <div class="card-title">Badges Dinâmicos na Sidebar</div>
+</div>
+<span class="badge badge-high">Alto</span>
+<span class="tag tag-api">API</span> <span class="tag tag-web">Web</span>
+<ul>
+  <li><strong>API endpoint:</strong> <code>GET /api/sidebar-counts</code> retorna contagens filtradas por role:
+    <ul>
+      <li>REVISOR: portarias em <code>EM_REVISAO_ABERTA</code> da secretaria</li>
+      <li>PREFEITO/SECRETARIO: portarias em <code>AGUARDANDO_ASSINATURA</code></li>
+      <li>ADMIN: usuários PENDENTE, portarias com FALHA</li>
+    </ul>
+  </li>
+  <li><strong>Hook:</strong> <code>useSidebarCounts()</code> com polling 15s + invalidação por SSE</li>
+  <li><strong>Sidebar:</strong> Alimentar <code>badge</code> em NavLeaf items (Revisão, Assinatura, Usuários)</li>
+  <li><strong>Animação:</strong> Pulse na badge quando valor muda (transição CSS)</li>
+</ul>
+</div>
+
+<!-- FASE 1B — IA/LLM -->
+<div class="phase">
+<div class="phase-title">FASE 1B — Correção e Evolução da IA/LLM</div>
+<div class="phase-time">Prioridade: CRÍTICA · Impacto: Assistente IA + Experiência do Admin</div>
+</div>
+
+<div class="grid-2">
+<div class="card">
+<div class="card-header">
+  <div class="num">4</div>
+  <div class="card-title">Corrigir Seleção de Modelo / Failover</div>
+</div>
+<span class="badge badge-critical">Crítico</span>
+<span class="tag tag-api">API</span> <span class="tag tag-web">Web</span>
+<ul>
+  <li><strong>Bug principal:</strong> Quando Cerebras dá rate limit (429), o circuit breaker faz fallback silencioso para Groq, trocando modelo e provider sem avisar o usuário
+  </li>
+  <li><strong>Correção 1 — Respeitar escolha manual:</strong>
+    <ul>
+      <li>Se <code>skipSmartRouter=true</code> (usuário escolheu modelo), NÃO fazer failover automático</li>
+      <li>Retornar erro claro: <em>"Doc's Cataguases: O modelo [X] via Cerebras está temporariamente indisponível. Tente outro modelo ou aguarde."</em></li>
+      <li>Manter failover automático apenas no modo "Automático"</li>
+    </ul>
+  </li>
+  <li><strong>Correção 2 — Transparência no failover:</strong>
+    <ul>
+      <li>No modo Automático, quando fizer fallback, retornar no response: <code>{ usedProvider, usedModel, fallbackReason }</code></li>
+      <li>Frontend exibe: "Respondido via Groq (Cerebras indisponível)" como nota discreta</li>
+    </ul>
+  </li>
+  <li><strong>Correção 3 — Erros com identidade:</strong>
+    <ul>
+      <li>Toda mensagem de erro do LLM prefixada com "Doc's Cataguases:"</li>
+      <li>Erros em pt-br consistentes: rate limit, timeout, sem chave, modelo indisponível</li>
+    </ul>
+  </li>
+</ul>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <div class="num">5</div>
+  <div class="card-title">Página de Treinamento de IA (Prompts)</div>
+</div>
+<span class="badge badge-critical">Crítico</span>
+<span class="tag tag-api">API</span> <span class="tag tag-web">Web</span> <span class="tag tag-db">DB</span>
+<ul>
+  <li><strong>Tabela <code>LlmPrompt</code></strong> no Prisma:
+    <ul>
+      <li><code>id</code>, <code>nome</code> (identificador amigável)</li>
+      <li><code>categoria</code> (SISTEMA, PORTARIA, REVISAO, CHAT_GERAL, MODELO, CUSTOM)</li>
+      <li><code>conteudo</code> (texto do prompt)</li>
+      <li><code>ativo</code> (boolean — pode desabilitar sem excluir)</li>
+      <li><code>ordem</code> (prioridade de injeção)</li>
+      <li><code>criadoPor</code>, <code>criadoEm</code>, <code>atualizadoEm</code></li>
+    </ul>
+  </li>
+  <li><strong>Página admin <code>/admin/ia/prompts</code></strong>:
+    <ul>
+      <li>Listar todos os prompts por categoria (accordion/tabs)</li>
+      <li>Criar novo prompt com editor de texto rico (textarea grande)</li>
+      <li>Editar/ativar/desativar prompts existentes</li>
+      <li>Preview: ver como ficaria o system prompt completo montado</li>
+      <li>Duplicar prompt para variações</li>
+      <li>Drag &amp; drop para reordenar prioridade</li>
+    </ul>
+  </li>
+  <li><strong>Injeção dinâmica no chat:</strong>
+    <ul>
+      <li><code>buildSystemPrompt()</code> monta prompt base + todos os prompts ativos do banco, ordenados por <code>ordem</code></li>
+      <li>Prompts de categoria SISTEMA são sempre injetados</li>
+      <li>Prompts de PORTARIA injetados apenas no modo criação/revisão</li>
+      <li>Prompts CUSTOM injetados conforme contexto (secretaria, modo)</li>
+    </ul>
+  </li>
+  <li><strong>Aplicar a TODAS as LLMs:</strong> O system prompt montado é enviado independente do provider (Cerebras, Groq, Mistral, OpenRouter)</li>
+</ul>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <div class="num">6</div>
+  <div class="card-title">Mensagens de Erro em pt-br + Branding</div>
+</div>
+<span class="badge badge-high">Alto</span>
+<span class="tag tag-api">API</span> <span class="tag tag-web">Web</span>
+<ul>
+  <li><strong>Padronizar todas as mensagens de erro com o nome do sistema:</strong>
+    <ul>
+      <li>Formato: <em>"Doc's Cataguases — [mensagem descritiva em português]"</em></li>
+      <li>Rate limit: <em>"Doc's Cataguases — O assistente está temporariamente sobrecarregado. Aguarde 1-2 minutos."</em></li>
+      <li>Timeout: <em>"Doc's Cataguases — O assistente demorou para responder. Tente novamente."</em></li>
+      <li>Sem chave: <em>"Doc's Cataguases — Nenhuma chave de IA configurada. Contate o administrador."</em></li>
+      <li>Modelo indisponível: <em>"Doc's Cataguases — O modelo selecionado está indisponível no momento."</em></li>
+    </ul>
+  </li>
+  <li><strong>Frontend — Toast/Alert com branding:</strong>
+    <ul>
+      <li>Componente de erro do chat exibe nome + ícone do Doc's Cataguases</li>
+      <li>Sugestão de ação: "Tente outro modelo" ou "Aguarde e tente novamente"</li>
+    </ul>
+  </li>
+  <li><strong>Auditoria completa:</strong> Varrer todos os <code>throw new Error</code> e <code>NextResponse.json({ error: ... })</code> garantindo pt-br</li>
+</ul>
+</div>
+
+<!-- Fluxograma IA/LLM -->
+<h3 style="margin-top: 2rem;">Fluxograma: Seleção de Modelo e Failover (Corrigido)</h3>
+<div class="mermaid">
+flowchart TD
+    A[Usuário envia mensagem no chat] --> B{Modelo selecionado?}
+    B -->|Automático| C[Smart Router escolhe provider+modelo]
+    B -->|Manual: ex llama-3.3-70b| D[skipSmartRouter=true<br/>provider=cerebras]
+
+    C --> E[Tenta provider escolhido]
+    D --> F[Tenta APENAS provider selecionado]
+
+    E -->|Sucesso| G[✅ Retorna resposta<br/>+ info do provider usado]
+    E -->|429 Rate Limit| H[Failover → próximo provider]
+    H --> I[Troca modelo para equivalente<br/>do novo provider]
+    I --> G
+
+    F -->|Sucesso| J[✅ Retorna resposta]
+    F -->|429 Rate Limit| K[❌ Retorna erro claro:<br/>Docs Cataguases — Modelo indisponível.<br/>Tente outro ou aguarde.]
+
+    G --> L[Frontend exibe resposta<br/>+ nota: via Provider X]
+    J --> L
+    K --> M[Frontend exibe erro<br/>com sugestão de ação]
+
+    style A fill:#dbeafe,stroke:#1d4ed8
+    style G fill:#d1fae5,stroke:#059669
+    style J fill:#d1fae5,stroke:#059669
+    style K fill:#fef2f2,stroke:#dc2626
+    style M fill:#fef2f2,stroke:#dc2626
+</div>
+
+<!-- FASE 1C — UX Básica -->
+<div class="phase">
+<div class="phase-title">FASE 1C — Cookies, Página Sobre e Ajustes UX</div>
+<div class="phase-time">Prioridade: ALTA · Impacto: Conformidade legal + Identidade do sistema</div>
+</div>
+
+<div class="grid-2">
+<div class="card">
+<div class="card-header">
+  <div class="num">7</div>
+  <div class="card-title">Banner de Cookies (LGPD)</div>
+</div>
+<span class="badge badge-high">Alto</span>
+<span class="tag tag-web">Web</span>
+<ul>
+  <li><strong>Componente <code>CookieBanner.tsx</code></strong>:
+    <ul>
+      <li>Banner fixo na parte inferior da tela</li>
+      <li>Texto: "O Doc's Cataguases utiliza cookies para melhorar sua experiência..."</li>
+      <li>Botões: "Aceitar todos", "Apenas essenciais", "Configurações"</li>
+      <li>Salvar preferência no <code>localStorage</code> (chave: <code>docs-cataguases-cookies-consent</code>)</li>
+      <li>Não exibir novamente após aceitar</li>
+    </ul>
+  </li>
+  <li><strong>Página de Política de Cookies</strong>: Rota <code>/cookies</code> com detalhes sobre tipos de cookies usados</li>
+</ul>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <div class="num">8</div>
+  <div class="card-title">Página Sobre o Sistema</div>
+</div>
+<span class="badge badge-high">Alto</span>
+<span class="tag tag-web">Web</span>
+<ul>
+  <li><strong>Rota <code>/sobre</code></strong> acessível por todos os usuários:
+    <ul>
+      <li>Nome do sistema: Doc's Cataguases</li>
+      <li>Descrição do propósito (gestão eletrônica de portarias)</li>
+      <li>Versão atual do sistema</li>
+      <li>Prefeitura de Cataguases — MG</li>
+      <li>Tecnologias utilizadas (resumo)</li>
+      <li>Contato/suporte</li>
+      <li>Link na sidebar ou footer</li>
+    </ul>
+  </li>
+</ul>
+</div>
+</div>
+
+<!-- FASE 2 -->
+<div class="phase">
+<div class="phase-title">FASE 2 — Assinatura Real + Cadastro + Design</div>
+<div class="phase-time">Prioridade: ALTA · Impacto: Segurança, UX e Identidade Visual</div>
+</div>
+
+<div class="grid-2">
+
+<div class="card" style="border-left: 3px solid var(--red);">
+<div class="card-header">
+  <div class="num">9</div>
+  <div class="card-title">Assinatura Real com App Externo + Variável de Linha</div>
+</div>
+<span class="badge badge-critical">Crítico</span>
+<span class="tag tag-api">API</span> <span class="tag tag-web">Web</span> <span class="tag tag-db">DB</span>
+<ul>
+  <li><strong>Problema atual:</strong> O sistema marca como "assinado" mas não abre nenhum app de assinatura, não mostra visualmente onde/como foi assinado no documento, e falta uma variável de linha de assinatura no modelo</li>
+  <li><strong>Variável <code>{{LINHA_ASSINATURA}}</code></strong>:
+    <ul>
+      <li>Nova variável de sistema tipo bloco</li>
+      <li>Renderiza no PDF: linha horizontal + nome do signatário + cargo + data</li>
+      <li>Inserida automaticamente em modelos ou posicionada via template</li>
+      <li>Suporta múltiplas linhas (ex: Prefeito + Secretário)</li>
+    </ul>
+  </li>
+  <li><strong>Integração com app de assinatura gratuito:</strong>
+    <ul>
+      <li><strong>Opção 1 — GOV.BR Assinatura</strong> (gratuito, oficial): API <code>assinatura.gov.br</code> para assinatura qualificada ICP-Brasil via login Gov.br</li>
+      <li><strong>Opção 2 — LibreSign (open source)</strong>: Auto-hospedado, integra com Nextcloud, assinatura digital com certificado</li>
+      <li><strong>Opção 3 — Assina PDF (Serpro, gratuito para governo)</strong>: Serviço do governo federal para assinatura de PDFs</li>
+    </ul>
+  </li>
+  <li><strong>Fluxo visual de assinatura no frontend:</strong>
+    <ul>
+      <li>Mostrar preview do PDF com área de assinatura destacada</li>
+      <li>Status claro: "Pendente de assinatura" → "Assinado por [Nome] em [Data]"</li>
+      <li>Selo visual no PDF gerado mostrando dados da assinatura</li>
+      <li>Verificação: botão "Verificar assinatura" que confere integridade</li>
+    </ul>
+  </li>
+</ul>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <div class="num">10</div>
+  <div class="card-title">Fluxo de Cadastro Completo</div>
+</div>
+<span class="badge badge-high">Alto</span>
+<span class="tag tag-api">API</span> <span class="tag tag-web">Web</span>
+<ul>
+  <li><strong>Tela /aguardando melhorada:</strong>
+    <ul>
+      <li>Polling a cada 10s: <code>GET /api/auth/me</code> verificando <code>role !== 'PENDENTE'</code></li>
+      <li>Quando aprovado → redirect automático para <code>/dashboard</code></li>
+      <li>Stepper visual: "Cadastro → Onboarding → Aguardando → Ativo"</li>
+      <li>Exibir info da secretaria selecionada e data do registro</li>
+    </ul>
+  </li>
+  <li><strong>Notificação ao admin:</strong> Quando novo usuário se cadastra, criar notificação + feed event <code>USER_REGISTRADO</code></li>
+  <li><strong>Email (futuro):</strong> Preparar hook para enviar email ao usuário quando aprovado</li>
+  <li><strong>Admin panel:</strong> Badge "N novos" em Usuários na sidebar</li>
+</ul>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <div class="num">11</div>
+  <div class="card-title">Redesign Completo das Páginas</div>
+</div>
+<span class="badge badge-high">Alto</span>
+<span class="tag tag-web">Web</span>
+<ul>
+  <li><strong>Objetivo:</strong> Melhorar a identidade visual de TODAS as páginas do sistema, criando uma experiência moderna, limpa e profissional</li>
+  <li><strong>Páginas prioritárias:</strong>
+    <ul>
+      <li><strong>Login/Registro:</strong> Layout moderno com branding do Doc's Cataguases, imagem institucional</li>
+      <li><strong>Dashboard:</strong> Cards com gradientes, gráficos mais atrativos, melhor uso do espaço</li>
+      <li><strong>Listagem de portarias:</strong> Table responsiva, filtros visuais, status com cores e ícones</li>
+      <li><strong>Detalhe da portaria:</strong> Layout em colunas, timeline lateral, preview do documento</li>
+      <li><strong>Painel admin:</strong> Consistência visual, formulários limpos, feedback visual em ações</li>
+    </ul>
+  </li>
+  <li><strong>Design system:</strong>
+    <ul>
+      <li>Paleta de cores padronizada (primária: azul institucional #1351b4)</li>
+      <li>Tipografia consistente (Inter ou similar)</li>
+      <li>Componentes base: botões, cards, modais, tabelas, badges</li>
+      <li>Responsividade mobile-first</li>
+      <li>Dark mode (futuro)</li>
+    </ul>
+  </li>
+  <li><strong>Micro-interações:</strong> Transições suaves, loading skeletons, hover states, animações de feedback</li>
+  </li>
+</ul>
+</div>
+</div>
+
+<!-- FASE 3 -->
+<div class="phase">
+<div class="phase-title">FASE 3 — Melhorias de Workflow</div>
+<div class="phase-time">Prioridade: MÉDIA · Impacto: Eficiência operacional</div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <div class="num">12</div>
+  <div class="card-title">Melhorias no Fluxo de Portarias</div>
+</div>
+<span class="badge badge-medium">Médio</span>
+<span class="tag tag-api">API</span> <span class="tag tag-web">Web</span> <span class="tag tag-db">DB</span>
+<ul>
+  <li><strong>Rollback de assinatura:</strong> Permitir ADMIN devolver de PRONTO_PUBLICACAO → AGUARDANDO_ASSINATURA (com motivo)</li>
+  <li><strong>Transferência expandida:</strong> Permitir transferir revisão para SECRETARIO e ADMIN (não só REVISOR)</li>
+  <li><strong>SLA/Timeouts:</strong>
+    <ul>
+      <li>Campo <code>prazoRevisao</code> na portaria (default 48h)</li>
+      <li>Cron job diário verificando portarias vencidas</li>
+      <li>Notificação automática quando prazo expira</li>
+      <li>Badge "ATRASADA" na listagem</li>
+    </ul>
+  </li>
+  <li><strong>Concorrência:</strong> Campo <code>version</code> no modelo Portaria para optimistic locking</li>
+  <li><strong>Histórico visual:</strong> Timeline vertical no detalhe da portaria mostrando todas as transições com timestamp, autor e observações</li>
+</ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>5. Resumo de Prioridades</h2>
+
+<table class="status-table">
+<thead><tr><th>#</th><th>Módulo</th><th>Prioridade</th><th>Fase</th><th>Arquivos principais</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Notificações por usuário</td><td><span class="badge badge-critical">Crítico</span></td><td>1</td><td>schema.prisma, notifications/, SSE, NotificationBell</td></tr>
+<tr><td>2</td><td>Auto-refresh (eliminar F5)</td><td><span class="badge badge-critical">Crítico</span></td><td>1</td><td>use-dashboard.ts, use-portarias.ts, React Query config</td></tr>
+<tr><td>3</td><td>Badges dinâmicos sidebar</td><td><span class="badge badge-high">Alto</span></td><td>1</td><td>AppSidebar.tsx, nova API sidebar-counts</td></tr>
+<tr><td>4</td><td>Corrigir seleção de modelo / failover IA</td><td><span class="badge badge-critical">Crítico</span></td><td>1B</td><td>llm.service.ts, chat/route.ts, FloatingChat.tsx</td></tr>
+<tr><td>5</td><td>Página de treinamento de IA (Prompts)</td><td><span class="badge badge-critical">Crítico</span></td><td>1B</td><td>schema.prisma, nova rota admin/ia/prompts, llm-system-prompt.ts</td></tr>
+<tr><td>6</td><td>Mensagens de erro pt-br + branding</td><td><span class="badge badge-high">Alto</span></td><td>1B</td><td>llm.service.ts, chat/route.ts, todas as rotas API</td></tr>
+<tr><td>7</td><td>Cookies banner + Página Sobre</td><td><span class="badge badge-high">Alto</span></td><td>1C</td><td>CookieBanner.tsx, nova rota /sobre</td></tr>
+<tr><td>8</td><td>Assinatura com app real + variável de linha</td><td><span class="badge badge-critical">Crítico</span></td><td>2</td><td>assinatura.service.ts, assinar/route.ts, ModeloVariavel</td></tr>
+<tr><td>9</td><td>Fluxo cadastro completo</td><td><span class="badge badge-high">Alto</span></td><td>2</td><td>aguardando.tsx, registro/, onboarding</td></tr>
+<tr><td>10</td><td>Redesign completo das páginas</td><td><span class="badge badge-high">Alto</span></td><td>2</td><td>Todas as rotas e componentes web</td></tr>
+<tr><td>11</td><td>Melhorias workflow</td><td><span class="badge badge-medium">Médio</span></td><td>3</td><td>fluxo/route.ts, portaria.service.ts</td></tr>
+</tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>6. Status da Assinatura Atual</h2>
+
+<div class="card" style="border-left: 3px solid var(--red);">
+<h3>Veredicto: Trust-Based — Precisa de App Real de Assinatura</h3>
+<p>O sistema <strong>NÃO abre nenhum aplicativo de assinatura</strong>. Apenas marca como "assinado" no banco de dados baseado no login do usuário. Não mostra visualmente onde/como o documento foi assinado, e falta uma variável de "linha de assinatura" nos modelos de documento.</p>
+<ul>
+  <li>✅ SHA-256 para integridade do PDF (real)</li>
+  <li>✅ Registro de assinante, timestamp, tipo (real)</li>
+  <li>✅ Upload de comprovante para assinatura manual (real)</li>
+  <li>✅ Audit trail completo no feed de atividades (real)</li>
+  <li>❌ <strong>Não abre app de assinatura</strong> (nenhuma integração externa)</li>
+  <li>❌ <strong>Não mostra visualmente se foi assinado</strong> no documento</li>
+  <li>❌ <strong>Falta variável {{LINHA_ASSINATURA}}</strong> nos modelos</li>
+  <li>❌ Sem validação de certificado ICP-Brasil</li>
+  <li>❌ Sem verificação de PDFs assinados externamente</li>
+</ul>
+<p><strong>Solução proposta (Fase 2, Módulo 9):</strong> Integrar com GOV.BR Assinatura (gratuito para governo), criar variável de linha de assinatura, e mostrar status visual claro no PDF e no frontend.</p>
+</div>
+
+</div>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'base',
+  themeVariables: {
+    primaryColor: '#dbeafe',
+    primaryBorderColor: '#1351b4',
+    primaryTextColor: '#1e293b',
+    lineColor: '#64748b',
+    secondaryColor: '#f0fdf4',
+    tertiaryColor: '#fef3c7',
+    fontSize: '13px'
+  }
+});
+</script>
+</body>
+</html>

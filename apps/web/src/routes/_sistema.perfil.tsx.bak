@@ -1,0 +1,171 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAuthStore } from '@/store/auth.store'
+import { Badge } from '@/components/ui/badge'
+import { Eye, EyeOff, ShieldAlert, KeyRound, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useToast } from '@/hooks/use-toast'
+import api from '@/lib/api'
+
+export const Route = createFileRoute('/_sistema/perfil')({
+    component: PerfilPage,
+})
+
+function PerfilPage() {
+    const { usuario, updateUsuario } = useAuthStore()
+    const [showPin, setShowPin] = useState(false)
+    const { toast } = useToast()
+
+    // Alterar PIN
+    const [novoPinA, setNovoPinA] = useState('')
+    const [novoPinB, setNovoPinB] = useState('')
+    const [salvandoPin, setSalvandoPin] = useState(false)
+    const [showNovoPins, setShowNovoPins] = useState(false)
+
+    if (!usuario) return null
+
+    const pinAtual = (usuario as any).pinSeguranca as string | undefined
+
+    async function handleSalvarPin() {
+        if (!novoPinA || novoPinA.length < 4) {
+            toast({ title: 'PIN muito curto', description: 'O PIN deve ter pelo menos 4 dígitos.', variant: 'destructive' })
+            return
+        }
+        if (novoPinA !== novoPinB) {
+            toast({ title: 'PINs não conferem', description: 'Os dois campos de PIN precisam ser iguais.', variant: 'destructive' })
+            return
+        }
+        setSalvandoPin(true)
+        try {
+            const res = await api.patch('/api/auth/me/pin', { pin: novoPinA })
+            if (!res.data.success) throw new Error(res.data.error)
+            // Atualiza o store com o novo PIN
+            updateUsuario({ ...(usuario as any), pinSeguranca: novoPinA })
+            toast({ title: 'PIN atualizado com sucesso!' })
+            setNovoPinA('')
+            setNovoPinB('')
+        } catch (e: any) {
+            toast({ title: 'Erro ao salvar PIN', description: e?.response?.data?.error || e.message, variant: 'destructive' })
+        } finally {
+            setSalvandoPin(false)
+        }
+    }
+
+    return (
+        <div className="p-6 max-w-4xl mx-auto space-y-6">
+            <div>
+                <h1 className="text-2xl font-black text-slate-800 tracking-tight">Meu Perfil</h1>
+                <p className="text-slate-500 mt-1">Gerencie suas informações e credenciais de segurança.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Dados da Conta</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-700">Nome</p>
+                            <p className="text-slate-600">{usuario.name}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-slate-700">Email</p>
+                            <p className="text-slate-600">{usuario.email}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-slate-700">Perfil de Acesso</p>
+                            <Badge variant="outline" className="mt-1">
+                                {usuario.role.replace('_', ' ')}
+                            </Badge>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {usuario.role === 'ADMIN_GERAL' && (
+                    <Card className="border-red-200">
+                        <CardHeader className="bg-red-50 rounded-t-lg border-b border-red-100">
+                            <CardTitle className="text-lg text-red-800 flex items-center gap-2">
+                                <ShieldAlert className="h-5 w-5" />
+                                Credenciais de Segurança Crítica
+                            </CardTitle>
+                            <CardDescription className="text-red-600/80">
+                                Token (PIN) utilizado para confirmar ações destrutivas (ex: Reset de Numeração, Exclusão de Portarias).
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6 space-y-5">
+                            {/* Visualizar PIN atual */}
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-semibold text-slate-700">PIN de Segurança do Administrador</label>
+                                <div className="flex items-center gap-2">
+                                    <div className="bg-slate-100 px-4 py-3 rounded-md font-mono text-xl tracking-widest font-black text-slate-800 border select-all w-40 text-center">
+                                        {showPin ? pinAtual || 'N/A' : '••••••'}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPin(!showPin)}
+                                        className="p-3 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                    >
+                                        {showPin ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-500">
+                                    Mantenha este código em segredo. Ele será solicitado sempre que houver a necessidade de uma ação administrativa de alto impacto.
+                                </p>
+                            </div>
+
+                            {/* Alterar PIN */}
+                            <div className="border-t border-slate-100 pt-4 space-y-3">
+                                <button
+                                    type="button"
+                                    className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                                    onClick={() => setShowNovoPins(!showNovoPins)}
+                                >
+                                    <KeyRound className="h-4 w-4" />
+                                    {pinAtual ? 'Alterar PIN' : 'Cadastrar PIN'}
+                                </button>
+
+                                {showNovoPins && (
+                                    <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-sm">Novo PIN <span className="text-red-500">*</span></Label>
+                                            <Input
+                                                type={showNovoPins ? 'text' : 'password'}
+                                                placeholder="Mínimo 4 dígitos"
+                                                value={novoPinA}
+                                                onChange={e => setNovoPinA(e.target.value.replace(/\D/g, ''))}
+                                                className="font-mono tracking-widest"
+                                                maxLength={10}
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-sm">Confirmar PIN <span className="text-red-500">*</span></Label>
+                                            <Input
+                                                type="password"
+                                                placeholder="Repita o PIN"
+                                                value={novoPinB}
+                                                onChange={e => setNovoPinB(e.target.value.replace(/\D/g, ''))}
+                                                className="font-mono tracking-widest"
+                                                maxLength={10}
+                                            />
+                                        </div>
+                                        <Button
+                                            onClick={handleSalvarPin}
+                                            disabled={salvandoPin || !novoPinA || !novoPinB}
+                                            className="w-full bg-primary hover:bg-primary/90 text-white font-bold"
+                                        >
+                                            {salvandoPin ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                            {salvandoPin ? 'Salvando...' : 'Salvar PIN'}
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
+        </div>
+    )
+}

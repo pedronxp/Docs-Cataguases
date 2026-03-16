@@ -13,16 +13,18 @@ import type { NotificacaoItem } from '@/types/domain'
 function EventoIcon({ tipo }: { tipo: string }) {
     if (tipo === 'MODELO_CRIADO' || tipo === 'MODELO_ATUALIZADO')
         return <FileText className="h-4 w-4 text-indigo-500 shrink-0" />
-    if (tipo.includes('APROVADA'))
+    if (tipo.includes('APROVADA') || tipo.includes('APROVAR'))
         return <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-    if (tipo.includes('REJEITADA'))
+    if (tipo.includes('REJEITADA') || tipo.includes('REJEITAR') || tipo.includes('DEVOLVIDO'))
         return <XCircle className="h-4 w-4 text-red-500 shrink-0" />
-    if (tipo.includes('SUBMETIDA') || tipo.includes('CRIADA'))
+    if (tipo.includes('SUBMETIDA') || tipo.includes('SUBMETIDO') || tipo.includes('CRIADA'))
         return <Clock className="h-4 w-4 text-amber-500 shrink-0" />
     if (tipo.includes('PUBLICADA'))
         return <BookOpen className="h-4 w-4 text-blue-500 shrink-0" />
-    if (tipo.includes('ASSINATURA') || tipo.includes('ASSINADA'))
+    if (tipo.includes('ASSINATURA') || tipo.includes('ASSINADA') || tipo.includes('DISPENSADA'))
         return <PenLine className="h-4 w-4 text-purple-500 shrink-0" />
+    if (tipo.includes('REVISAO') || tipo.includes('REVISÃO') || tipo.includes('ATRIBUIDA'))
+        return <CheckCheck className="h-4 w-4 text-amber-600 shrink-0" />
     return <Bell className="h-4 w-4 text-slate-400 shrink-0" />
 }
 
@@ -83,8 +85,8 @@ export function NotificationBell() {
         }
         if (n.portariaId) {
             navigate({
-                to: '/administrativo/portarias/$portariaId',
-                params: { portariaId: n.portariaId },
+                to: '/administrativo/portarias/$id',
+                params: { id: n.portariaId },
             }).catch(() => {
                 navigate({ to: '/administrativo/portarias' })
             })

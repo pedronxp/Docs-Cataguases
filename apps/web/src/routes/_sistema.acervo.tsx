@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Search, Download, Loader2, BookOpen, FileText, Building2, CalendarCheck } from 'lucide-react'
+import { Search, Download, Loader2, BookOpen, FileText, Building2, CalendarCheck, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { useAbility } from '@casl/react'
 import { AbilityContext } from '@/lib/ability'
@@ -96,6 +96,7 @@ function AcervoPage() {
   const [secretariaAtivaId, setSecretariaAtivaId] = useState<string>(
     podeVerTodasSecretarias ? '' : (usuario?.secretariaId ?? '')
   )
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const [portarias, setPortarias] = useState<Portaria[]>([])
   const [secretarias, setSecretarias] = useState<Secretaria[]>([])
@@ -215,33 +216,105 @@ function AcervoPage() {
         />
       )}
 
+      {/* Mobile: Chips de secretaria */}
+      {podeVerTodasSecretarias && (
+        <div className="lg:hidden flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <button
+            onClick={() => { setSecretariaAtivaId(''); setPage(1) }}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              secretariaAtivaId === '' ? 'bg-[#1351B4] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Todas ({Object.values(contadores).reduce((a, b) => a + b, 0)})
+          </button>
+          {secretarias.map(sec => (
+            <button
+              key={sec.id}
+              onClick={() => { setSecretariaAtivaId(sec.id); setPage(1) }}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                secretariaAtivaId === sec.id ? 'text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+              style={secretariaAtivaId === sec.id ? { backgroundColor: sec.cor || '#6366f1' } : undefined}
+            >
+              {sec.sigla} ({contadores[sec.id] ?? 0})
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Layout principal */}
       <div className="flex gap-5 items-start">
 
-        {/* Sidebar */}
+        {/* Sidebar — desktop */}
         {podeVerTodasSecretarias && (
-          <aside className="w-56 shrink-0">
-            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-              <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50">
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Secretarias</p>
+          <aside className={`hidden lg:block shrink-0 transition-all duration-200 ${sidebarCollapsed ? 'w-14' : 'w-56'}`}>
+            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm sticky top-4">
+              <div className="px-3 py-2.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                {!sidebarCollapsed && (
+                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Secretarias</p>
+                )}
+                <button
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                  title={sidebarCollapsed ? 'Expandir' : 'Recolher'}
+                >
+                  {sidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+                </button>
               </div>
-              <div className="py-1">
-                <PastaSecretaria
-                  secretaria={{ id: '', sigla: 'Todas', nome: 'Todas as Secretarias', cor: '' }}
-                  ativa={secretariaAtivaId === ''}
-                  totalDocs={Object.values(contadores).reduce((a, b) => a + b, 0)}
-                  onClick={() => { setSecretariaAtivaId(''); setPage(1) }}
-                />
-                {secretarias.length > 0 && <div className="mx-3 my-1 border-t border-slate-100" />}
-                {secretarias.map((sec) => (
-                  <PastaSecretaria
-                    key={sec.id}
-                    secretaria={sec}
-                    ativa={secretariaAtivaId === sec.id}
-                    totalDocs={contadores[sec.id] ?? 0}
-                    onClick={() => { setSecretariaAtivaId(sec.id); setPage(1) }}
-                  />
-                ))}
+              <div className="py-1 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
+                {sidebarCollapsed ? (
+                  <>
+                    <button
+                      onClick={() => { setSecretariaAtivaId(''); setPage(1) }}
+                      className={`w-full flex items-center justify-center py-2.5 transition-colors ${
+                        secretariaAtivaId === '' ? 'bg-blue-50' : 'hover:bg-slate-50'
+                      }`}
+                      title="Todas as Secretarias"
+                    >
+                      <div className={`w-8 h-8 rounded-md flex items-center justify-center text-[9px] font-black ${
+                        secretariaAtivaId === '' ? 'bg-[#1351B4] text-white' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        ALL
+                      </div>
+                    </button>
+                    {secretarias.map((sec) => (
+                      <button
+                        key={sec.id}
+                        onClick={() => { setSecretariaAtivaId(sec.id); setPage(1) }}
+                        className={`w-full flex items-center justify-center py-2.5 transition-colors ${
+                          secretariaAtivaId === sec.id ? 'bg-blue-50' : 'hover:bg-slate-50'
+                        }`}
+                        title={`${sec.sigla} — ${sec.nome}`}
+                      >
+                        <div
+                          className="w-8 h-8 rounded-md flex items-center justify-center text-[9px] font-black text-white"
+                          style={{ backgroundColor: secretariaAtivaId === sec.id ? '#1351B4' : (sec.cor || '#6366f1') }}
+                        >
+                          {sec.sigla?.slice(0, 3) || <Building2 size={14} />}
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <PastaSecretaria
+                      secretaria={{ id: '', sigla: 'Todas', nome: 'Todas as Secretarias', cor: '' }}
+                      ativa={secretariaAtivaId === ''}
+                      totalDocs={Object.values(contadores).reduce((a, b) => a + b, 0)}
+                      onClick={() => { setSecretariaAtivaId(''); setPage(1) }}
+                    />
+                    {secretarias.length > 0 && <div className="mx-3 my-1 border-t border-slate-100" />}
+                    {secretarias.map((sec) => (
+                      <PastaSecretaria
+                        key={sec.id}
+                        secretaria={sec}
+                        ativa={secretariaAtivaId === sec.id}
+                        totalDocs={contadores[sec.id] ?? 0}
+                        onClick={() => { setSecretariaAtivaId(sec.id); setPage(1) }}
+                      />
+                    ))}
+                  </>
+                )}
               </div>
             </div>
           </aside>

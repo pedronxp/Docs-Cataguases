@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
     try {
         const session = await getSession()
-        if (!session || !['JORNALISTA', 'ADMIN_GERAL'].includes(session.role)) {
+        if (!session || !['JORNALISTA', 'ADMIN_GERAL'].includes(session.role as string)) {
             return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 })
         }
 
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const session = await getSession()
-        if (!session || !['JORNALISTA', 'ADMIN_GERAL'].includes(session.role)) {
+        if (!session || !['JORNALISTA', 'ADMIN_GERAL'].includes(session.role as string)) {
             return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 })
         }
 
@@ -93,9 +93,10 @@ export async function POST(request: Request) {
 
         if (!filaItem) return NextResponse.json({ success: false, error: 'Item não encontrado na fila' }, { status: 404 })
 
-        const resultNum = await NumeracaoService.alocarNumeroPortaria(
+        const resultNum = await NumeracaoService.alocarNumero(
             filaItem.portariaId,
-            session.id,
+            'PORTARIA',
+            session.id as string,
             request.headers.get('x-forwarded-for') || '127.0.0.1'
         )
 
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
                     tipoEvento: 'PUBLICACAO_JORNAL',
                     mensagem: `Documento oficializado com o número ${numeroOficial} e publicado no Diário Oficial.`,
                     portariaId: filaItem.portariaId,
-                    autorId: session.id,
+                    autorId: session.id as string,
                     secretariaId: filaItem.portaria.secretariaId
                 }
             })

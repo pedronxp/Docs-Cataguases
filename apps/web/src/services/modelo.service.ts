@@ -48,16 +48,21 @@ export async function deletarModelo(id: string): Promise<Result<void>> {
     }
 }
 
+/**
+ * Faz upload do arquivo .docx template para o Supabase Storage.
+ * Retorna o path do arquivo no bucket (salvar como docxTemplateUrl no modelo).
+ */
 export async function uploadTemplate(file: File): Promise<Result<string>> {
     try {
         const formData = new FormData()
         formData.append('file', file)
-        const response = await api.post('/api/upload', formData, {
+        const response = await api.post('/api/admin/modelos/upload-template', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         })
-        return ok(response.data.url)
+        // Retorna o path no Storage (ex: "modelos/1234567890_portaria.docx")
+        return ok(response.data.data.path)
     } catch (error: any) {
-        return err(error.response?.data?.error || 'Erro no upload do arquivo')
+        return err(error.response?.data?.error || 'Erro no upload do template')
     }
 }
 

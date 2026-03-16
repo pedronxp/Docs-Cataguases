@@ -10,9 +10,12 @@ import prisma from '@/lib/prisma'
 const modeloSchema = z.object({
     nome: z.string().min(1),
     descricao: z.string().min(1),
+    tipoDocumento: z.enum(['PORTARIA', 'MEMORANDO', 'OFICIO', 'LEI']).default('PORTARIA'),
     categoria: z.string().default('Outros'),
+    ativo: z.boolean().default(true),
     secretariaId: z.string().optional().nullable(),
-    docxTemplateUrl: z.string().url().optional().nullable(),
+    // Aceita qualquer string (path do Supabase Storage OU URL completa)
+    docxTemplateUrl: z.string().optional().nullable(),
     conteudoHtml: z.string().min(1),
     variaveis: z.array(z.object({
         chave: z.string().min(1),

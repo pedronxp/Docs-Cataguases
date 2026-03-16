@@ -81,8 +81,8 @@ export function SignatureModal({ ids, open, onOpenChange, onSuccess, onConfirm }
                             placeholder="Digite sua senha de segurança..."
                             onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
                         />
-                        <p className="text-[10px] text-slate-500 italic">
-                            Dica: Use a senha "123456" para o ambiente de testes.
+                        <p className="text-[10px] text-slate-500">
+                            Sua identidade é verificada pela sessão autenticada. A confirmação por senha serve como etapa adicional de segurança.
                         </p>
                     </div>
                 </div>

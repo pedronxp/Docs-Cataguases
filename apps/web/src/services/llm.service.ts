@@ -1,7 +1,7 @@
 import { ok, err, type Result } from '../lib/result'
 import { BaseApiService, httpClient } from './base'
 
-export type LLMProvider = 'groq' | 'openrouter'
+export type LLMProvider = 'cerebras' | 'mistral' | 'groq' | 'openrouter'
 
 export interface LLMMessage {
     role: 'system' | 'user' | 'assistant'
@@ -11,11 +11,13 @@ export interface LLMMessage {
 export interface LLMChatRequest {
     messages: LLMMessage[]
     model?: string
+    selectedModel?: string   // modelo escolhido manualmente pelo usuário no seletor do chat
     maxTokens?: number
     temperature?: number
     provider?: LLMProvider
-    mode?: 'chat' | 'analysis'   // 'chat' = prompt compacto + 8b-instant; 'analysis' = prompt completo + 70b
+    mode?: 'chat' | 'analysis'
     useSystemPrompt?: boolean
+    userAuth?: { nome: string; email: string; role?: string }
 }
 
 export interface LLMChatResponse {
@@ -62,10 +64,14 @@ export interface LLMRequestLog {
 
 export interface LLMStatus {
     activeProvider: LLMProvider
+    cerebras: LLMProviderStats
+    mistral: LLMProviderStats
     groq: LLMProviderStats
     openrouter: LLMProviderStats
     recentRequests: LLMRequestLog[]
     models: {
+        cerebras: Array<{ id: string; label: string; contextWindow?: number }>
+        mistral: Array<{ id: string; label: string; contextWindow?: number }>
         groq: Array<{ id: string; label: string; contextWindow?: number }>
         openrouter: Array<{ id: string; label: string }>
     }
@@ -78,8 +84,8 @@ class LLMApiService extends BaseApiService {
 
     async chat(request: LLMChatRequest): Promise<Result<LLMChatResponse>> {
         try {
-            // HttpClient já faz unwrap de res.data do Axios — body é o objeto da resposta diretamente
-            const body: any = await this.http.post(this.url('/chat'), request)
+            const raw: any = await this.http.post(this.url('/chat'), request)
+            const body = raw?.data ?? raw
             if (!body?.success) return err(body?.error || 'Resposta inválida do servidor LLM')
             return ok({
                 content: body.content,
@@ -94,8 +100,8 @@ class LLMApiService extends BaseApiService {
 
     async getStatus(): Promise<Result<LLMStatus>> {
         try {
-            const body: any = await this.http.get(this.url('/status'))
-            return ok(body)
+            const raw: any = await this.http.get(this.url('/status'))
+            return ok(raw?.data ?? raw)
         } catch (e: any) {
             return err(e.response?.data?.error || 'Erro ao buscar status LLM')
         }
@@ -103,8 +109,8 @@ class LLMApiService extends BaseApiService {
 
     async setProvider(provider: LLMProvider): Promise<Result<{ activeProvider: LLMProvider }>> {
         try {
-            const body: any = await this.http.patch(this.url('/provider'), { provider })
-            return ok(body)
+            const raw: any = await this.http.patch(this.url('/provider'), { provider })
+            return ok(raw?.data ?? raw)
         } catch (e: any) {
             return err(e.response?.data?.error || 'Erro ao trocar provider')
         }

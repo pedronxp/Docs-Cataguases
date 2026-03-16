@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 import { buildAbility } from '@/lib/ability'
+import { subject } from '@casl/ability'
 import { PortariaService } from '@/services/portaria.service'
 import { z } from 'zod'
 
@@ -32,10 +33,43 @@ export async function POST(req: NextRequest) {
         if (!parsed.success)
             return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
+        // Resolve secretariaId: payload > usuário > modelo (fallback para ADMIN_GERAL)
+        let secretariaId: string | undefined =
+            parsed.data.secretariaId || (usuario as any).secretariaId || undefined
+
+        if (!secretariaId) {
+            const modelo = await prisma.modeloDocumento.findUnique({
+                where: { id: parsed.data.modeloId },
+                select: { secretariaId: true },
+            })
+            secretariaId = modelo?.secretariaId ?? undefined
+        }
+
+        if (!secretariaId) {
+            return NextResponse.json(
+                { error: 'É necessário informar a secretaria para criar a portaria.' },
+                { status: 400 }
+            )
+        }
+
+        // Valida que o setor pertence à secretaria
+        const resolvedSetorId = parsed.data.setorId || (usuario as any).setorId
+        if (resolvedSetorId) {
+            const setor = await prisma.setor.findFirst({
+                where: { id: resolvedSetorId, secretariaId, ativo: true }
+            })
+            if (!setor) {
+                return NextResponse.json(
+                    { error: 'O setor informado não pertence à secretaria selecionada ou está inativo.' },
+                    { status: 400 }
+                )
+            }
+        }
+
         const result = await PortariaService.criar({
             ...parsed.data,
             criadoPorId: usuario.id as string,
-            secretariaId: parsed.data.secretariaId || (usuario as any).secretariaId,
+            secretariaId,
             setorId: parsed.data.setorId || (usuario as any).setorId,
         })
 
@@ -69,16 +103,28 @@ export async function GET(req: NextRequest) {
             where: {
                 ...(status && { status: status as any }),
             },
-            // orderBy: { createdAt: 'desc' },
+            orderBy: { updatedAt: 'desc' },
             include: {
                 criadoPor: {
-                    select: { name: true, email: true },
+                    select: { id: true, name: true, email: true },
+                },
+                revisorAtual: {
+                    select: { id: true, name: true, email: true },
+                },
+                secretaria: {
+                    select: { id: true, nome: true, sigla: true },
+                },
+                setor: {
+                    select: { id: true, nome: true, sigla: true },
+                },
+                modelo: {
+                    select: { id: true, nome: true },
                 },
             },
         })
 
         // Filtra pela habilidade CASL no backend
-        const filtradas = portarias.filter(p => ability.can('ler', 'Portaria', p as any))
+        const filtradas = portarias.filter(p => ability.can('ler', subject('Portaria', p as any)))
 
         return NextResponse.json(filtradas)
     } catch (error) {

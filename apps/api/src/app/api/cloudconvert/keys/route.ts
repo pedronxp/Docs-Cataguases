@@ -20,7 +20,7 @@ export async function OPTIONS() {
 export async function POST(request: Request) {
     try {
         const session = await getSession()
-        if (!session || !['ADMIN_GERAL'].includes(session.role)) {
+        if (!session || !['ADMIN_GERAL'].includes(session.role as string)) {
             return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 })
         }
 

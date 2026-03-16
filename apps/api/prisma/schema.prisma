@@ -57,6 +57,8 @@ model Portaria {
   assinaturaJustificativa  String?         @db.Text
   assinaturaComprovanteUrl String?
 
+  motivoExclusao           String?         @db.Text
+
   jornalQueue              JornalQueue?
 }
 
@@ -72,6 +74,7 @@ model User {
   image         String?
   role          String    @default("USER")             // ADMIN_GERAL, ADMIN_SETORIAL, USER
   ativo           Boolean  @default(true)
+  pinSeguranca  String?   // B1: token gerado para ações destrutivas críticas pelo Admin
   permissoesExtra String[] @default([])
   setorId       String?
   secretariaId  String?
@@ -84,6 +87,7 @@ model User {
   portariasRevisadas Portaria[] @relation("RevisorAtual")
   portariasAssinadas Portaria[] @relation("AssinadoPor")
   atividades      FeedAtividade[]
+  llmPromptsCriados LlmPrompt[] @relation("LlmPromptsCriados")
 }
 
 model FeedAtividade {
@@ -184,4 +188,36 @@ model JornalQueue {
   updatedAt       DateTime      @updatedAt
 
   portaria        Portaria      @relation(fields: [portariaId], references: [id], onDelete: Cascade)
+}
+
+model LlmApiKey {
+  id           String    @id @default(cuid())
+  provider     String    // "groq" | "openrouter" | "cerebras" | "mistral"
+  label        String    // Ex: "Groq - Conta TI Prefeitura"
+  keyEncrypted String    @unique // Chave real (nunca exposta ao front)
+  mask         String    // Ex: "gsk-••••••••1234" (exibição no painel)
+  ativo        Boolean   @default(true)
+  requisicoes  Int       @default(0)
+  tokensTotal  Int       @default(0)
+  esgotada     Boolean   @default(false)
+  esgotadaAte  DateTime? // null = disponível, preenchido = cooldown ativo
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+}
+
+// ── Prompts de Treinamento da IA ──────────────────────────────────────────────
+// Permite que admins criem e gerenciem prompts personalizados injetados no sistema.
+// São combinados com o system prompt base antes de cada chamada ao LLM.
+model LlmPrompt {
+  id           String   @id @default(cuid())
+  nome         String   // Nome amigável, ex: "Instruções de Revisão"
+  categoria    String   // "SISTEMA" | "PORTARIA" | "REVISAO" | "CHAT_GERAL" | "MODELO" | "CUSTOM"
+  conteudo     String   @db.Text // Texto do prompt (pode ser longo)
+  ativo        Boolean  @default(true)
+  ordem        Int      @default(0) // Menor = injetado primeiro
+  criadoPorId  String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  criadoPor    User?    @relation("LlmPromptsCriados", fields: [criadoPorId], references: [id], onDelete: SetNull)
 }

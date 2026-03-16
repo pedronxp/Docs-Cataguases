@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
+import { LibreOfficeConvertService } from '@/services/libreoffice-convert.service'
 import { CloudConvertService } from '@/services/cloudconvert.service'
+import { DocxImageService } from '@/services/docx-image.service'
+import { DocxHeaderService } from '@/services/docx-header.service'
+import { setDocxAnalise } from '@/lib/llm-tools'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,13 +33,57 @@ export async function POST(req: NextRequest) {
             const arrayBuffer = await file.arrayBuffer()
             const buffer = Buffer.from(arrayBuffer)
 
-            const extractionResult = await CloudConvertService.extractToHtml(buffer, file.name)
+            // ── Tentativa 1: LibreOffice local ──────────────────────────────────────
+            // Converte DOCX → HTML incluindo cabeçalho (brasão) e convertendo EMF→PNG.
+            // É mais completo que CloudConvert pois inclui headers/footers do documento.
+            const loResult = await LibreOfficeConvertService.convertDocxToHtml(buffer, file.name)
 
-            if (!extractionResult.ok) {
-                return NextResponse.json({ error: extractionResult.error }, { status: 500 })
+            if (loResult.ok) {
+                conteudoHtml = loResult.value
+
+                // Nota: LibreOfficeConvertService já injeta o cabeçalho (brasão) internamente.
+                // Não reinjetar aqui para evitar duplicidade.
+
+                // Injetar imagens do body que o LibreOffice pode ter referenciado como paths externos
+                conteudoHtml = DocxImageService.processHtml(buffer, conteudoHtml)
+
+                console.log('[analisar] Conversão feita pelo LibreOffice local (header já injetado no serviço).')
+            } else {
+                // ── Fallback: CloudConvert ───────────────────────────────────────────
+                // Usado apenas se LibreOffice falhar (ex: servidor sem soffice).
+                console.warn('[analisar] LibreOffice falhou, tentando CloudConvert:', loResult.error)
+
+                const ccResult = await CloudConvertService.extractToHtml(buffer, file.name)
+
+                if (!ccResult.ok) {
+                    console.error('[analisar] CloudConvert também falhou:', ccResult.error)
+                    return NextResponse.json({
+                        error: 'Não foi possível processar o documento no momento. Verifique se o arquivo é um DOCX válido e tente novamente.'
+                    }, { status: 500 })
+                }
+
+                // DocxImageService como segurança extra: injeta imagens PNG/JPG do DOCX ZIP
+                // que o CloudConvert possa ter perdido (não substitui data: URIs já presentes)
+                conteudoHtml = DocxImageService.processHtml(buffer, ccResult.value)
+
+                // Injetar cabeçalho (brasão) também no path do CloudConvert
+                // O CloudConvert não inclui headers/footers do DOCX no HTML
+                try {
+                    const headerHtml = await DocxHeaderService.extractHeaderHtml(buffer)
+                    if (headerHtml) {
+                        if (/<body[^>]*>/i.test(conteudoHtml)) {
+                            conteudoHtml = conteudoHtml.replace(/(<body[^>]*>)/i, `$1\n${headerHtml}`)
+                        } else {
+                            conteudoHtml = headerHtml + '\n' + conteudoHtml
+                        }
+                        console.log('[analisar] Cabeçalho (brasão) injetado no HTML do CloudConvert.')
+                    }
+                } catch (hdrErr: any) {
+                    console.warn('[analisar] Erro ao injetar cabeçalho (não crítico):', hdrErr?.message)
+                }
+
+                console.log('[analisar] Conversão feita pelo CloudConvert (fallback).')
             }
-
-            conteudoHtml = extractionResult.value
         } else {
             // Suporte legado para JSON
             const body = await req.json()
@@ -133,6 +181,9 @@ export async function POST(req: NextRequest) {
             opcoes: [],
             ordem: index + 1
         }))
+
+        // Cache do HTML completo + variáveis para uso pelo chatbot (criar_modelo)
+        setDocxAnalise(usuario.id, { conteudoHtml, variaveis })
 
         return NextResponse.json({
             success: true,

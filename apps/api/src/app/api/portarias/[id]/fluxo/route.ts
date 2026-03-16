@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import {
+    criarNotificacao,
+    criarNotificacoes,
+    buscarRevisoresDaSecretaria,
+} from '@/services/notificacao.service'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,20 +60,26 @@ export async function PATCH(
                 mensagemLog = `Portaria enviada para revisão por ${nomeAutor}`
                 break
 
+            // SOLICITAR_REVISAO é o novo nome; ASSUMIR_REVISAO mantido por compatibilidade
+            case 'SOLICITAR_REVISAO':
             case 'ASSUMIR_REVISAO':
-                if (!rolesRevisor.includes(session.role)) {
+                if (!rolesRevisor.includes(session.role as string)) {
                     return NextResponse.json({ success: false, error: 'Sem permissão para revisar portarias' }, { status: 403 })
                 }
                 if (portaria.status !== 'EM_REVISAO_ABERTA') {
                     return NextResponse.json({ success: false, error: 'Portaria não está disponível para revisão' }, { status: 400 })
                 }
+                // Bloqueia race condition: outro usuário já assumiu enquanto esta requisição chegava
+                if (portaria.revisorAtualId) {
+                    return NextResponse.json({ success: false, error: 'Esta portaria já foi aceita por outro revisor' }, { status: 409 })
+                }
                 novoStatus = 'EM_REVISAO_ATRIBUIDA'
-                revisorAtualId = session.id
-                mensagemLog = `Revisão assumida por ${nomeAutor}`
+                revisorAtualId = (session.id as string)
+                mensagemLog = `Revisão solicitada e atribuída a ${nomeAutor}`
                 break
 
             case 'APROVAR_REVISAO':
-                if (portaria.revisorAtualId !== session.id && session.role !== 'ADMIN_GERAL') {
+                if (portaria.revisorAtualId !== (session.id as string) && session.role !== 'ADMIN_GERAL') {
                     return NextResponse.json({ success: false, error: 'Apenas o revisor atual pode aprovar' }, { status: 403 })
                 }
                 if (portaria.status !== 'EM_REVISAO_ATRIBUIDA') {
@@ -80,7 +91,7 @@ export async function PATCH(
                 break
 
             case 'REJEITAR_REVISAO':
-                if (portaria.revisorAtualId !== session.id && session.role !== 'ADMIN_GERAL') {
+                if (portaria.revisorAtualId !== (session.id as string) && session.role !== 'ADMIN_GERAL') {
                     return NextResponse.json({ success: false, error: 'Apenas o revisor atual pode rejeitar' }, { status: 403 })
                 }
                 if (portaria.status !== 'EM_REVISAO_ATRIBUIDA') {
@@ -96,7 +107,7 @@ export async function PATCH(
                 break
 
             case 'TRANSFERIR_REVISAO':
-                if (portaria.revisorAtualId !== session.id && session.role !== 'ADMIN_GERAL') {
+                if (portaria.revisorAtualId !== (session.id as string) && session.role !== 'ADMIN_GERAL') {
                     return NextResponse.json({ success: false, error: 'Apenas o revisor atual pode transferir' }, { status: 403 })
                 }
                 if (portaria.status !== 'EM_REVISAO_ATRIBUIDA') {
@@ -120,6 +131,26 @@ export async function PATCH(
                 mensagemLog = `Revisão transferida de ${nomeAutor} para ${revisorDestino.name}. Justificativa: "${justificativa}"`
                 break
 
+            case 'ROLLBACK_RASCUNHO': {
+                // Somente o autor ou ADMIN_GERAL podem fazer rollback de CORRECAO_NECESSARIA → RASCUNHO
+                if (portaria.status !== 'CORRECAO_NECESSARIA') {
+                    return NextResponse.json({ success: false, error: 'Apenas portarias com correção pendente podem voltar para rascunho' }, { status: 400 })
+                }
+                // Verifica se é o autor
+                const portariaParaRollback = await prisma.portaria.findUnique({
+                    where: { id },
+                    select: { criadoPorId: true }
+                }) as any
+                const isAutor = portariaParaRollback?.criadoPorId === (session.id as string)
+                if (!isAutor && session.role !== 'ADMIN_GERAL') {
+                    return NextResponse.json({ success: false, error: 'Apenas o autor do documento pode reverter para rascunho' }, { status: 403 })
+                }
+                novoStatus = 'RASCUNHO'
+                revisorAtualId = null
+                mensagemLog = `Documento revertido para rascunho por ${nomeAutor}${justificativa ? `: "${justificativa}"` : ''}`
+                break
+            }
+
             default:
                 return NextResponse.json({ success: false, error: 'Ação inválida no fluxo' }, { status: 400 })
         }
@@ -134,19 +165,142 @@ export async function PATCH(
                 }
             })
 
+            // Normaliza o tipoEvento para SOLICITAR_REVISAO mesmo se vier ASSUMIR_REVISAO
+            const tipoEventoNormalizado = action === 'ASSUMIR_REVISAO'
+                ? 'MUDANCA_STATUS_SOLICITAR_REVISAO'
+                : `MUDANCA_STATUS_${action}`
+
             await tx.feedAtividade.create({
                 data: {
-                    tipoEvento: `MUDANCA_STATUS_${action}`,
+                    tipoEvento: tipoEventoNormalizado,
                     mensagem: mensagemLog,
                     portariaId: id,
-                    autorId: session.id,
+                    autorId: (session.id as string),
                     secretariaId: portaria.secretariaId,
                     metadata: { action, observacao }
                 }
             })
 
+            // Quando o revisor rejeita, cria notificação adicional voltada ao autor
+            if (action === 'REJEITAR_REVISAO') {
+                const portariaComAutor = await (tx.portaria as any).findUnique({
+                    where: { id },
+                    include: { criadoPor: { select: { id: true } } }
+                })
+                if (portariaComAutor?.criadoPorId) {
+                    await tx.feedAtividade.create({
+                        data: {
+                            tipoEvento: 'DOCUMENTO_DEVOLVIDO_AUTOR',
+                            mensagem: `Seu documento foi devolvido para correção por ${nomeAutor}: "${observacao}"`,
+                            portariaId: id,
+                            autorId: (session.id as string),
+                            secretariaId: portaria.secretariaId,
+                            metadata: { action, observacao, destinatarioId: portariaComAutor.criadoPorId }
+                        }
+                    })
+                }
+            }
+
+            // Quando revisão é solicitada, cria notificação adicional visível ao secretário/admin
+            if (action === 'SOLICITAR_REVISAO' || action === 'ASSUMIR_REVISAO') {
+                await tx.feedAtividade.create({
+                    data: {
+                        tipoEvento: 'REVISAO_ATRIBUIDA',
+                        mensagem: `${nomeAutor} assumiu a revisão do documento`,
+                        portariaId: id,
+                        autorId: (session.id as string),
+                        secretariaId: portaria.secretariaId,
+                        metadata: { action, revisorId: (session.id as string) }
+                    }
+                })
+            }
+
             return p
         })
+
+        // ── Notificações direcionadas por userId ──────────────────────────────
+        // Executado fora da transação (falha não bloqueia o fluxo principal)
+        try {
+            const portariaLabel = `portaria ${portaria.id.slice(0, 8)}`
+
+            if (action === 'ENVIAR_REVISAO') {
+                // Notifica todos os revisores/secretários da secretaria
+                const revisores = await buscarRevisoresDaSecretaria(portaria.secretariaId)
+                await criarNotificacoes(
+                    revisores.map((r) => ({
+                        userId: r.id,
+                        tipo: 'PORTARIA_SUBMETIDA',
+                        mensagem: `Nova portaria enviada para revisão por ${nomeAutor}`,
+                        portariaId: id,
+                        metadata: { action },
+                    }))
+                )
+            }
+
+            if (action === 'SOLICITAR_REVISAO' || action === 'ASSUMIR_REVISAO') {
+                // Notifica o autor de que a revisão foi assumida
+                const portariaComAutor = await prisma.portaria.findUnique({
+                    where: { id },
+                    select: { criadoPorId: true },
+                }) as any
+                if (portariaComAutor?.criadoPorId) {
+                    await criarNotificacao({
+                        userId: portariaComAutor.criadoPorId,
+                        tipo: 'REVISAO_ATRIBUIDA',
+                        mensagem: `${nomeAutor} assumiu a revisão da sua portaria`,
+                        portariaId: id,
+                        metadata: { action },
+                    })
+                }
+            }
+
+            if (action === 'REJEITAR_REVISAO') {
+                // Notifica o autor sobre a devolução (notificação direcionada)
+                const portariaComAutor = await prisma.portaria.findUnique({
+                    where: { id },
+                    select: { criadoPorId: true },
+                }) as any
+                if (portariaComAutor?.criadoPorId) {
+                    await criarNotificacao({
+                        userId: portariaComAutor.criadoPorId,
+                        tipo: 'DOCUMENTO_DEVOLVIDO_AUTOR',
+                        mensagem: `Seu documento foi devolvido para correção por ${nomeAutor}: "${observacao}"`,
+                        portariaId: id,
+                        metadata: { action, observacao },
+                    })
+                }
+            }
+
+            if (action === 'APROVAR_REVISAO') {
+                // Notifica o autor que a portaria foi aprovada na revisão
+                const portariaComAutor = await prisma.portaria.findUnique({
+                    where: { id },
+                    select: { criadoPorId: true },
+                }) as any
+                if (portariaComAutor?.criadoPorId) {
+                    await criarNotificacao({
+                        userId: portariaComAutor.criadoPorId,
+                        tipo: 'PORTARIA_APROVADA',
+                        mensagem: `Sua portaria foi aprovada na revisão por ${nomeAutor} e aguarda assinatura`,
+                        portariaId: id,
+                        metadata: { action },
+                    })
+                }
+            }
+
+            if (action === 'TRANSFERIR_REVISAO' && revisorId) {
+                // Notifica o novo revisor
+                await criarNotificacao({
+                    userId: revisorId,
+                    tipo: 'REVISAO_ATRIBUIDA',
+                    mensagem: `${nomeAutor} transferiu a revisão de ${portariaLabel} para você`,
+                    portariaId: id,
+                    metadata: { action, justificativa },
+                })
+            }
+        } catch (notifErr) {
+            console.warn('[Fluxo] Falha ao criar notificações direcionadas:', notifErr)
+        }
 
         return NextResponse.json({ success: true, data: atualizada })
     } catch (err: any) {

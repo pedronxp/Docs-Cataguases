@@ -24,7 +24,7 @@ export async function POST(
         }
         const session = rawSession as unknown as SessionPayload
 
-        if (!['SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'].includes(session.role)) {
+        if (!['SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'].includes(session.role as string)) {
             return NextResponse.json({ success: false, error: 'Sem permissão para registrar assinatura' }, { status: 403 })
         }
 
@@ -106,9 +106,10 @@ export async function POST(
                     assinaturaJustificativa: justificativa || null,
                     assinaturaComprovanteUrl: comprovanteUrl || null,
                     status: 'PRONTO_PUBLICACAO',
-                    // Para assinatura digital: registra o signatário; para manual/dispensada: quem registrou
                     assinadoPorId: session.id,
-                    assinadoEm: new Date()
+                    assinadoEm: new Date(),
+                    pdfUrl: null, // Clear cached pdf so it can be regenerated with signature
+                    docxRascunhoUrl: null
                 }
             })
 
@@ -135,7 +136,7 @@ export async function POST(
             })
 
             return p
-        })
+        }, { timeout: 15000, maxWait: 10000 })
 
         return NextResponse.json({ success: true, data: atualizada })
     } catch (error: any) {

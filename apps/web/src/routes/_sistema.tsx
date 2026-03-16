@@ -5,9 +5,11 @@ import { useAuthStore } from '@/store/auth.store'
 import { useMemo } from 'react'
 import { createMongoAbility } from '@casl/ability'
 import { FloatingChat } from '@/components/chat/FloatingChat'
+import { RouterErrorComponent } from '@/components/shared/ErrorPage'
 
 export const Route = createFileRoute('/_sistema')({
     component: SistemaLayout,
+    errorComponent: RouterErrorComponent,
 })
 
 const ROUTE_TITLES: Record<string, string> = {
