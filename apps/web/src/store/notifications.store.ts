@@ -12,8 +12,10 @@ interface NotificationsState {
     sseTokenExpiraEm: string | null
     setSseToken: (token: string, expiraEm: string) => void
     addNotificacao: (n: NotificacaoItem) => void
+    marcarLida: (id: string) => void
     marcarTodasLidas: () => void
     clearNotificacoes: () => void
+    setNaoLidas: (count: number) => void
 }
 
 export const useNotificationsStore = create<NotificationsState>()(
@@ -35,7 +37,21 @@ export const useNotificationsStore = create<NotificationsState>()(
                     return {
                         notificacoes: [n, ...state.notificacoes].slice(0, MAX_NOTIFICACOES),
                         naoLidas: state.naoLidas + 1,
-                        ultimaVista: n.createdAt, // avança o cursor para a reconexão
+                        ultimaVista: n.criadoEm ?? n.createdAt ?? new Date().toISOString(),
+                    }
+                }),
+
+            marcarLida: (id) =>
+                set((state) => {
+                    const idx = state.notificacoes.findIndex((n) => n.id === id)
+                    if (idx === -1) return state
+                    const already = state.notificacoes[idx].lida
+                    if (already) return state
+                    const updated = [...state.notificacoes]
+                    updated[idx] = { ...updated[idx], lida: true }
+                    return {
+                        notificacoes: updated,
+                        naoLidas: Math.max(0, state.naoLidas - 1),
                     }
                 }),
 
@@ -48,6 +64,8 @@ export const useNotificationsStore = create<NotificationsState>()(
 
             clearNotificacoes: () =>
                 set({ notificacoes: [], naoLidas: 0 }),
+
+            setNaoLidas: (count) => set({ naoLidas: count }),
         }),
         {
             name: 'docs-cataguases-notifications',

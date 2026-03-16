@@ -31,7 +31,7 @@ export class PortariaService {
                     secretariaId: data.secretariaId,
                     setorId: data.setorId,
                     criadoPorId: data.criadoPorId,
-                    status: data.submetido ? 'PENDENTE' : 'RASCUNHO',
+                    status: data.submetido ? 'EM_REVISAO_ABERTA' : 'RASCUNHO',
                 },
                 include: { modelo: true }
             })
@@ -59,11 +59,14 @@ export class PortariaService {
         try {
             const portaria = await prisma.portaria.findUnique({ where: { id } })
             if (!portaria) return err('Portaria não encontrada.')
-            if (portaria.status !== 'PENDENTE') return err('Apenas portarias pendentes podem ser aprovadas.')
+            // Secretário aprova portaria que aguarda assinatura/aprovação final
+            if (!['AGUARDANDO_ASSINATURA', 'PRONTO_PUBLICACAO'].includes(portaria.status)) {
+                return err('Portaria não está em status válido para aprovação.')
+            }
 
             const atualizada = await prisma.portaria.update({
                 where: { id },
-                data: { status: 'APROVADA' }
+                data: { status: 'PRONTO_PUBLICACAO' }
             })
 
             await this.registrarEvento({
@@ -92,7 +95,9 @@ export class PortariaService {
         try {
             const portaria = await prisma.portaria.findUnique({ where: { id } })
             if (!portaria) return err('Portaria não encontrada.')
-            if (portaria.status !== 'PENDENTE') return err('Apenas portarias pendentes podem ser rejeitadas.')
+            if (!['AGUARDANDO_ASSINATURA', 'PRONTO_PUBLICACAO', 'EM_REVISAO_ATRIBUIDA'].includes(portaria.status)) {
+                return err('Portaria não está em status válido para rejeição.')
+            }
 
             // Limpa o PDF ao rejeitar, pois o conteúdo precisará ser revisado
             const atualizada = await prisma.portaria.update({

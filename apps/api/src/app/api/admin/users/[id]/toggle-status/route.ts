@@ -52,7 +52,7 @@ export async function PATCH(
         FeedService.registrarEvento({
             tipoEvento: novoStatus ? 'ACESSO_REATIVADO' : 'ACESSO_REVOGADO',
             mensagem: `${novoStatus ? 'Acesso reativado' : 'Acesso desativado'}: ${user.name}`,
-            autorId: session.id,
+            autorId: (session.id as string),
             secretariaId: user.secretariaId ?? null,
             metadata: { targetUserId: id, novoStatus }
         }).catch(e => console.error('Falha ao registrar auditoria:', e))

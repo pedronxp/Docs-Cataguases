@@ -116,7 +116,7 @@ function OrganogramaPessoalPage() {
         return (
             <div className="space-y-6 animate-in fade-in duration-500 bg-[#f8f9fa] min-h-[calc(100vh-4rem)] p-6 -m-6">
                 <div className="border-l-4 border-[#1351b4] pl-4">
-                    <h2 className="text-3xl font-bold tracking-tight text-[#333333]">Lotação por Secretaria</h2>
+                    <h2 className="text-3xl font-bold tracking-tight text-[#333333]">Quadro de Servidores</h2>
                 </div>
                 <div className="space-y-2">
                     {[1, 2, 3, 4, 5].map(i => (
@@ -133,7 +133,7 @@ function OrganogramaPessoalPage() {
             {/* Cabeçalho */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
                 <div className="border-l-4 border-[#1351b4] pl-4">
-                    <h2 className="text-3xl font-bold tracking-tight text-[#333333]">Lotação por Secretaria</h2>
+                    <h2 className="text-3xl font-bold tracking-tight text-[#333333]">Quadro de Servidores</h2>
                     <p className="text-base text-[#555555] font-medium mt-1">
                         Visualize a distribuição de servidores por secretaria e setor.
                     </p>

@@ -1,17 +1,22 @@
 /**
- * LLM Service — Groq + OpenRouter com failover automático
+ * LLM Service — Multi-Provider Pool + Smart Router + Circuit Breaker
  *
- * Providers:
- *   - Groq:       https://api.groq.com/openai/v1  (ultra-rápido, free tier)
- *   - OpenRouter: https://openrouter.ai/api/v1    (400+ modelos, inclui gratuitos)
+ * Providers (REGRA MÁXIMA: Cerebras primeiro):
+ *   - Cerebras:   https://api.cerebras.ai/v1      (motor principal — wafer-scale ⚡)
+ *   - Mistral:    https://api.mistral.ai/v1       (alternativa de alta qualidade)
+ *   - Groq:       https://api.groq.com/openai/v1  (fallback rápido)
+ *   - OpenRouter: https://openrouter.ai/api/v1    (fallback robusto final)
  *
- * Lógica de rotação:
- *   1. Usa Groq por padrão (mais rápido)
- *   2. Se Groq retornar 429 (rate limit), troca para OpenRouter automaticamente
- *   3. Admin pode forçar troca manualmente via setActiveProvider()
+ * Lógica:
+ *   1. Smart Router analisa a mensagem → escolhe o modelo ideal (Cerebras preferencial)
+ *   2. Pool Balancer seleciona a melhor API Key do banco de dados
+ *   3. Circuit Breaker detecta 429 → gira para próxima key → fallback chain
+ *   4. Fallback legacy para variáveis de ambiente (compatibilidade)
  */
 
-export type LLMProvider = 'groq' | 'openrouter'
+import prisma from '@/lib/prisma'
+
+export type LLMProvider = 'cerebras' | 'mistral' | 'groq' | 'openrouter'
 
 export interface LLMMessage {
     role: 'system' | 'user' | 'assistant'
@@ -24,18 +29,67 @@ export interface LLMChatOptions {
     maxTokens?: number
     temperature?: number
     provider?: LLMProvider  // forçar provider específico
+    tools?: any[]           // ferramentas para o modelo (Function Calling)
+    skipSmartRouter?: boolean // desabilita seleção automática de modelo
 }
 
 export interface LLMChatResult {
     content: string
+    tool_calls?: any[]
     provider: LLMProvider
     model: string
+    keyId?: string              // ID da chave usada (para auditoria)
+    fallbackUsed?: boolean      // true se provider diferente do solicitado foi usado
+    requestedProvider?: LLMProvider // provider originalmente solicitado (para transparência)
     usage: {
         inputTokens: number
         outputTokens: number
         totalTokens: number
     }
 }
+
+// ── Configuração dos providers ─────────────────────────────────────────────────
+
+const GROQ_BASE = 'https://api.groq.com/openai/v1'
+const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
+const CEREBRAS_BASE = 'https://api.cerebras.ai/v1'
+const MISTRAL_BASE = 'https://api.mistral.ai/v1'
+
+// ── Catálogo de Modelos ────────────────────────────────────────────────────────
+
+// CEREBRAS — Motor principal (wafer-scale ⚡, gratuito até 1M tokens/dia)
+export const CEREBRAS_MODELS = [
+    { id: 'llama-3.3-70b', label: 'Llama 3.3 70B ⚡ (Textos formais e licitações)', contextWindow: 128000 },
+    { id: 'qwen-3-32b',    label: 'Qwen3 32B ⚡ (Técnicos e advertências)', contextWindow: 32768 },
+    { id: 'llama-4-maverick', label: 'Llama 4 Maverick ⚡ (Tarefas complexas e longas)', contextWindow: 256000 },
+    { id: 'llama3.1-8b',  label: 'Llama 3.1 8B ⚡ (Respostas rápidas)', contextWindow: 128000 },
+]
+
+// MISTRAL — Alta qualidade, raciocínio estruturado
+export const MISTRAL_MODELS = [
+    { id: 'mistral-large-latest', label: 'Mistral Large (Raciocínio avançado)', contextWindow: 128000 },
+    { id: 'mistral-small-latest', label: 'Mistral Small (Rápido)', contextWindow: 32768 },
+    { id: 'open-mistral-nemo',    label: 'Mistral Nemo (Leve e eficiente)', contextWindow: 128000 },
+]
+
+// GROQ — Fallback rápido
+export const GROQ_MODELS = [
+    { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Versatile)', contextWindow: 128000 },
+    { id: 'llama-3.1-8b-instant',    label: 'Llama 3.1 8B (Instant)', contextWindow: 131072 },
+    { id: 'qwen-qwq-32b',            label: 'QwQ 32B (Raciocínio)', contextWindow: 32768 },
+    { id: 'llama-4-scout-17b',       label: 'Llama 4 Scout (Contexto longo)', contextWindow: 1048576 },
+]
+
+// OPENROUTER — Fallback final
+export const OPENROUTER_FREE_MODELS = [
+    { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (free)' },
+    { id: 'google/gemma-3-27b-it:free', label: 'Gemma 3 27B (free)' },
+    { id: 'deepseek/deepseek-r1:free', label: 'DeepSeek R1 (free)' },
+]
+
+// ── Estado de rastreamento em memória ─────────────────────────────────────────
+
+let activeProvider: LLMProvider = (process.env.LLM_DEFAULT_PROVIDER as LLMProvider) || 'cerebras'
 
 export interface LLMProviderStats {
     requestsTotal: number
@@ -46,12 +100,10 @@ export interface LLMProviderStats {
     tokensOutputToday: number
     lastRateLimitAt: string | null
     rateLimitCount: number
-    // Groq-specific (dos headers de resposta)
     groqRemainingRequests?: number
     groqRemainingTokens?: number
     groqResetRequestsAt?: string
     groqResetTokensAt?: string
-    // OpenRouter-specific
     openrouterCreditsTotal?: number
     openrouterCreditsUsed?: number
     openrouterCreditsRemaining?: number
@@ -62,6 +114,8 @@ export interface LLMRequestLog {
     ts: string
     provider: LLMProvider
     model: string
+    keyId?: string
+    keyMask?: string
     inputTokens: number
     outputTokens: number
     totalTokens: number
@@ -70,34 +124,28 @@ export interface LLMRequestLog {
     error?: string
 }
 
-// ── Estado em memória ─────────────────────────────────────────────────────────
-
-let activeProvider: LLMProvider = (process.env.LLM_DEFAULT_PROVIDER as LLMProvider) || 'groq'
+const emptyStats = (): LLMProviderStats => ({
+    requestsTotal: 0, requestsToday: 0,
+    tokensInputTotal: 0, tokensOutputTotal: 0,
+    tokensInputToday: 0, tokensOutputToday: 0,
+    lastRateLimitAt: null, rateLimitCount: 0,
+})
 
 const stats: Record<LLMProvider, LLMProviderStats> = {
-    groq: {
-        requestsTotal: 0, requestsToday: 0,
-        tokensInputTotal: 0, tokensOutputTotal: 0,
-        tokensInputToday: 0, tokensOutputToday: 0,
-        lastRateLimitAt: null, rateLimitCount: 0,
-    },
-    openrouter: {
-        requestsTotal: 0, requestsToday: 0,
-        tokensInputTotal: 0, tokensOutputTotal: 0,
-        tokensInputToday: 0, tokensOutputToday: 0,
-        lastRateLimitAt: null, rateLimitCount: 0,
-    },
+    cerebras:   emptyStats(),
+    mistral:    emptyStats(),
+    groq:       emptyStats(),
+    openrouter: emptyStats(),
 }
 
 const requestLog: LLMRequestLog[] = []
 
-// Reset contadores diários à meia-noite
 let lastResetDay = new Date().toDateString()
 function resetDailyIfNeeded() {
     const today = new Date().toDateString()
     if (today !== lastResetDay) {
         lastResetDay = today
-        for (const p of ['groq', 'openrouter'] as LLMProvider[]) {
+        for (const p of Object.keys(stats) as LLMProvider[]) {
             stats[p].requestsToday = 0
             stats[p].tokensInputToday = 0
             stats[p].tokensOutputToday = 0
@@ -105,88 +153,372 @@ function resetDailyIfNeeded() {
     }
 }
 
-// ── Configurações dos providers ───────────────────────────────────────────────
+// ── Smart Router — Seleção de Modelo por Complexidade ─────────────────────────
 
-const GROQ_BASE = 'https://api.groq.com/openai/v1'
-const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
-
-// Modelos padrão por provider
-const DEFAULT_MODELS: Record<LLMProvider, string> = {
-    groq: 'llama-3.3-70b-versatile',
-    openrouter: 'meta-llama/llama-3.3-70b-instruct:free',
+interface ModelChoice {
+    provider: LLMProvider
+    model: string
+    reason: string
 }
 
-// Modelos disponíveis para seleção no frontend
-export const GROQ_MODELS = [
-    { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Versatile)', contextWindow: 128000 },
-    { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B (Instant)', contextWindow: 131072 },
-    { id: 'gemma2-9b-it', label: 'Gemma 2 9B', contextWindow: 8192 },
-    { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B', contextWindow: 32768 },
-]
+function getDefaultModelForProvider(provider: LLMProvider): string {
+    if (provider === 'cerebras') return 'llama-3.3-70b'
+    if (provider === 'mistral') return 'mistral-large-latest'
+    if (provider === 'groq') return 'llama-3.3-70b-versatile'
+    if (provider === 'openrouter') return 'meta-llama/llama-3.3-70b-instruct:free'
+    return 'llama-3.3-70b'
+}
 
-export const OPENROUTER_FREE_MODELS = [
-    { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (free)' },
-    { id: 'google/gemma-3-27b-it:free', label: 'Gemma 3 27B (free)' },
-    { id: 'deepseek/deepseek-r1:free', label: 'DeepSeek R1 (free – raciocínio)' },
-    { id: 'mistralai/mistral-7b-instruct:free', label: 'Mistral 7B (free)' },
-    { id: 'microsoft/phi-3-mini-128k-instruct:free', label: 'Phi-3 Mini 128K (free)' },
-]
+function chooseModel(options: LLMChatOptions): ModelChoice {
+    // Se provider foi solicitado explicitamente, respeitar e NÃO usar smart router
+    if (options?.provider) {
+        return {
+            provider: options.provider,
+            model: options.model || getDefaultModelForProvider(options.provider),
+            reason: `Provider explicitamente solicitado: ${options.provider}`
+        }
+    }
 
-// ── Função principal de chat ──────────────────────────────────────────────────
+    // Se modelo foi solicitado explicitamente, respeitar
+    if (options.model) {
+        const provider = activeProvider
+        return { provider, model: options.model, reason: 'Modelo explicitamente solicitado' }
+    }
+
+    const hasTools = options.tools && options.tools.length > 0
+    const totalChars = options.messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0)
+
+    // Usa o provider ativo configurado pelo admin (padrão: cerebras)
+    const preferred = activeProvider
+
+    // Modelos por provider para cada cenário
+    const modelMap: Record<LLMProvider, { tools: string; fast: string; long: string; default: string }> = {
+        cerebras:   { tools: 'llama-3.3-70b', fast: 'llama3.1-8b', long: 'llama-4-maverick', default: 'llama-3.3-70b' },
+        mistral:    { tools: 'mistral-large-latest', fast: 'mistral-small-latest', long: 'mistral-large-latest', default: 'mistral-large-latest' },
+        groq:       { tools: 'llama-3.3-70b-versatile', fast: 'llama-3.1-8b-instant', long: 'llama-4-scout-17b', default: 'llama-3.3-70b-versatile' },
+        openrouter: { tools: 'meta-llama/llama-3.3-70b-instruct:free', fast: 'meta-llama/llama-3.3-70b-instruct:free', long: 'deepseek/deepseek-r1:free', default: 'meta-llama/llama-3.3-70b-instruct:free' },
+    }
+
+    const models = modelMap[preferred]
+
+    // Tools: usar modelo com melhor raciocínio para function calling
+    if (hasTools) {
+        return {
+            provider: preferred,
+            model: models.tools,
+            reason: `Function Calling → ${preferred}/${models.tools}`
+        }
+    }
+
+    // Pergunta curta e simples → modelo rápido
+    if (totalChars < 400) {
+        return {
+            provider: preferred,
+            model: models.fast,
+            reason: `Pergunta curta (${totalChars} chars) → ${preferred}/${models.fast}`
+        }
+    }
+
+    // Contexto muito longo → modelo com contexto longo
+    if (totalChars >= 4000) {
+        return {
+            provider: preferred,
+            model: models.long,
+            reason: `Contexto longo (${totalChars} chars) → ${preferred}/${models.long}`
+        }
+    }
+
+    // Padrão: modelo principal do provider ativo
+    return {
+        provider: preferred,
+        model: models.default,
+        reason: `Complexidade média (${totalChars} chars) → ${preferred}/${models.default}`
+    }
+}
+
+// ── Pool Balancer — Seleção da Melhor API Key ─────────────────────────────────
+
+async function pickBestKey(provider: LLMProvider) {
+    const now = new Date()
+    
+    // Reativar chaves cujo cooldown expirou
+    await prisma.llmApiKey.updateMany({
+        where: {
+            provider,
+            esgotada: true,
+            esgotadaAte: { lt: now },
+        },
+        data: { esgotada: false, esgotadaAte: null },
+    })
+
+    // Pegar chave menos usada que ainda está disponível
+    return prisma.llmApiKey.findFirst({
+        where: {
+            provider,
+            ativo: true,
+            esgotada: false,
+        },
+        orderBy: { requisicoes: 'asc' },
+    })
+}
+
+async function markKeyExhausted(keyId: string, cooldownMinutes = 60) {
+    const esgotadaAte = new Date(Date.now() + cooldownMinutes * 60 * 1000)
+    await prisma.llmApiKey.update({
+        where: { id: keyId },
+        data: { esgotada: true, esgotadaAte },
+    })
+}
+
+async function incrementKeyUsage(keyId: string, tokens: number) {
+    await prisma.llmApiKey.update({
+        where: { id: keyId },
+        data: {
+            requisicoes: { increment: 1 },
+            tokensTotal: { increment: tokens },
+        },
+    })
+}
+
+// ── Circuit Breaker — Chamada com Retry Automático ────────────────────────────
+
+// Motivo pelo qual um provider não foi usado
+type SkipReason = 'no_key' | 'rate_limited'
+
+async function callWithCircuitBreaker(
+    provider: LLMProvider,
+    model: string,
+    options: LLMChatOptions
+): Promise<LLMChatResult & { tried: boolean; skipReason?: SkipReason }> {
+    // Tentar cada chave do pool para este provider
+    while (true) {
+        const key = await pickBestKey(provider)
+
+        // Se não há chave no banco, tentar via variável de ambiente (fallback legacy)
+        if (!key) {
+            const envKey = provider === 'groq'
+                ? process.env.GROQ_API_KEY
+                : provider === 'cerebras'
+                ? process.env.CEREBRAS_API_KEY
+                : provider === 'mistral'
+                ? process.env.MISTRAL_API_KEY
+                : process.env.OPENROUTER_API_KEY
+
+            if (!envKey) {
+                // Sem chave alguma para este provider
+                console.warn(`[LLM Pool] ${provider}: nenhuma chave configurada (banco ou .env)`)
+                return { tried: false, skipReason: 'no_key' } as any
+            }
+
+            try {
+                const result = await callProviderRaw(provider, envKey, undefined, model, options)
+                return { ...result, tried: true }
+            } catch (err: any) {
+                const status = err.status ?? 0
+                if (status === 429 || status === 402) {
+                    // Rate limit — pula para o próximo provider
+                    console.warn(`[LLM Pool] ${provider} ENV key esgotou (${status}) → próximo provider`)
+                    stats[provider].rateLimitCount++
+                    stats[provider].lastRateLimitAt = new Date().toISOString()
+                    return { tried: false, skipReason: 'rate_limited' } as any
+                }
+                if (status === 401 || status === 403) {
+                    // Chave inválida ou expirada — pula para o próximo provider
+                    console.warn(`[LLM Pool] ${provider} ENV key inválida/expirada (${status}) → próximo provider`)
+                    return { tried: false, skipReason: 'no_key' } as any
+                }
+                // Outros erros (400, 500, timeout): pula mas registra
+                console.error(`[LLM Pool] ${provider} erro inesperado (${status}): ${err.message?.slice(0, 120)} → próximo provider`)
+                return { tried: false, skipReason: 'no_key' } as any
+            }
+        }
+
+        try {
+            const result = await callProviderRaw(provider, key.keyEncrypted, key.id, model, options)
+            await incrementKeyUsage(key.id, result.usage.totalTokens).catch(() => {})
+            return { ...result, tried: true }
+        } catch (err: any) {
+            const status = err.status ?? 0
+            if (status === 429 || status === 402) {
+                console.warn(`[LLM Pool] Chave ${key.mask} do ${provider} esgotada (${status}) → próxima chave`)
+                await markKeyExhausted(key.id, 60)
+                stats[provider].rateLimitCount++
+                stats[provider].lastRateLimitAt = new Date().toISOString()
+                continue  // Tenta a próxima chave do mesmo provider
+            }
+            if (status === 401 || status === 403) {
+                console.warn(`[LLM Pool] Chave ${key.mask} do ${provider} inválida/expirada (${status}) → desativa e tenta próxima`)
+                await markKeyExhausted(key.id, 24 * 60) // Cooldown de 24h para chave inválida
+                continue  // Tenta a próxima chave do mesmo provider
+            }
+            // Erro inesperado: marca como esgotada por 5 minutos e passa para próximo provider
+            console.error(`[LLM Pool] Chave ${key.mask} do ${provider} erro (${status}): ${err.message?.slice(0, 80)}`)
+            await markKeyExhausted(key.id, 5)
+            continue
+        }
+    }
+}
+
+// ── Função Principal de Chat ──────────────────────────────────────────────────
+
+/**
+ * Verifica se um provider tem chave ENV configurada.
+ * Usado para otimizar a ordem de tentativas — providers sem chave vão para o final.
+ */
+function hasEnvKey(p: LLMProvider): boolean {
+    const k = p === 'cerebras' ? process.env.CEREBRAS_API_KEY
+        : p === 'mistral'    ? process.env.MISTRAL_API_KEY
+        : p === 'groq'       ? process.env.GROQ_API_KEY
+        : process.env.OPENROUTER_API_KEY
+    return !!k
+}
 
 export async function llmChat(options: LLMChatOptions): Promise<LLMChatResult> {
     resetDailyIfNeeded()
 
-    const providerToUse = options.provider || activeProvider
-    const model = options.model || DEFAULT_MODELS[providerToUse]
+    const choice = options.skipSmartRouter
+        ? { provider: (options.provider || 'cerebras') as LLMProvider, model: options.model || 'llama-3.3-70b', reason: 'Manual' }
+        : chooseModel(options)
+
+    console.log(`[LLM Router] ${choice.reason} → ${choice.provider}/${choice.model}`)
+
     const start = Date.now()
 
-    try {
-        const result = await callProvider(providerToUse, model, options)
-        trackSuccess(providerToUse, model, result, Date.now() - start)
-        return result
-    } catch (err: any) {
-        const is429 = err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('rate_limit')
+    // ── Ordem de failover ─────────────────────────────────────────────────────
+    // MODO MANUAL (skipSmartRouter=true): respeitar escolha do usuário, SEM failover.
+    // Se o provider selecionado falhar, retornar erro claro. NÃO tentar outros providers.
+    //
+    // MODO AUTOMÁTICO: Fallback chain Cerebras → Mistral → Groq → OpenRouter
+    let providerOrder: LLMProvider[]
 
-        if (is429 && providerToUse === 'groq') {
-            // Failover automático para OpenRouter
-            stats.groq.lastRateLimitAt = new Date().toISOString()
-            stats.groq.rateLimitCount++
-            activeProvider = 'openrouter'
+    if (options.skipSmartRouter) {
+        // Modo manual: somente o provider escolhido, sem fallback silencioso
+        providerOrder = [choice.provider]
+        console.log(`[LLM Router] Modo manual: usando APENAS ${choice.provider}/${choice.model} (sem fallback)`)
+    } else {
+        // Modo automático: tentar em ordem de disponibilidade
+        const allProviders: LLMProvider[] = ['cerebras', 'mistral', 'groq', 'openrouter']
+        const base = Array.from(new Set([choice.provider, ...allProviders]))
+        providerOrder = [
+            ...base.filter(p => hasEnvKey(p)),   // providers com chave ENV primeiro
+            ...base.filter(p => !hasEnvKey(p)),  // providers sem chave ENV por último
+        ]
+        console.log(`[LLM Router] Modo automático: ${providerOrder.join(' → ')} (${providerOrder.filter(hasEnvKey).join(', ')} com chave ENV)`)
+    }
 
-            const fallbackModel = options.model && options.model.includes(':free')
-                ? options.model
-                : DEFAULT_MODELS.openrouter
+    // Rastrear motivos de falha por provider
+    const failReasons: Record<string, SkipReason | 'error'> = {}
 
-            try {
-                const result = await callProvider('openrouter', fallbackModel, options)
-                trackSuccess('openrouter', fallbackModel, result, Date.now() - start)
-                return result
-            } catch (fallbackErr: any) {
-                trackError('openrouter', fallbackModel, fallbackErr.message, Date.now() - start)
-                throw fallbackErr
-            }
+    for (const provider of providerOrder) {
+        // Seleciona modelo padrão do provider se houve failover
+        let modelToUse = choice.model
+        if (provider !== choice.provider || modelToUse.includes('/')) {
+            if (provider === 'cerebras') modelToUse = 'llama-3.3-70b'
+            else if (provider === 'mistral') modelToUse = 'mistral-large-latest'
+            else if (provider === 'groq') modelToUse = 'llama-3.3-70b-versatile'
+            else modelToUse = 'meta-llama/llama-3.3-70b-instruct:free'
         }
 
-        trackError(providerToUse, model, err.message, Date.now() - start)
-        throw err
+        try {
+            const result = await callWithCircuitBreaker(provider, modelToUse, options)
+
+            if (!(result as any).tried) {
+                const reason = (result as any).skipReason as SkipReason
+                failReasons[provider] = reason
+                console.warn(`[LLM Pool] ${provider} pulado (${reason}) → tentando próximo provider`)
+                continue
+            }
+
+            trackSuccess(provider, modelToUse, result, Date.now() - start, result.keyId)
+
+            // Atualizar stats do Groq com info dos headers (se disponível)
+            if (provider === 'groq' && (result as any).groqHeaders) {
+                const h = (result as any).groqHeaders
+                stats.groq.groqRemainingRequests = h.remaining
+                stats.groq.groqRemainingTokens = h.remainingTokens
+            }
+
+            // Indicar se houve fallback (provider diferente do solicitado)
+            const fallbackUsed = provider !== choice.provider
+            return {
+                ...result,
+                fallbackUsed,
+                requestedProvider: fallbackUsed ? choice.provider : undefined,
+            }
+        } catch (err: any) {
+            failReasons[provider] = 'error'
+            trackError(provider, modelToUse, err.message, Date.now() - start)
+
+            if (provider === providerOrder[providerOrder.length - 1]) {
+                throw err // Último provider também falhou — relança o erro real
+            }
+
+            console.warn(`[LLM Pool] ${provider} erro não-recuperável: ${err.message?.slice(0, 100)}. Tentando ${providerOrder[providerOrder.indexOf(provider) + 1]}`)
+        }
     }
+
+    // Diagnóstico: quantos falharam por qual motivo
+    const noKey = Object.entries(failReasons).filter(([, r]) => r === 'no_key').map(([p]) => p)
+    const rateLimited = Object.entries(failReasons).filter(([, r]) => r === 'rate_limited').map(([p]) => p)
+
+    console.error('[LLM Pool] Todos os providers falharam:', JSON.stringify(failReasons))
+
+    // ── Mensagens de erro com branding "Doc's Cataguases" ────────────────────
+    if (options.skipSmartRouter && rateLimited.includes(choice.provider)) {
+        // Modo manual: provider escolhido está com rate limit
+        throw new Error(
+            `Doc's Cataguases — O modelo selecionado (${choice.provider}) está temporariamente sobrecarregado. ` +
+            `Aguarde 1–2 minutos ou selecione outro modelo.`
+        )
+    }
+
+    if (options.skipSmartRouter && noKey.includes(choice.provider)) {
+        // Modo manual: provider escolhido não tem chave configurada
+        throw new Error(
+            `Doc's Cataguases — O provedor selecionado (${choice.provider}) não tem chave de API configurada. ` +
+            `Contate o administrador ou selecione outro modelo.`
+        )
+    }
+
+    if (rateLimited.length > 0 && noKey.length + rateLimited.length === providerOrder.length) {
+        // Todos falharam — compõe mensagem detalhada
+        const partes: string[] = []
+        if (rateLimited.length > 0) partes.push(`limite atingido: ${rateLimited.join(', ')}`)
+        if (noKey.length > 0) partes.push(`sem chave configurada: ${noKey.join(', ')}`)
+        throw new Error(
+            `Doc's Cataguases — O assistente está temporariamente indisponível (${partes.join(' | ')}). ` +
+            `Aguarde 1–2 minutos e tente novamente.`
+        )
+    }
+
+    if (noKey.length === providerOrder.length) {
+        // Nenhum provider tem chave configurada
+        throw new Error(
+            `Doc's Cataguases — Nenhuma chave de IA está configurada no servidor. ` +
+            `Peça ao administrador para adicionar uma chave Cerebras, Groq ou OpenRouter nas configurações.`
+        )
+    }
+
+    throw new Error(
+        `Doc's Cataguases — Assistente indisponível no momento. ` +
+        `Provedores sem chave: [${noKey.join(', ')}]. Com limite atingido: [${rateLimited.join(', ')}]. ` +
+        `Tente novamente em alguns minutos.`
+    )
 }
 
-// ── Chamada ao provider ───────────────────────────────────────────────────────
+// ── Chamada ao Provider ───────────────────────────────────────────────────────
 
-async function callProvider(
+async function callProviderRaw(
     provider: LLMProvider,
+    apiKey: string,
+    keyId: string | undefined,
     model: string,
     options: LLMChatOptions
 ): Promise<LLMChatResult> {
-    const apiKey = provider === 'groq'
-        ? process.env.GROQ_API_KEY
-        : process.env.OPENROUTER_API_KEY
-
-    if (!apiKey) throw new Error(`API key não configurada para provider: ${provider}`)
-
-    const baseUrl = provider === 'groq' ? GROQ_BASE : OPENROUTER_BASE
+    const baseUrl = provider === 'cerebras' ? CEREBRAS_BASE
+        : provider === 'mistral' ? MISTRAL_BASE
+        : provider === 'groq' ? GROQ_BASE
+        : OPENROUTER_BASE
 
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -197,12 +529,20 @@ async function callProvider(
         headers['HTTP-Referer'] = 'https://docs.cataguases.mg.gov.br'
         headers['X-Title'] = 'Docs Cataguases'
     }
+    if (provider === 'mistral') {
+        headers['Accept'] = 'application/json'
+    }
 
-    const body = {
+    const body: any = {
         model,
         messages: options.messages,
         max_tokens: options.maxTokens ?? 4096,
         temperature: options.temperature ?? 0.7,
+    }
+
+    if (options.tools && options.tools.length > 0) {
+        body.tools = options.tools
+        body.tool_choice = 'auto'
     }
 
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -212,18 +552,18 @@ async function callProvider(
     })
 
     // Capturar headers de rate limit do Groq
-    if (provider === 'groq') {
-        const s = stats.groq
-        s.groqRemainingRequests = parseInt(res.headers.get('x-ratelimit-remaining-requests') || '0')
-        s.groqRemainingTokens = parseInt(res.headers.get('x-ratelimit-remaining-tokens') || '0')
-        s.groqResetRequestsAt = res.headers.get('x-ratelimit-reset-requests') || undefined
-        s.groqResetTokensAt = res.headers.get('x-ratelimit-reset-tokens') || undefined
-    }
+    const groqHeaders = provider === 'groq' ? {
+        remaining: parseInt(res.headers.get('x-ratelimit-remaining-requests') || '999'),
+        remainingTokens: parseInt(res.headers.get('x-ratelimit-remaining-tokens') || '999999'),
+        resetAt: res.headers.get('x-ratelimit-reset-requests'),
+    } : null
 
     if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: res.statusText }))
+        console.error(`[LLM Provider ${provider}] Status ${res.status}:`, JSON.stringify(errBody))
         const err = new Error(errBody?.error?.message || errBody?.error || res.statusText) as any
         err.status = res.status
+        err.resetAt = groqHeaders?.resetAt
         throw err
     }
 
@@ -232,23 +572,27 @@ async function callProvider(
 
     return {
         content: choice?.message?.content ?? '',
+        tool_calls: choice?.message?.tool_calls,
         provider,
         model: data.model || model,
+        keyId,
+        groqHeaders,
         usage: {
             inputTokens: data.usage?.prompt_tokens ?? 0,
             outputTokens: data.usage?.completion_tokens ?? 0,
             totalTokens: data.usage?.total_tokens ?? 0,
         },
-    }
+    } as any
 }
 
-// ── Helpers de rastreamento ───────────────────────────────────────────────────
+// ── Helpers de Rastreamento ───────────────────────────────────────────────────
 
 function trackSuccess(
     provider: LLMProvider,
     model: string,
     result: LLMChatResult,
-    durationMs: number
+    durationMs: number,
+    keyId?: string
 ) {
     const s = stats[provider]
     s.requestsTotal++
@@ -258,15 +602,7 @@ function trackSuccess(
     s.tokensInputToday += result.usage.inputTokens
     s.tokensOutputToday += result.usage.outputTokens
 
-    addLog({
-        provider,
-        model,
-        inputTokens: result.usage.inputTokens,
-        outputTokens: result.usage.outputTokens,
-        totalTokens: result.usage.totalTokens,
-        durationMs,
-        success: true,
-    })
+    addLog({ provider, model, keyId, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens, totalTokens: result.usage.totalTokens, durationMs, success: true })
 }
 
 function trackError(provider: LLMProvider, model: string, error: string, durationMs: number) {
@@ -274,15 +610,15 @@ function trackError(provider: LLMProvider, model: string, error: string, duratio
 }
 
 function addLog(entry: Omit<LLMRequestLog, 'id' | 'ts'>) {
-    requestLog.unshift({
+    requestLog.push({
         id: Math.random().toString(36).slice(2),
         ts: new Date().toISOString(),
         ...entry,
     })
-    if (requestLog.length > 100) requestLog.length = 100  // manter apenas últimas 100
+    if (requestLog.length > 100) requestLog.shift()
 }
 
-// ── Consultar créditos do OpenRouter ─────────────────────────────────────────
+// ── Créditos OpenRouter ───────────────────────────────────────────────────────
 
 export async function fetchOpenRouterCredits(): Promise<void> {
     const key = process.env.OPENROUTER_API_KEY
@@ -294,33 +630,29 @@ export async function fetchOpenRouterCredits(): Promise<void> {
         })
         if (!res.ok) return
         const data = await res.json()
-
         const s = stats.openrouter
         s.openrouterCreditsTotal = data.total_credits ?? 0
         s.openrouterCreditsUsed = data.total_usage ?? 0
         s.openrouterCreditsRemaining = (data.total_credits ?? 0) - (data.total_usage ?? 0)
-    } catch {
-        // silencioso
-    }
+    } catch { /* silencioso */ }
 }
 
-// ── API pública do serviço ────────────────────────────────────────────────────
+// ── API Pública do Serviço ────────────────────────────────────────────────────
 
-export function getActiveProvider(): LLMProvider {
-    return activeProvider
-}
-
-export function setActiveProvider(provider: LLMProvider): void {
-    activeProvider = provider
-}
+export function getActiveProvider(): LLMProvider { return activeProvider }
+export function setActiveProvider(provider: LLMProvider): void { activeProvider = provider }
 
 export function getLLMStats() {
     return {
         activeProvider,
+        cerebras: stats.cerebras,
+        mistral: stats.mistral,
         groq: stats.groq,
         openrouter: stats.openrouter,
         recentRequests: requestLog.slice(0, 20),
         models: {
+            cerebras: CEREBRAS_MODELS,
+            mistral: MISTRAL_MODELS,
             groq: GROQ_MODELS,
             openrouter: OPENROUTER_FREE_MODELS,
         },

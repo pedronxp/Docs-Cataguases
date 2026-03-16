@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,9 +7,7 @@
 @layer base {
   :root {
     --background: 210 40% 98%;
-    /* slate-50 */
     --foreground: 222 47% 11%;
-    /* slate-800 */
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
@@ -24,7 +24,6 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
-    /* slate-200 */
     --input: 214.3 31.8% 91.4%;
     --ring: 218 81% 39%;
     --radius: 0.5rem;
@@ -72,4 +71,56 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%
   }
+
+  html, body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Fix: cursor desaparecendo em inputs/textareas com bg-transparent */
+  input, textarea, [contenteditable] {
+    caret-color: hsl(var(--foreground));
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
 }
+
+/* ── Custom Scrollbar ─────────────────────────────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  transition: background 0.2s;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ── Glassmorphism ────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Sidebar hide scrollbar ──────────────────────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Chat pulse button ────────────────────────────────────────────────────── */
+@keyframes chat-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(19, 81, 180, 0.4); }
+  50% { box-shadow: 0 0 0 10px rgba(19, 81, 180, 0); }
+}
+.chat-pulse {
+  animation: chat-pulse 2.5s ease-in-out infinite;
+}

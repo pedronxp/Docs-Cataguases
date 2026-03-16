@@ -40,7 +40,16 @@ export async function getSession() {
     }
 }
 
+import prisma from './prisma'
+
 /**
- * Alias para getSession seguindo o padrão do projeto.
+ * Retorna o usuário completo do banco de dados a partir da sessão.
  */
-export const getAuthUser = getSession
+export async function getAuthUser() {
+    const session = await getSession()
+    if (!session || !session.id) return null
+    
+    return prisma.user.findUnique({
+        where: { id: session.id as string }
+    })
+}

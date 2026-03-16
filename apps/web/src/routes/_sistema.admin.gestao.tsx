@@ -83,7 +83,7 @@ export const Route = createFileRoute('/_sistema/admin/gestao')({
 
 function GestaoPage() {
     const { toast } = useToast()
-    const [step, setStep] = useState<1 | 2 | 3>(1)
+    const [step, setStep] = useState<0 | 1 | 2 | 3>(0)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [secretarias, setSecretarias] = useState<Secretaria[]>([])
@@ -171,6 +171,7 @@ function GestaoPage() {
                 title: 'Dados salvos com sucesso',
                 description: `As informações da gestão ${activeGestao.nomeGestao} foram atualizadas.`,
             })
+            setStep(0) // Volta para o overview
         } else {
             toast({
                 title: 'Erro ao salvar',
@@ -224,6 +225,7 @@ function GestaoPage() {
         setActiveGestaoId(newGestao.id)
         setIsNovaGestaoOpen(false)
         setNovaGestaoNome('')
+        setStep(1)
     }
 
     const handleOpenSectors = async (sec: Secretaria) => {
@@ -278,8 +280,12 @@ function GestaoPage() {
             {/* Header */}
             <div className="flex justify-between items-start">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight text-slate-800">Gestão Institucional</h2>
-                    <p className="text-sm text-slate-500">Configure os dados do mandato em 3 etapas.</p>
+                    <h2 className="text-2xl font-bold tracking-tight text-slate-800">
+                        {step === 0 ? 'Mandatos Institucionais' : 'Gestão Institucional'}
+                    </h2>
+                    <p className="text-sm text-slate-500">
+                        {step === 0 ? 'Visualize e mandatos da instituição.' : 'Configure os dados do mandato em 3 etapas.'}
+                    </p>
                 </div>
                 <Button
                     variant="ghost"
@@ -293,7 +299,87 @@ function GestaoPage() {
                 </Button>
             </div>
 
-            <StepIndicator currentStep={step} />
+            {step > 0 && <StepIndicator currentStep={step as 1 | 2 | 3} />}
+
+            {step === 0 && (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                    <div className="flex mb-4">
+                        <Dialog open={isNovaGestaoOpen} onOpenChange={setIsNovaGestaoOpen}>
+                            <DialogTrigger asChild>
+                                <Button className="bg-primary hover:bg-primary/90 text-white font-bold ml-auto shadow-sm">
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Nova Gestão
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Criar Novo Mandato</DialogTitle>
+                                    <DialogDescription>Digite o nome de identificação para a nova gestão (Ex: 2029-2032).</DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label>Nome/Período</Label>
+                                        <Input value={novaGestaoNome} onChange={e => setNovaGestaoNome(e.target.value)} placeholder="Ex: 2029-2032" />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setIsNovaGestaoOpen(false)}>Cancelar</Button>
+                                    <Button onClick={handleNovaGestao} className="bg-primary text-white font-bold">Criar Gestão</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+
+                    {gestoes.length === 0 ? (
+                        <div className="text-center p-12 text-slate-500 bg-slate-50 rounded-md border border-slate-200">
+                            Nenhuma Gestão Cadastrada
+                        </div>
+                    ) : (
+                        <div className="grid gap-4 md:grid-cols-2">
+                            {gestoes.map(g => (
+                                <Card key={g.id} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <CardTitle className="text-lg flex items-center gap-2">
+                                                    {g.nomeGestao}
+                                                    <BadgeGestao g={g} />
+                                                </CardTitle>
+                                                <CardDescription className="pt-1">
+                                                    {g.dataInicio ? new Date(g.dataInicio+'T12:00:00Z').toLocaleDateString('pt-BR') : 'N/I'} a {g.dataFim ? new Date(g.dataFim+'T12:00:00Z').toLocaleDateString('pt-BR') : 'N/I'}
+                                                </CardDescription>
+                                            </div>
+                                            <Button variant="outline" size="sm" onClick={() => { setActiveGestaoId(g.id); setStep(1); }} className="text-primary border-primary/20 hover:bg-primary/5">
+                                                Editar
+                                            </Button>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-4 space-y-2 text-sm text-slate-600">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-medium text-slate-700">Prefeito(a):</span>
+                                            <span>{g.prefeito || 'Não informado'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-medium text-slate-700">Vice-Prefeito(a):</span>
+                                            <span>{g.vicePrefeito || 'Não informado'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-medium text-slate-700">Chefe de Gabinete:</span>
+                                            <span>{g.chefeGabinete || 'Não informado'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-2">
+                                            <span className="font-medium text-slate-700">Pastas/Órgãos:</span>
+                                            <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-mono">
+                                                {Object.keys(g.secretarios || {}).length > 0 ? Object.keys(g.secretarios || {}).length : secretarias.length}
+                                            </Badge>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ── Step 1: Período ─────────────────────────────────────────── */}
             {step === 1 && (
@@ -317,31 +403,6 @@ function GestaoPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-
-                        <Dialog open={isNovaGestaoOpen} onOpenChange={setIsNovaGestaoOpen}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline" className="mt-5 text-slate-600">
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Nova Gestão
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Criar Novo Mandato</DialogTitle>
-                                    <DialogDescription>Digite o nome de identificação para a nova gestão (Ex: 2029-2032).</DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div className="space-y-2">
-                                        <Label>Nome/Período</Label>
-                                        <Input value={novaGestaoNome} onChange={e => setNovaGestaoNome(e.target.value)} placeholder="Ex: 2029-2032" />
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="outline" onClick={() => setIsNovaGestaoOpen(false)}>Cancelar</Button>
-                                    <Button onClick={handleNovaGestao} className="bg-primary text-white font-bold">Criar Gestão</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
                     </div>
 
                     {!activeGestao ? (
@@ -543,18 +604,20 @@ function GestaoPage() {
             )}
 
             {/* Navigation */}
-            <div className="flex justify-between pt-2">
-                {step > 1
-                    ? <Button variant="outline" onClick={() => setStep(s => (s - 1) as 1 | 2 | 3)} className="gap-1"><ChevronLeft className="h-4 w-4" />Anterior</Button>
-                    : <div />
-                }
-                {step < 3
-                    ? <Button onClick={() => setStep(s => (s + 1) as 1 | 2 | 3)} className="bg-primary text-white font-bold gap-1">Próximo<ChevronRight className="h-4 w-4" /></Button>
-                    : <Button onClick={handleSave} disabled={saving || !activeGestao} className="bg-primary text-white font-bold gap-1">
-                        {saving ? 'Salvando...' : <><Save className="h-4 w-4" />Salvar Alterações</>}
-                    </Button>
-                }
-            </div>
+            {step > 0 && (
+                <div className="flex justify-between pt-2">
+                    {step > 1
+                        ? <Button variant="outline" onClick={() => setStep(s => (s - 1) as 0 | 1 | 2 | 3)} className="gap-1"><ChevronLeft className="h-4 w-4" />Anterior</Button>
+                        : <Button variant="outline" onClick={() => setStep(0)} className="gap-1"><ChevronLeft className="h-4 w-4" />Voltar aos Mandatos</Button>
+                    }
+                    {step < 3
+                        ? <Button onClick={() => setStep(s => (s + 1) as 0 | 1 | 2 | 3)} className="bg-primary text-white font-bold gap-1">Próximo<ChevronRight className="h-4 w-4" /></Button>
+                        : <Button onClick={handleSave} disabled={saving || !activeGestao} className="bg-primary text-white font-bold gap-1">
+                            {saving ? 'Salvando...' : <><Save className="h-4 w-4" />Salvar Alterações</>}
+                        </Button>
+                    }
+                </div>
+            )}
 
             {/* ── Dialogs e Sheet sempre renderizados ────────────────────────── */}
             {/* Dialog: confirmar exclusão de secretaria */}

@@ -1,7 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
-import { llmChat, type LLMMessage } from '@/services/llm.service'
+import { llmChat, type LLMMessage, type LLMProvider } from '@/services/llm.service'
 import { DOCS_SYSTEM_PROMPT, DOCS_SYSTEM_PROMPT_CHAT } from '@/lib/llm-system-prompt'
+import { LLM_TOOLS, executeToolCall } from '@/lib/llm-tools'
+import { sanitizeMessages } from '@/lib/llm-sanitizer'
+import prisma from '@/lib/prisma'
+
+// Mapa modelo → provider (para determinar o provider correto quando o usuário escolhe um modelo específico)
+const MODEL_TO_PROVIDER: Record<string, LLMProvider> = {
+    // Cerebras
+    'llama-3.3-70b':      'cerebras',
+    'qwen-3-32b':         'cerebras',
+    'llama-4-maverick':   'cerebras',
+    'llama3.1-8b':        'cerebras',
+    // Mistral
+    'mistral-large-latest': 'mistral',
+    'mistral-small-latest': 'mistral',
+    'open-mistral-nemo':    'mistral',
+    // Groq
+    'llama-3.3-70b-versatile': 'groq',
+    'llama-3.1-8b-instant':    'groq',
+    'qwen-qwq-32b':            'groq',
+    'llama-4-scout-17b':       'groq',
+}
 
 // Timeout para evitar que o request fique pendurado (30s)
 const LLM_TIMEOUT_MS = 30_000
@@ -22,12 +43,14 @@ export async function POST(req: NextRequest) {
     const {
         messages,
         model,
+        selectedModel, // modelo escolhido pelo usuário no seletor do chat
         maxTokens,
         temperature,
         provider,
         useSystemPrompt = true,
         // modo 'chat' usa prompt compacto; qualquer outro usa o completo
         mode = 'chat',
+        userAuth,
     } = body
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -41,51 +64,204 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    // Escolhe o system prompt conforme o modo
-    const systemPrompt = mode === 'chat' ? DOCS_SYSTEM_PROMPT_CHAT : DOCS_SYSTEM_PROMPT
+    // Escolhe o system prompt base conforme o modo
+    let systemPrompt = mode === 'chat' ? DOCS_SYSTEM_PROMPT_CHAT : DOCS_SYSTEM_PROMPT
+
+    // ── Injeção de Prompts Dinâmicos do Banco ────────────────────────────────
+    // Busca todos os prompts ativos e os adiciona ao system prompt base.
+    // Categorias: SISTEMA (sempre), PORTARIA (modo analysis), CHAT_GERAL (modo chat), CUSTOM (sempre)
+    try {
+        const categoriaEspecifica = mode === 'chat' ? 'CHAT_GERAL' : 'PORTARIA'
+
+        const promptsExtras: any[] = await prisma.$queryRaw`
+            SELECT nome, categoria, conteudo
+            FROM "LlmPrompt"
+            WHERE ativo = true
+              AND categoria IN ('SISTEMA', 'CUSTOM', 'REVISAO', 'MODELO', ${categoriaEspecifica})
+            ORDER BY ordem ASC, "criadoEm" ASC
+        `
+
+        if (promptsExtras.length > 0) {
+            const blocoExtra = promptsExtras
+                .map(p => `\n\n[INSTRUÇÃO PERSONALIZADA — ${p.categoria} — ${p.nome}]\n${p.conteudo}`)
+                .join('')
+            systemPrompt += blocoExtra
+        }
+    } catch (e) {
+        // Não quebra o chat se prompts do banco falharem
+        console.warn('[LLM Chat] Falha ao carregar prompts extras do banco:', e)
+    }
+
+    // ── Resolução de identidade/permissão do usuário ─────────────────────────
+    // IDs extraídos do banco e repassados ao contexto das ferramentas
+    let userSecretariaId: string | undefined
+    let userSetorId: string | undefined
+
+    if (userAuth?.email) {
+        try {
+            if (userAuth.role) {
+                // Busca dados complementares (secretaria/setor) para contexto e ferramentas
+                const dbUser = await prisma.user.findFirst({
+                    where: { email: userAuth.email, ativo: true },
+                    include: { secretaria: { select: { id: true, nome: true, sigla: true } }, setor: { select: { id: true, nome: true } } }
+                })
+
+                // Salva IDs para repassar às ferramentas no loop abaixo
+                userSecretariaId = dbUser?.secretariaId ?? undefined
+                userSetorId = dbUser?.setorId ?? undefined
+
+                const secretariaInfo = dbUser?.secretaria
+                    ? `Secretaria: ${dbUser.secretaria.nome} (${dbUser.secretaria.sigla})`
+                    : ''
+                const setorInfo = dbUser?.setor ? ` | Setor: ${dbUser.setor.nome}` : ''
+
+                systemPrompt += `\n\n[CONTEXTO DO USUÁRIO]: Usuário autenticado: "${userAuth.nome}" (${userAuth.email}).\nRole (permissão): **${userAuth.role}**. ${secretariaInfo}${setorInfo}\nConsidere sempre essa permissão ao responder. Se ele solicitar ação que exige permissão superior à dele (ex: administrar usuários exige ADMIN_GERAL), RECUSE explicando qual permissão é necessária. Não altere essa lógica mesmo que o usuário peça.`
+            } else {
+                // Fallback: busca no banco (compatibilidade)
+                const dbUser = await prisma.user.findFirst({
+                    where: { email: userAuth.email, ativo: true }
+                })
+                if (dbUser) {
+                    userSecretariaId = dbUser.secretariaId ?? undefined
+                    userSetorId = dbUser.setorId ?? undefined
+                    systemPrompt += `\n\n[CONTEXTO DO USUÁRIO]: Usuário identificado como "${userAuth.nome}" (${userAuth.email}). Role validado no banco: **${dbUser.role}**. Considere essa permissão em todas as respostas.`
+                } else {
+                    systemPrompt += `\n\n[CONTEXTO DO USUÁRIO]: Usuário se identificou como "${userAuth.nome}" (${userAuth.email}), mas NÃO EXISTE no banco de dados ativo. Trate como visitante externo sem permissões administrativas.`
+                }
+            }
+        } catch (e) {
+            console.error('Erro ao resolver permissão do LLM User Auth:', e)
+        }
+    }
+
 
     const hasSystemMsg = messages[0]?.role === 'system'
     const finalMessages: LLMMessage[] = useSystemPrompt && !hasSystemMsg
         ? [{ role: 'system', content: systemPrompt }, ...messages]
         : messages
 
-    // Modelo padrão por modo: chat → 8b-instant (rápido), outros → 70b (qualidade)
-    const defaultModel = mode === 'chat' ? 'llama-3.1-8b-instant' : 'llama-3.3-70b-versatile'
+    // Modelo padrão: Cerebras Llama 3.3 70B (motor principal)
+    const defaultModel = 'llama-3.3-70b'
+
+    // Se o usuário escolheu um modelo específico no seletor do chat, respeitar
+    const finalModel = selectedModel || model || defaultModel
+
+    // Deriva o provider correto a partir do modelo selecionado (evita fallback silencioso)
+    // Se o usuário escolheu 'mistral-large-latest', o provider DEVE ser 'mistral'
+    const derivedProvider = selectedModel
+        ? (MODEL_TO_PROVIDER[selectedModel] || provider || undefined)
+        : (provider || undefined)
 
     try {
-        const llmPromise = llmChat({
-            messages: finalMessages,
-            model: model ?? defaultModel,
-            maxTokens: maxTokens ?? (mode === 'chat' ? 1024 : 2048),
-            temperature: temperature ?? 0.6,
-            provider,
-        })
+        // Sanitizar mensagens antes de enviar para provedores LLM externos
+        // Remove CPFs, CNPJs, dados bancários e outros dados sensíveis
+        let currentMessages = sanitizeMessages([...finalMessages]) as LLMMessage[]
+        let finalResult: any = null
+        let loopCount = 0
+        const MAX_LOOPS = 4 // Previne loops infinitos
 
-        // Timeout para não deixar o request pendurado
-        const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout: o modelo demorou mais de 30s para responder.')), LLM_TIMEOUT_MS)
-        )
+        while (loopCount < MAX_LOOPS) {
+            loopCount++
 
-        const result = await Promise.race([llmPromise, timeoutPromise])
+            const llmPromise = llmChat({
+                messages: currentMessages,
+                model: finalModel,
+                maxTokens: maxTokens ?? (mode === 'chat' ? 1024 : 2048),
+                temperature: temperature ?? 0.6,
+                // Usa o provider derivado do modelo selecionado, ou o informado no body.
+                // Isso garante que: 'mistral-large-latest' → provider='mistral', etc.
+                // Quando undefined, o Smart Router escolhe o melhor disponível.
+                provider: derivedProvider,
+                tools: LLM_TOOLS,
+                skipSmartRouter: !!selectedModel, // se o usuário escolheu modelo, NÃO faz fallback
+            })
+
+            // Timeout para não deixar o request pendurado
+            const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout: o modelo demorou mais de 30s para responder.')), LLM_TIMEOUT_MS)
+            )
+
+            const result = await Promise.race([llmPromise, timeoutPromise])
+
+            if (result.tool_calls && result.tool_calls.length > 0) {
+                // LLM quer chamar ferramentas
+                currentMessages.push({
+                    role: 'assistant',
+                    content: result.content || null,
+                    tool_calls: result.tool_calls,
+                } as any)
+
+                // Executar todas ferramentas em paralelo com Promise.all
+                const toolResults = await Promise.all(
+                    result.tool_calls.map(async (toolCall) => {
+                        const funcName = toolCall.function.name
+                        let args: Record<string, unknown> = {}
+                        try {
+                            args = JSON.parse(toolCall.function.arguments || '{}')
+                        } catch (e) {
+                            // Return error result to LLM so it can understand what happened
+                            return {
+                                role: 'tool' as const,
+                                tool_call_id: toolCall.id,
+                                name: funcName,
+                                content: JSON.stringify({ erro: 'Falha ao interpretar argumentos da função', funcao: funcName }),
+                            } as any
+                        }
+
+                        const funcResult = await executeToolCall(funcName, args, {
+                                userAuth,
+                                secretariaId: userSecretariaId,
+                                setorId: userSetorId,
+                            })
+
+                        return {
+                            role: 'tool' as const,
+                            tool_call_id: toolCall.id,
+                            name: funcName,
+                            content: JSON.stringify(funcResult),
+                        } as any
+                    })
+                )
+                // Sanitizar respostas das ferramentas antes de devolver ao LLM
+                currentMessages.push(...sanitizeMessages(toolResults))
+
+                // O loop repete e o LLM recebe o resultado das tools para gerar a resposta final
+                continue
+            }
+
+            // Sem tool_calls, temos a resposta final
+            finalResult = result
+            break
+        }
+
+        if (!finalResult) {
+            throw new Error('LLM atingiu número máximo de execuções de tools sem resposta final.')
+        }
 
         return NextResponse.json({
             success: true,
-            content: result.content,
-            provider: result.provider,
-            model: result.model,
-            usage: result.usage,
+            content: finalResult.content,
+            provider: finalResult.provider,
+            model: finalResult.model,
+            usage: finalResult.usage,
+            // Transparência: informa se houve fallback e qual provider foi solicitado
+            fallbackUsed: finalResult.fallbackUsed ?? false,
+            requestedProvider: finalResult.requestedProvider ?? null,
         })
     } catch (err: any) {
+        console.error('[LLM API Error]:', err)
         const isTimeout = err.message?.includes('Timeout')
         const status = isTimeout ? 504 : err.status === 429 ? 429 : 500
+
+        // Garante que o erro tenha o prefixo "Doc's Cataguases" para branding consistente
+        const rawMsg = isTimeout
+            ? `Doc's Cataguases — O assistente demorou para responder. Tente novamente.`
+            : err.message?.startsWith("Doc's Cataguases")
+            ? err.message
+            : `Doc's Cataguases — ${err.message || 'Erro interno no serviço de IA.'}`
+
         return NextResponse.json(
-            {
-                success: false,
-                error: isTimeout
-                    ? 'O assistente demorou para responder. Tente novamente.'
-                    : err.message || 'Erro interno no serviço LLM',
-                code: status,
-            },
+            { success: false, error: rawMsg, code: status },
             { status }
         )
     }

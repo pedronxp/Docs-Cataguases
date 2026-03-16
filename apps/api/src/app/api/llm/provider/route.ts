@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest) {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-    if (session.role !== 'ADMIN') {
+    if (!['ADMIN_GERAL', 'ADMIN'].includes(session.role as string)) {
         return NextResponse.json({ error: 'Apenas administradores podem trocar o provider LLM.' }, { status: 403 })
     }
 
@@ -25,8 +25,8 @@ export async function PATCH(req: NextRequest) {
     }
 
     const { provider } = body
-    if (provider !== 'groq' && provider !== 'openrouter') {
-        return NextResponse.json({ error: 'Provider inválido. Use "groq" ou "openrouter".' }, { status: 400 })
+    if (!['groq', 'openrouter', 'cerebras'].includes(provider)) {
+        return NextResponse.json({ error: 'Provider inválido. Use "groq", "openrouter" ou "cerebras".' }, { status: 400 })
     }
 
     setActiveProvider(provider as LLMProvider)

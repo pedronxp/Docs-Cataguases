@@ -1,0 +1,3 @@
+Use agents/Skills/hooks/Settigns
+
+npx claude-code-templates@latest --agent development-team/fullstack-developer --setting statusline/context-monitor,environment/performance-optimization --hook automation/simple-notifications --skill development/skill-creator,creative-design/frontend-design,development/code-reviewer,web-development/react-best-practices,development/senior-frontend,development/senior-backend,document-processing/docx,creative-design/ui-ux-pro-max,document-processing/xlsx,document-processing/pptx

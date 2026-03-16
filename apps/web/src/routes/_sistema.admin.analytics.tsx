@@ -125,8 +125,8 @@ function AnalyticsPage() {
             <Building2 className="h-4 w-4 text-indigo-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold text-indigo-900">{data.kpis.orgaoMaisAtivo.nome}</div>
-            <p className="text-xs text-indigo-600/80 mt-1">{data.kpis.orgaoMaisAtivo.quantidade} documentos esse ano</p>
+            <div className="text-xl font-bold text-indigo-900">{data.kpis.orgaoMaisAtivo?.nome ?? '—'}</div>
+            <p className="text-xs text-indigo-600/80 mt-1">{data.kpis.orgaoMaisAtivo?.quantidade ?? 0} documentos esse ano</p>
           </CardContent>
         </Card>
       </div>

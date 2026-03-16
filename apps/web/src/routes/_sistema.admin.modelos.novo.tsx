@@ -39,6 +39,8 @@ function NovoModeloWizard() {
   const [modoEntrada, setModoEntrada] = useState<'upload' | 'texto'>('upload')
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [conteudoHtml, setConteudoHtml] = useState('')
+  // Path do template DOCX salvo no Supabase Storage (salvo como docxTemplateUrl no modelo)
+  const [docxTemplateStoragePath, setDocxTemplateStoragePath] = useState<string | null>(null)
 
   // Variáveis Analisadas (Passo 3)
   const [variaveis, setVariaveis] = useState<VariavelExtraida[]>([])
@@ -212,6 +214,23 @@ function NovoModeloWizard() {
       }
 
       setLoading(true)
+
+      // Se é upload de DOCX, faz o upload do arquivo original para o Storage ANTES de analisar
+      // Isso garante que o docxTemplateUrl seja salvo corretamente no modelo
+      if (modoEntrada === 'upload' && arquivo) {
+        const uploadRes = await modeloService.uploadTemplate(arquivo)
+        if (uploadRes.success) {
+          setDocxTemplateStoragePath(uploadRes.data)
+        } else {
+          toast({
+            title: 'Aviso: upload do template falhou',
+            description: `O modelo será salvo sem o arquivo DOCX original. Detalhes: ${uploadRes.error}`,
+            variant: 'destructive'
+          })
+          // Não aborta — segue com a análise mesmo assim
+        }
+      }
+
       const res = await modeloService.analisarModelo(modoEntrada === 'upload' ? arquivo! : conteudoHtml)
 
       // Buscar variáveis globais para pré-preencher configurações
@@ -357,6 +376,8 @@ function NovoModeloWizard() {
         categoria,
         conteudoHtml,
         ativo: true,
+        // docxTemplateUrl: path no Supabase Storage — necessário para gerar portarias
+        docxTemplateUrl: docxTemplateStoragePath ?? null,
         variaveis: variaveis.map(v => ({
           chave: v.tag,
           label: v.label,
@@ -542,7 +563,7 @@ function NovoModeloWizard() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PORTARIA">Portaria — PORT-001/CATAGUASES</SelectItem>
+                  <SelectItem value="PORTARIA">Portaria — PORT-001/2026</SelectItem>
                   <SelectItem value="MEMORANDO">Memorando — MEM-001/2026</SelectItem>
                   <SelectItem value="OFICIO">Ofício — OF-001/2026</SelectItem>
                   <SelectItem value="LEI">Lei — LEI-001/2026</SelectItem>
@@ -972,7 +993,7 @@ function NovoModeloWizard() {
                               <code className="font-bold bg-sky-50 px-1.5 py-0.5 border border-sky-200 rounded text-[10px] text-sky-700 shrink-0">{'{{SYS_NUMERO}}'}</code>
                               <Badge className="bg-amber-100 text-amber-700 border-amber-300 border text-[9px] px-1.5 h-4 font-bold gap-1 hover:bg-amber-100"><Clock size={9} /> Na Publicação</Badge>
                             </div>
-                            <span className="text-[11px] text-sky-800/80">Número sequencial oficial — ex: <strong>PORT-0001/CATAGUASES</strong>. Gerado com lock atômico na publicação.</span>
+                            <span className="text-[11px] text-sky-800/80">Número sequencial oficial — ex: <strong>PORT-0001/2026</strong>. Gerado com lock atômico na publicação.</span>
                           </div>
                         </div>
 

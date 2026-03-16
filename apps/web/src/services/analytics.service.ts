@@ -6,7 +6,7 @@ export interface KpiMetrics {
     crescimentoPercentual: number
     taxaPublicacao: number
     acervoOficial: number
-    orgaoMaisAtivo: { nome: string; quantidade: number }
+    orgaoMaisAtivo?: { nome: string; quantidade: number }
 }
 
 export interface HistoricoItem {

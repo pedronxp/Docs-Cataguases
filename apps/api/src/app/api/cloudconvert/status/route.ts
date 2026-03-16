@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
     try {
         const session = await getSession()
-        if (!session || !['ADMIN_GERAL'].includes(session.role)) {
+        if (!session || !['ADMIN_GERAL'].includes(session.role as string)) {
             return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 })
         }
 

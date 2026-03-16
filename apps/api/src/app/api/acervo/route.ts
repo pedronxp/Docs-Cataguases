@@ -26,7 +26,7 @@ export async function GET(request: Request) {
             // ABAC: se não tem permissão global, ignora secretariaId do querystring e força a do usuário
             secretariaId: podeVerTudo
                 ? (searchParams.get('secretariaId') || undefined)
-                : (session.secretariaId ?? undefined),
+                : ((session as any).secretariaId ?? undefined),
             setorId: searchParams.get('setorId') || undefined,
             status: searchParams.get('status') || undefined,
             ano: searchParams.get('ano') ? parseInt(searchParams.get('ano')!) : undefined,

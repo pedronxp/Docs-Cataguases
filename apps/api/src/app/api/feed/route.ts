@@ -16,10 +16,13 @@ export async function GET(request: NextRequest) {
         const pageSize = parseInt(searchParams.get('pageSize') || '20')
 
         const user = usuario as any
+        const meuFeed = searchParams.get('meuFeed') === 'true'
+
         const result = await FeedService.listarAtividades({
             secretariaId: user.secretariaId as string | undefined,
             setorId: user.setorId as string | undefined,
             role: user.role as string,
+            autorId: meuFeed ? user.id : undefined,
             page,
             pageSize
         })

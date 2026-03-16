@@ -8,6 +8,7 @@ export class FeedService {
     static async listarAtividades(params: {
         secretariaId?: string;
         setorId?: string;
+        autorId?: string;
         page?: number;
         pageSize?: number;
         role: string;
@@ -15,6 +16,7 @@ export class FeedService {
         const {
             secretariaId,
             setorId,
+            autorId,
             page = 1,
             pageSize = 20,
             role
@@ -26,7 +28,10 @@ export class FeedService {
             // Filtro ABAC básico aplicado no banco
             const where: any = {}
 
-            if (role !== 'ADMIN_GERAL' && role !== 'PREFEITO') {
+            // Se autorId for passado, filtra APENAS atividades do usuário
+            if (autorId) {
+                where.autorId = autorId
+            } else if (role !== 'ADMIN_GERAL' && role !== 'PREFEITO') {
                 if (secretariaId) {
                     where.secretariaId = secretariaId
                 }
@@ -46,7 +51,7 @@ export class FeedService {
                             select: { id: true, titulo: true, numeroOficial: true }
                         }
                     } as any,
-                    // orderBy: { createdAt: 'desc' },
+                    orderBy: { createdAt: 'desc' },
                     skip,
                     take: pageSize
                 }),

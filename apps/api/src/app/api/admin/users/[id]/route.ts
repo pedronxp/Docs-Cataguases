@@ -108,7 +108,7 @@ export async function PATCH(
             FeedService.registrarEvento({
                 tipoEvento,
                 mensagem,
-                autorId: session.id,
+                autorId: (session.id as string),
                 secretariaId: result.value.secretariaId ?? null,
                 metadata: { targetUserId: id, changes: parsed.data }
             }).catch(e => console.error('Falha ao registrar auditoria:', e))
