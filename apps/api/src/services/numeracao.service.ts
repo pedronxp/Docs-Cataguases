@@ -1,36 +1,33 @@
 import prisma from '@/lib/prisma'
-import { Result, ok, err } from '@/lib/result'
 
-// Formatos padrão criados automaticamente se o livro ainda não existir para o tipo
-const FORMATO_PADRAO: Record<string, string> = {
-    PORTARIA:  'PORT-{N}/CATAGUASES',
-    MEMORANDO: 'MEM-{N}/{ANO}',
-    OFICIO:    'OF-{N}/{ANO}',
-    LEI:       'LEI-{N}/{ANO}',
-}
-
-const NOME_PADRAO: Record<string, string> = {
-    PORTARIA:  'Portarias Cataguases',
-    MEMORANDO: 'Memorandos Cataguases',
-    OFICIO:    'Ofícios Cataguases',
-    LEI:       'Leis Cataguases',
-}
+type Result<T> = { ok: true; value: T } | { ok: false; error: string }
 
 export class NumeracaoService {
+
     /**
-     * Aloca o próximo número oficial de forma atômica.
-     * Seleciona o livro correto pelo tipoDocumento do modelo.
-     * Suporta placeholders {N} (3 dígitos) e {ANO} (ano atual) no formato_base.
+     * Aloca o próximo número oficial de forma atômica utilizando "SELECT FOR UPDATE" do Postgres.
      */
-    static async alocarNumero(
-        portariaId: string,
-        tipoDocumento: string = 'PORTARIA',
-        aprovadorId: string,
-        ip: string = '127.0.0.1'
-    ): Promise<Result<string>> {
+    static async alocarNumero(portariaId: string, tipoDocumento: string, autorId: string, ip: string): Promise<Result<string>> {
         try {
+            // Tenta criar o livro caso não exista ANTES de abrir a transação pesada (evita timeout de lock/create concorrente)
+            try {
+                const existe = await prisma.livrosNumeracao.findUnique({ where: { tipoDocumento: tipoDocumento as any }})
+                if (!existe) {
+                    await prisma.livrosNumeracao.create({
+                        data: {
+                            nome: `Livro Principal - ${tipoDocumento}`,
+                            tipoDocumento: tipoDocumento as any,
+                            formato_base: 'PORT-{N}/{ANO}',
+                            proximo_numero: 1,
+                            ativo: true
+                        }
+                    })
+                }
+            } catch (ignore) {
+                // Se der erro de UniqueConstraint na criação concorrida, apenas ignora
+            }
+
             return await prisma.$transaction(async (tx) => {
-                // SELECT FOR UPDATE — trava o livro do tipo correto atomicamente
                 const livros = await tx.$queryRaw<any[]>`
                     SELECT id, nome, "formato_base", "proximo_numero", logs
                     FROM "LivrosNumeracao"
@@ -40,54 +37,53 @@ export class NumeracaoService {
                     FOR UPDATE
                 `
 
-                let livro = livros[0]
-
-                // Autocria o livro se ainda não existir para este tipo
-                if (!livro) {
-                    const formato = FORMATO_PADRAO[tipoDocumento] ?? `DOC-{N}/{ANO}`
-                    const nome    = NOME_PADRAO[tipoDocumento]    ?? `Documentos ${tipoDocumento}`
-                    livro = await tx.livrosNumeracao.create({
-                        data: {
-                            nome,
-                            tipoDocumento: tipoDocumento as any,
-                            formato_base: formato,
-                            proximo_numero: 1,
-                            numero_inicial: 1,
-                            ativo: true
-                        }
-                    })
+                if (!livros || livros.length === 0) {
+                    throw new Error('Não foi possível encontrar ou travar o livro de numeração.')
                 }
 
-                const numeroAlocado  = livro.proximo_numero
-                const anoAtual       = new Date().getFullYear().toString()
-                const numeroFormatado = livro.formato_base
-                    .replace('{N}',   String(numeroAlocado).padStart(3, '0'))
-                    .replace('{ANO}', anoAtual)
+                let livro = livros[0]
+                const numeroAlocado = livro.proximo_numero
+                const anoAtual = new Date().getFullYear()
 
-                const novoLog = {
-                    numero:      String(numeroAlocado).padStart(3, '0'),
-                    portaria_id: portariaId,
-                    aprovador:   aprovadorId,
-                    data:        new Date().toISOString(),
+                const logEntry = {
+                    portariaId,
+                    numero: numeroAlocado,
+                    autor: autorId,
+                    data: new Date().toISOString(),
                     ip
                 }
 
-                const logsAtuais = Array.isArray(livro.logs) ? livro.logs : []
-
-                await tx.livrosNumeracao.update({
-                    where: { id: livro.id },
-                    data: {
-                        proximo_numero: numeroAlocado + 1,
-                        logs:           [...logsAtuais, novoLog],
-                        atualizado_em:  new Date()
+                const parseLogs = (l: any) => {
+                    if (!l) return []
+                    if (typeof l === 'string') {
+                        try { return JSON.parse(l) } catch { return [] }
                     }
-                })
+                    if (Array.isArray(l)) return l
+                    return []
+                }
+                const historico = parseLogs(livro.logs)
+                const novoLogs = [...historico, logEntry]
 
-                return ok(numeroFormatado)
-            })
-        } catch (error) {
-            console.error('[NumeracaoService] Erro ao alocar número:', error)
-            return err('Falha técnica ao gerar numeração oficial. Verifique o Livro de Numeração.')
+                // Atualiza proximo_numero no banco
+                await tx.$executeRaw`
+                    UPDATE "LivrosNumeracao"
+                    SET "proximo_numero" = ${numeroAlocado + 1},
+                        logs = ${JSON.stringify(novoLogs)}::jsonb,
+                        "atualizado_em" = NOW()
+                    WHERE id = ${livro.id}
+                `
+
+                // Exemplo: 001/2024
+                const numeroFormatado = String(numeroAlocado).padStart(3, '0') // 3 dígitos
+                const numeroOficialFinal = livro.formato_base
+                    .replace(/\{N\}|\{\{NUMERO\}\}/g, numeroFormatado)
+                    .replace(/\{ANO\}|\{\{ANO\}\}/g, String(anoAtual))
+
+                return { ok: true, value: numeroOficialFinal }
+            }, { timeout: 15000, maxWait: 10000 })
+        } catch (error: any) {
+            console.error('Erro de concorrência em Numeração:', error)
+            return { ok: false, error: 'Erro de concorrência ou timeout ao gerar banco. Tente novamente.' }
         }
     }
 }

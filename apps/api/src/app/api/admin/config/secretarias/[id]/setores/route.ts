@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
 import { z } from 'zod'
+import { FeedService } from '@/services/feed.service'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +60,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 secretariaId: id,
             },
         })
+
+        // Registra no feed
+        await FeedService.registrarEvento({
+            tipoEvento: 'SETOR_CRIADO',
+            mensagem: `Setor "${parsed.data.nome}" (${parsed.data.sigla.toUpperCase()}) criado na secretaria`,
+            autorId: session.id as string,
+            secretariaId: id,
+        }).catch(() => {})
 
         return NextResponse.json({ success: true, data: setor }, { status: 201 })
     } catch (error: any) {

@@ -48,6 +48,88 @@ export class PdfService {
     }
 
     /**
+     * Converte um buffer DOCX para PDF usando CloudConvert com rotação de chaves.
+     * O PDF resultante preserva toda a formatação, imagens e estilos do Word.
+     */
+    static async docxToPdf(docxBuffer: Buffer): Promise<Result<Buffer>> {
+        const availableKeys = await this.getKeys();
+        if (availableKeys.length === 0) return err('Nenhuma chave CloudConvert configurada.');
+
+        let currentIndex = parseInt(process.env.CLOUDCONVERT_CURRENT_KEY_INDEX || '0', 10);
+        let attempts = 0;
+
+        while (attempts < availableKeys.length) {
+            const actualKeyIndex = currentIndex % availableKeys.length;
+            const currentKey = availableKeys[actualKeyIndex];
+            try {
+                // 1. Importa o DOCX como base64
+                const base64 = docxBuffer.toString('base64');
+                const jobRes = await axios.post('https://api.cloudconvert.com/v2/jobs', {
+                    tasks: {
+                        'import-docx': {
+                            operation: 'import/base64',
+                            file: base64,
+                            filename: 'documento.docx'
+                        },
+                        'convert-pdf': {
+                            operation: 'convert',
+                            input: 'import-docx',
+                            output_format: 'pdf',
+                            engine: 'office'  // LibreOffice — fidelidade máxima ao Word
+                        },
+                        'export-pdf': {
+                            operation: 'export/url',
+                            input: 'convert-pdf'
+                        }
+                    }
+                }, {
+                    headers: { 'Authorization': `Bearer ${currentKey}` },
+                    timeout: 30000
+                });
+
+                const job = jobRes.data.data;
+
+                const waitRes = await axios.get(`https://api.cloudconvert.com/v2/jobs/${job.id}/wait`, {
+                    headers: { 'Authorization': `Bearer ${currentKey}` },
+                    timeout: 120000
+                });
+
+                const finishedJob = waitRes.data.data;
+                const exportTask = finishedJob.tasks.find((t: any) => t.operation === 'export/url' && t.status === 'finished');
+
+                if (!exportTask || !exportTask.result?.files?.[0]?.url) {
+                    throw new Error('Falha na exportação do PDF a partir do DOCX');
+                }
+
+                const res = await axios.get(exportTask.result.files[0].url, {
+                    responseType: 'arraybuffer',
+                    timeout: 30000
+                });
+
+                if (res.status !== 200) throw new Error('Erro ao baixar PDF convertido');
+
+                const buffer = Buffer.from(res.data);
+
+                if (actualKeyIndex !== parseInt(process.env.CLOUDCONVERT_CURRENT_KEY_INDEX || '0', 10)) {
+                    await this.persistActiveIndex(actualKeyIndex);
+                }
+
+                return ok(buffer);
+
+            } catch (error: any) {
+                const is402 = error.message?.includes('402') || error.response?.status === 402;
+                if (is402 && attempts < availableKeys.length - 1) {
+                    currentIndex++;
+                    attempts++;
+                    continue;
+                }
+                return err(error.message || 'Erro na conversão DOCX→PDF');
+            }
+        }
+        return err('Todas as chaves esgotadas.');
+    }
+
+    /**
      * Converte HTML para PDF usando CloudConvert com rotação de chaves.
      */
     static async htmlToPdf(html: string): Promise<Result<Buffer>> {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 import { getSession } from '@/lib/auth'
@@ -15,7 +16,7 @@ export async function GET() {
             )
         }
 
-        const user = await prisma.user.findUnique({
+        let user = await prisma.user.findUnique({
             where: { id: session.id as string },
         })
 
@@ -24,6 +25,16 @@ export async function GET() {
                 { success: false, error: 'Usuário não encontrado' },
                 { status: 404 }
             )
+        }
+
+        // Auto-gera PIN de segurança para ADMIN_GERAL caso não tenha
+        // Usa crypto.randomInt para geração criptograficamente segura
+        if (user.role === 'ADMIN_GERAL' && !user.pinSeguranca) {
+            const newPin = crypto.randomInt(100000, 999999).toString()
+            user = await prisma.user.update({
+                where: { id: user.id },
+                data: { pinSeguranca: newPin }
+            })
         }
 
         // Remove a senha do objeto de retorno

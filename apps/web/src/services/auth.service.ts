@@ -20,7 +20,8 @@ export async function login(payload: LoginRequest): Promise<Result<LoginResponse
 
 export async function completarOnboarding(secretariaId: string, setorId: string): Promise<Result<Usuario>> {
     try {
-        const response = await api.post('/api/auth/onboarding', { secretariaId, setorId })
+        const payload = setorId ? { secretariaId, setorId } : { secretariaId }
+        const response = await api.patch('/api/auth/onboarding', payload)
         return ok(response.data.data)
     } catch (error: any) {
         const message = error.response?.data?.error || 'Erro ao completar onboarding'

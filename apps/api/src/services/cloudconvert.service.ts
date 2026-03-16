@@ -139,21 +139,90 @@ export class CloudConvertService {
                 const finishedJob = waitRes.data.data;
                 const exportTask = finishedJob.tasks.find((task: any) => task.operation === 'export/url' && task.status === 'finished');
 
-                if (!exportTask || !exportTask.result?.files?.[0]?.url) {
-                    throw new Error('Erro ao exportar resultado');
+                if (!exportTask || !exportTask.result?.files?.length) {
+                    throw new Error('Erro ao exportar resultado: nenhum arquivo retornado pelo CloudConvert');
                 }
 
-                const url = exportTask.result.files[0].url;
+                const exportedFiles: Array<{ filename: string; url: string }> = exportTask.result.files;
 
-                // Usando axios para maior controle de timeout e evitar erros do fetch nativo (undici)
-                const response = await axios.get(url, {
+                // Identificar o arquivo HTML e os arquivos de imagem
+                const htmlFile = exportedFiles.find(f => f.filename.endsWith('.html') || f.filename.endsWith('.htm'))
+                    ?? exportedFiles[0];
+                const imageFiles = exportedFiles.filter(f => f.filename !== htmlFile.filename);
+
+                // Baixar o HTML principal
+                const htmlResponse = await axios.get(htmlFile.url, {
                     responseType: 'text',
-                    timeout: 30000 // 30 segundos de timeout
+                    timeout: 30000
                 });
 
-                if (response.status !== 200) throw new Error('Erro ao baixar HTML convertido');
+                if (htmlResponse.status !== 200) throw new Error('Erro ao baixar HTML convertido');
+                let htmlContent: string = htmlResponse.data;
 
-                const htmlContent = response.data;
+                // Baixar cada imagem exportada e embutir como base64 no HTML
+                if (imageFiles.length > 0) {
+                    console.log(`[CloudConvert] Baixando ${imageFiles.length} imagem(ns) exportada(s)...`);
+
+                    const MIME_MAP: Record<string, string> = {
+                        png: 'image/png',
+                        jpg: 'image/jpeg',
+                        jpeg: 'image/jpeg',
+                        gif: 'image/gif',
+                        bmp: 'image/bmp',
+                        webp: 'image/webp',
+                        svg: 'image/svg+xml',
+                        tiff: 'image/tiff',
+                        tif: 'image/tiff',
+                    };
+
+                    // Baixar todas as imagens em paralelo
+                    const imageDownloads = await Promise.allSettled(
+                        imageFiles.map(async (imgFile) => {
+                            const imgRes = await axios.get(imgFile.url, {
+                                responseType: 'arraybuffer',
+                                timeout: 30000
+                            });
+                            const ext = imgFile.filename.split('.').pop()?.toLowerCase() || 'png';
+                            const mimeType = MIME_MAP[ext] || 'image/png';
+                            const base64 = Buffer.from(imgRes.data).toString('base64');
+                            return {
+                                filename: imgFile.filename,
+                                dataUri: `data:${mimeType};base64,${base64}`
+                            };
+                        })
+                    );
+
+                    // Substituir referências no HTML pelos data URIs
+                    for (const result of imageDownloads) {
+                        if (result.status !== 'fulfilled') continue;
+                        const { filename, dataUri } = result.value;
+
+                        // Substituição case-insensitive pelo nome exato do arquivo
+                        // ex: src="Pictures/image1.png" → src="data:image/png;base64,..."
+                        const escapedName = filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const imgRegex = new RegExp(
+                            `(<img[^>]+src=["'])([^"']*(?:Pictures/|media/)?${escapedName})(["'][^>]*>)`,
+                            'gi'
+                        );
+                        const replaced = htmlContent.replace(imgRegex, `$1${dataUri}$3`);
+
+                        if (replaced !== htmlContent) {
+                            htmlContent = replaced;
+                            console.log(`[CloudConvert] Imagem injetada: ${filename}`);
+                        } else {
+                            // Fallback: substituir por src parcial que contenha o nome sem extensão
+                            const nameNoExt = filename.replace(/\.[^.]+$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const fallbackRegex = new RegExp(
+                                `(<img[^>]+src=["'])([^"']*${nameNoExt}[^"']*)(["'][^>]*>)`,
+                                'gi'
+                            );
+                            htmlContent = htmlContent.replace(fallbackRegex, `$1${dataUri}$3`);
+                            console.log(`[CloudConvert] Imagem injetada (fallback parcial): ${filename}`);
+                        }
+                    }
+                } else {
+                    console.log('[CloudConvert] Nenhuma imagem extra exportada pelo CloudConvert.');
+                }
 
                 // Se mudamos de chave, persiste a nova
                 if (actualKeyIndex !== parseInt(process.env.CLOUDCONVERT_CURRENT_KEY_INDEX || '0', 10)) {
@@ -169,15 +238,20 @@ export class CloudConvertService {
                     error.response?.status === 402 ||
                     (error.cause?.status === 402);
 
-                if (isPaymentRequired && attempts < availableKeys.length - 1) {
-                    console.warn(`[CloudConvert] Chave ${actualKeyIndex} esgotada (402). Rotacionando...`);
-                    currentIndex++;
-                    attempts++;
-                    continue; // Tenta o próximo loop
+                if (isPaymentRequired) {
+                    if (attempts < availableKeys.length - 1) {
+                        console.warn(`[CloudConvert] Chave ${actualKeyIndex} esgotada (402). Rotacionando...`);
+                        currentIndex++;
+                        attempts++;
+                        continue; // Tenta o próximo loop
+                    }
+                    // Todas as chaves estão esgotadas
+                    console.error('[CloudConvert Service] Todas as chaves esgotadas (402).');
+                    return err('Serviço de conversão de documentos temporariamente indisponível. Tente novamente mais tarde.');
                 }
 
                 console.error('[CloudConvert Service] Erro fatal:', error);
-                return err(error.message || 'Erro inesperado no CloudConvert');
+                return err('Não foi possível converter o documento. Verifique o formato do arquivo e tente novamente.');
             }
         }
 

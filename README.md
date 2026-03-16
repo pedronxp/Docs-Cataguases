@@ -1,73 +1,154 @@
-# Doc's Cataguases 🏛️
+# Doc's Cataguases
 
-Sistema de Gestão de Documentos e Portarias para a Prefeitura de Cataguases.
+Sistema de Gestao de Documentos e Portarias da Prefeitura de Cataguases-MG.
 
-## 🚀 Sobre o Projeto
-O Doc's Cataguases é uma plataforma moderna desenvolvida para simplificar a criação, tramitação e validação de documentos oficiais (Portarias) do município. O sistema foca em usabilidade, segurança e agilidade nos processos administrativos.
+## Sobre o Projeto
 
-## ✨ Funcionalidades Principais
-- **Fluxo de Onboarding**: Registro simplificado e aprovação de servidores por lotação/setor.
-- **Wizard de Portarias**: Motor de criação guiada em 3 etapas com preenchimento dinâmico e máscaras inteligentes (CPF, Moeda).
-- **Assinatura Digital**: Gestão de assinaturas em lote e fluxos de aprovação simplificados.
-- **Validação Pública**: Consulta de autenticidade de documentos via Hash/QR Code para o cidadão.
-- **Acervo Digital**: Organização de documentos por pastas com filtros avançados de busca.
-- **Painel Administrativo**: Gestão completa de usuários (RBAC), modelos de documentos (DOCX) e variáveis sistêmicas.
-- **Analytics**: Dashboards de produtividade e monitoramento de status em tempo real.
+O Doc's Cataguases e uma plataforma completa para criacao, tramitacao, revisao, assinatura e publicacao de documentos oficiais (Portarias, Memorandos, Oficios, Leis) do municipio. O sistema implementa um fluxo de trabalho completo com controle de acesso granular, assistente de IA multi-provider e numeracao automatica atomica.
 
-## 🛠️ Tecnologias Utilizadas
-- **Frontend**: [Next.js 15](https://nextjs.org/) (App Router), [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS](https://tailwindcss.com/)
-- **Componentes**: [shadcn/ui](https://ui.shadcn.com/)
-- **Gerenciamento de Estado**: [Zustand](https://zustand-demo.pmnd.rs/)
-- **Roteamento**: [TanStack Router](https://tanstack.com/router)
-- **Backend/Infra**: [Supabase](https://supabase.com/) (PostgreSQL, Auth, RLS)
-- **Segurança**: Controle de acesso baseado em permissões (ABAC) via [CASL](https://casl.js.org/)
+## Stack Tecnologica
 
-## 📦 Como Iniciar
+| Camada | Tecnologias |
+|--------|-------------|
+| **Frontend** | React 18, TypeScript, TanStack Router, Tailwind CSS, shadcn/ui, Zustand, CASL/React |
+| **Backend** | Next.js App Router, Prisma ORM, JWT Auth, CASL |
+| **Banco de Dados** | PostgreSQL (Supabase), Supabase Storage |
+| **IA** | Cerebras (primario), Mistral, Groq, OpenRouter — fallback chain com circuit breaker |
+| **Infra** | CloudConvert (DOCX->PDF), LibreOffice (fallback local), SSE (notificacoes), Puppeteer |
 
-1. **Clonar o Repositório**:
-   ```bash
-   git clone https://github.com/pedronxp/Docs-Cataguases.git
-   ```
+## Funcionalidades
 
-2. **Instalar Dependências**:
-   ```bash
-   npm install
-   ```
+**Fluxo de Documentos**
+- Wizard de criacao em 3 etapas com modelos DOCX e variaveis dinamicas
+- Revisao claim-based com SLA visual e timeline de acompanhamento
+- Assinatura digital, manual ou dispensada (com justificativa)
+- Numeracao automatica atomica via SELECT FOR UPDATE (PORT-001/2026)
+- Publicacao com hash SHA-256 de integridade
 
-3. **Configurar Variáveis de Ambiente**:
-   - Crie um arquivo `.env.local` na raiz
-   - Siga as instruções do `.env.example`
+**Assistente de IA**
+- Smart Router: seleciona modelo ideal por complexidade da mensagem
+- 12 ferramentas (tool calling): listar secretarias, criar portarias, resumir documentos, etc.
+- Circuit breaker com rotacao de chaves e fallback automatico entre providers
+- Sanitizacao de dados sensiveis (CPFs, CNPJs) antes do envio
 
-4. **Executar em Desenvolvimento**:
-   ```bash
-   npm run dev
-   ```
+**Administracao**
+- RBAC com 6 roles: ADMIN_GERAL, PREFEITO, SECRETARIO, REVISOR, OPERADOR, PENDENTE
+- Permissoes extras dinamicas por usuario (formato acao:Subject:escopo)
+- Gestao de secretarias, setores, modelos, variaveis, livros de numeracao
+- Logs de auditoria com KPIs, busca textual e exportacao CSV
+
+**Notificacoes e Monitoramento**
+- Feed de atividades em tempo real via SSE (Server-Sent Events)
+- Dashboard personalizado com KPIs e feed do usuario logado
+- Sidebar com badges dinamicos (fila de revisao, assinaturas pendentes)
+- Analytics com graficos e tendencias
+
+## Fluxo da Portaria
+
+```
+RASCUNHO --> EM_REVISAO_ABERTA --> EM_REVISAO_ATRIBUIDA
+                                        |
+                          Aprovar -------+------- Rejeitar
+                            |                        |
+                 AGUARDANDO_ASSINATURA     CORRECAO_NECESSARIA
+                            |                        |
+                    PRONTO_PUBLICACAO         (Corrigir e resubmeter)
+                            |
+                        PUBLICADA (imutavel)
+```
+
+## Roles e Permissoes
+
+| Role | Acesso |
+|------|--------|
+| **ADMIN_GERAL** | Acesso total — gerencia usuarios, secretarias, modelos, LLM, livros |
+| **PREFEITO** | Assina documentos (digital/manual/lote), publica portarias |
+| **SECRETARIO** | Cria portarias, gerencia revisao, aprova/rejeita, publica na secretaria |
+| **REVISOR** | Assume revisoes na fila, aprova/rejeita com parecer |
+| **OPERADOR** | Cria rascunhos, edita documentos proprios, submete para revisao |
+| **PENDENTE** | Sem permissoes — aguarda ativacao por admin |
+
+## Estrutura do Projeto
+
+```
+apps/
+  web/                      # Frontend React
+    src/
+      routes/               # 45+ paginas (TanStack Router)
+      components/           # Componentes UI (shared, portarias, features, ui)
+      hooks/                # 12 custom hooks (useDashboard, usePortarias, etc.)
+      services/             # Clientes API
+      store/                # Zustand (auth, UI)
+      lib/                  # Ability (CASL), utils
+  api/                      # Backend Next.js
+    src/
+      app/api/              # 65+ endpoints REST
+      services/             # 18 servicos de negocio
+      lib/                  # Auth, Prisma, LLM prompts, sanitizer
+    prisma/
+      schema.prisma         # 12 modelos de banco de dados
+      seed.ts               # Dados iniciais (livros, variaveis)
+```
+
+## API Endpoints Principais
+
+| Metodo | Endpoint | Descricao |
+|--------|----------|-----------|
+| POST | `/api/auth/login` | Autenticacao |
+| GET/POST | `/api/portarias` | Listar/Criar portarias |
+| POST | `/api/portarias/[id]/fluxo` | Transicao de estado |
+| POST | `/api/portarias/[id]/assinar` | Assinar documento |
+| POST | `/api/portarias/[id]/publicar` | Publicar com numeracao |
+| POST | `/api/admin/modelos/analisar` | Analisar DOCX e extrair variaveis |
+| POST | `/api/llm/chat` | Chat com assistente IA |
+| POST | `/api/pdf/extract` | Extrair texto/tabelas de PDF |
+| GET | `/api/notifications/sse` | Stream de notificacoes |
+| GET | `/api/sidebar-counts` | Contadores para badges |
+
+## Como Iniciar
+
+```bash
+# 1. Clonar
+git clone https://github.com/pedronxp/Docs-Cataguases.git
+cd Docs-Cataguases
+
+# 2. Instalar dependencias
+npm install
+
+# 3. Configurar ambiente
+cp apps/api/.env.example apps/api/.env
+# Editar .env com suas credenciais (Supabase, CloudConvert, etc.)
+
+# 4. Gerar Prisma Client
+cd apps/api && npx prisma generate
+
+# 5. Rodar seed (dados iniciais)
+npx prisma db seed
+
+# 6. Executar em desenvolvimento
+cd ../.. && npm run dev
+```
+
+## Variaveis de Ambiente
+
+```env
+DATABASE_URL=postgresql://...
+DIRECT_URL=postgresql://...
+SUPABASE_SERVICE_ROLE_KEY=...
+NEXTAUTH_SECRET=...
+CLOUDCONVERT_API_KEY_1=...
+CLOUDCONVERT_API_KEY_2=...
+JWT_EXPIRES_IN=8h
+```
+
+Chaves de LLM (Cerebras, Mistral, Groq, OpenRouter) sao gerenciadas pelo painel administrativo e armazenadas criptografadas no banco.
+
+## Documentacao
+
+- `Documentacao_Sistema_Docs_Cataguases.pdf` — Documentacao tecnica completa com fluxogramas, organograma, correcoes e plano de atualizacao
+- `agents/` — Documentacao de modulos e infraestrutura para agentes de IA
+- `WORKFLOW.md` — Ciclo de vida completo da portaria
+
 ---
 
-## 🤖 Trabalhando com IAs (Agentic Workflow)
-
-Este projeto foi inteiramente desenhado sob uma arquitetura de **Engenharia de Prompt para IAs (Cursor, Windsurf, Lovable)**. Todo o conhecimento de negócio, fluxo de telas e regras de banco de dados estão descritos nos arquivos `.md` na raiz do projeto (iniciando pelo `00_INDEX.md`).
-
-**Se você é um desenvolvedor utilizando IA em um novo ambiente, cole o comando abaixo no chat da sua IDE para realizar o Onboarding Automático:**
-
-> "Olá, IA. Acabei de clonar este repositório. Este é um projeto GovTech Enterprise.
-> 
-> **AÇÃO IMEDIATA REQUERIDA (Onboarding do Desenvolvedor):**
-> 1. Leia OBRIGATORIAMENTE o arquivo `00_INDEX.md` na raiz do projeto. Ele é o seu mapa mental.
-> 2. Leia o arquivo `AGENTS_GITHUB.md` com extrema atenção. Ele dita as regras inquebráveis do seu comportamento (Agentic Workflow, Matriz de Branches, Push de Backup).
-> 3. Entenda que nós NUNCA fazemos commits diretos na branch `main`.
-> 4. Abra o arquivo `PROGRESS.md` e faça uma leitura do status atual do projeto (o que já tem `[x]` e o que falta `[ ]`).
-> 
-> 5. **PARE E GERE O SEU RELATÓRIO DE STATUS:**
->    - Diga-me qual foi a última tarefa concluída.
->    - Diga-me qual é a **próxima tarefa pendente** no `PROGRESS.md` e a qual **Matriz** ela pertence.
->    - Explique brevemente como você planeja desenvolvê-la (arquitetura).
->    - **PERGUNTE:** *"Posso criar a nova branch `<tipo>/<matriz>/<tarefa>` para começarmos os trabalhos neste computador?"*
-
----
-
-**Desenvolvido com 🩵 para a Prefeitura de Cataguases.**
-
----
-
-[English Version available here](./README.en.md)
+Desenvolvido para a Prefeitura Municipal de Cataguases-MG.

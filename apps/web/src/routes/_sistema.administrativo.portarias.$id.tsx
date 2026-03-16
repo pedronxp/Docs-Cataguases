@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useContext } from 'react'
 import { portariaService } from '@/services/portaria.service'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,7 +8,9 @@ import { Textarea } from '@/components/ui/textarea'
 import {
     FileText, CheckCircle2, AlertCircle, UserPlus,
     ChevronLeft, PenTool, ShieldCheck, Download, AlertTriangle, Loader2,
-    Clock, Eye, XCircle, FileSignature, Send
+    Clock, Eye, XCircle, FileSignature, Send, User, Building2,
+    FolderOpen, Hash, CalendarDays, RefreshCw, Pencil, ScrollText, Lock, RotateCcw,
+    TrendingUp, CheckCircle, Circle
 } from 'lucide-react'
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -22,6 +24,7 @@ import { STATUS_PORTARIA } from '@/types/domain'
 import { AbilityContext } from '@/lib/ability'
 import { useAuthStore } from '@/store/auth.store'
 import { AssinaturaModal } from '@/components/portarias/AssinaturaModal'
+import { HistoricoDocumentoModal } from '@/components/portarias/HistoricoDocumentoModal'
 
 export const Route = createFileRoute('/_sistema/administrativo/portarias/$id')({
     component: PortariaDetalhesPage,
@@ -29,6 +32,7 @@ export const Route = createFileRoute('/_sistema/administrativo/portarias/$id')({
 
 function PortariaDetalhesPage() {
     const { id } = Route.useParams()
+    const navigate = useNavigate()
     const { toast } = useToast()
     const ability = useContext(AbilityContext)
     const { usuario } = useAuthStore()
@@ -36,8 +40,13 @@ function PortariaDetalhesPage() {
     const [portaria, setPortaria] = useState<Portaria | null>(null)
     const [actionLoading, setActionLoading] = useState(false)
     const [observacaoRejeicao, setObservacaoRejeicao] = useState('')
+    const [justificativaRollback, setJustificativaRollback] = useState('')
     const [isAssinaturaModalOpen, setIsAssinaturaModalOpen] = useState(false)
+    const [isHistoricoOpen, setIsHistoricoOpen] = useState(false)
     const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null)
+    // 'pdf' = iframe PDF direto | 'office' = DOCX via Office Online | null = HTML genérico
+    const [viewerMode, setViewerMode] = useState<'pdf' | 'office' | null>(null)
+    const [pdfLoadError, setPdfLoadError] = useState(false)
 
     useEffect(() => {
         loadPortaria()
@@ -46,30 +55,52 @@ function PortariaDetalhesPage() {
     async function loadPortaria() {
         setLoading(true)
         setPdfViewerUrl(null)
+        setViewerMode(null)
+        setPdfLoadError(false)
         const res = await portariaService.buscarPortaria(id)
         if (res.success) {
             setPortaria(res.data)
-            if (res.data.pdfUrl) {
-                const pdfRes = await portariaService.gerarPdf(id)
-                if (pdfRes.success) setPdfViewerUrl(pdfRes.data.url)
+            const p = res.data as any
+            if (p.pdfUrl) {
+                // Tem PDF → usa endpoint de proxy same-origin (evita CORS/CSP do Supabase)
+                setPdfViewerUrl(`/api/portarias/${p.id}/stream?type=pdf`)
+                setViewerMode('pdf')
+            } else if (p.docxRascunhoUrl) {
+                // Tem DOCX mas não PDF → marca modo 'office' para mostrar card de download
+                setViewerMode('office')
+            } else if (p.status === 'RASCUNHO' && p.formData && Object.keys(p.formData as object).length > 0) {
+                // RASCUNHO com formData preenchido → gera DOCX automaticamente em background
+                portariaService.downloadDocx(p.id, false).then(r => {
+                    if (r.success) {
+                        setViewerMode('office')
+                        // Recarrega portaria para mostrar docxRascunhoUrl atualizado
+                        portariaService.buscarPortaria(p.id).then(r2 => {
+                            if (r2.success) setPortaria(r2.data)
+                        })
+                    }
+                })
             }
         }
         setLoading(false)
     }
 
-    const handleAction = async (actionFn: () => Promise<any>, successMsg: string) => {
+    const handleAction = async (actionFn: () => Promise<any>, successMsg: string, redirectToList = false) => {
         setActionLoading(true)
         const res = await actionFn()
-        setActionLoading(false)
         if (res.success) {
-            setPortaria(res.data)
             toast({ title: 'Sucesso', description: successMsg })
+            if (redirectToList) {
+                navigate({ to: '/administrativo/portarias' })
+            } else {
+                await loadPortaria()
+            }
         } else {
             toast({ title: 'Erro', description: res.error, variant: 'destructive' })
         }
+        setActionLoading(false)
     }
 
-    const handleAssumirRevisao = () => handleAction(() => portariaService.assumirRevisao(id), 'Você assumiu a revisão desta portaria.')
+    const handleAssumirRevisao = () => handleAction(() => portariaService.solicitarRevisao(id), 'Revisão assumida. O documento foi bloqueado para edição.')
     const handleAprovar = () => handleAction(() => portariaService.aprovarPortaria(id), 'Portaria aprovada para assinatura.')
 
     const handleRejeitar = () => {
@@ -80,21 +111,42 @@ function PortariaDetalhesPage() {
         handleAction(() => portariaService.rejeitarPortaria(id, observacaoRejeicao), 'Portaria devolvida para correção.')
     }
 
-    const handleDownloadPdf = async () => {
-        setActionLoading(true)
-        const res = await portariaService.gerarPdf(id)
-        setActionLoading(false)
+    const handleDownloadPdf = () => {
+        // Usa endpoint de proxy same-origin — evita popup blocker, funciona com <a download>
+        const link = document.createElement('a')
+        link.href = `/api/portarias/${id}/stream?type=pdf`
+        link.download = `portaria-${id}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        toast({ title: 'Download iniciado', description: 'O PDF está sendo baixado.' })
+    }
 
+    const handleRollbackRascunho = (justificativa?: string) =>
+        handleAction(
+            () => portariaService.rollbackRascunho(id, justificativa),
+            'Documento revertido para rascunho. Você pode editá-lo livremente.'
+        )
+
+    const handleEnviarParaRevisao = async () => {
+        setActionLoading(true)
+        const res = await portariaService.submeterPortaria({ portariaId: id })
         if (res.success) {
-            window.open(res.data.url, '_blank')
-            toast({ title: 'Sucesso', description: 'PDF pronto para download.' })
+            const rawRes = res as any
+            if (rawRes.warning) {
+                toast({
+                    title: 'Enviado com aviso',
+                    description: rawRes.warning,
+                    variant: 'destructive'
+                })
+            } else {
+                toast({ title: 'Enviado para revisão!', description: 'A portaria foi para a fila de revisão.' })
+            }
+            await loadPortaria()
         } else {
-            toast({
-                title: 'Erro ao gerar PDF',
-                description: res.error,
-                variant: 'destructive'
-            })
+            toast({ title: 'Erro', description: res.error, variant: 'destructive' })
         }
+        setActionLoading(false)
     }
 
     if (loading) return <PortariaSkeleton />
@@ -116,14 +168,13 @@ function PortariaDetalhesPage() {
     const isRevisaoAtribuida = portaria.status === STATUS_PORTARIA.EM_REVISAO_ATRIBUIDA
 
 
-    const dadosLista = Object.entries(portaria.formData || {})
     const canSign = ability.can('assinar', 'Portaria')
     const canApprove = ability.can('aprovar', 'Portaria')
     const canEdit = ability.can('criar', 'Portaria')
     const isMyReview = portaria.revisorAtualId === usuario?.id
 
     return (
-        <div className="space-y-5 animate-in fade-in duration-500 max-w-6xl">
+        <div className="space-y-5 animate-in fade-in duration-500 max-w-6xl w-full">
             {/* Cabeçalho */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -142,7 +193,15 @@ function PortariaDetalhesPage() {
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 text-xs font-semibold border-slate-200 text-slate-600 hover:bg-slate-50"
+                        onClick={() => setIsHistoricoOpen(true)}
+                    >
+                        <ScrollText className="mr-1.5 h-3.5 w-3.5" /> Ver Histórico
+                    </Button>
                     {isPublicada && (
                         <Button
                             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 px-5 shadow-md shadow-emerald-200 text-sm"
@@ -164,100 +223,147 @@ function PortariaDetalhesPage() {
                                 <span className="text-sm font-bold text-slate-700">Visualização do Documento</span>
                             </div>
                             <Badge variant="outline" className="text-[10px] font-black uppercase text-slate-400 border-slate-200">
-                                {isPublicada ? 'PDF Oficial' : 'Pré-visualização'}
+                                {isPublicada ? 'PDF Oficial' : viewerMode === 'office' ? 'Rascunho Word' : viewerMode === 'pdf' ? 'PDF' : 'Sem documento'}
                             </Badge>
                         </CardHeader>
-                        <CardContent className="p-0 bg-slate-100 min-h-[700px] flex flex-col">
-                            {/* PDF real via iframe quando disponível */}
-                            {pdfViewerUrl ? (
-                                <iframe
-                                    src={pdfViewerUrl}
-                                    className="w-full flex-1 min-h-[700px] border-0"
-                                    title="Visualização do Documento PDF"
-                                />
-                            ) : (
-                            <div className="p-6 flex flex-col items-start justify-center gap-4 min-h-[700px]">
-                            <div className="bg-white w-full max-w-[600px] mx-auto shadow-xl border border-slate-200 p-14 space-y-8 flex flex-col relative">
-                                {/* D'Água de Rascunho se não for publicada */}
-                                {!isPublicada && !isProntoPublicacao && (
-                                    <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none overflow-hidden">
-                                        <div className="text-8xl font-black rotate-45 tracking-widest text-slate-900">RASCUNHO</div>
+                        <CardContent className="p-0 bg-slate-100 min-h-[300px] sm:min-h-[500px] lg:min-h-[700px] flex flex-col">
+                            {/* PDF: renderiza via proxy same-origin no iframe */}
+                            {viewerMode === 'pdf' && pdfViewerUrl ? (
+                                pdfLoadError ? (
+                                    /* Fallback quando o PDF não carrega no iframe */
+                                    <div className="flex flex-col items-center justify-center gap-5 min-h-[300px] sm:min-h-[500px] lg:min-h-[700px] text-center px-8">
+                                        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                                            <AlertTriangle className="h-8 w-8 text-red-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-700">Não foi possível exibir o PDF no navegador</p>
+                                            <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
+                                                Isso pode ocorrer por bloqueio do navegador ou arquivo corrompido.
+                                                Tente baixar diretamente para visualizar.
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-3 flex-wrap justify-center">
+                                            <Button
+                                                variant="outline"
+                                                className="gap-2 font-semibold border-slate-200"
+                                                onClick={handleDownloadPdf}
+                                            >
+                                                <Download size={14} /> Baixar PDF
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50"
+                                                onClick={() => {
+                                                    setPdfLoadError(false)
+                                                    setPdfViewerUrl(`/api/portarias/${id}/stream?type=pdf&t=${Date.now()}`)
+                                                }}
+                                            >
+                                                <RefreshCw size={14} /> Tentar novamente
+                                            </Button>
+                                        </div>
                                     </div>
-                                )}
+                                ) : (
+                                    <iframe
+                                        src={pdfViewerUrl}
+                                        className="w-full flex-1 min-h-[300px] sm:min-h-[500px] lg:min-h-[700px] border-0"
+                                        title="Visualização do Documento PDF"
+                                        allow="fullscreen"
+                                        onError={() => setPdfLoadError(true)}
+                                        onLoad={(e) => {
+                                            // Detecta se o iframe carregou um JSON de erro (não um PDF real)
+                                            try {
+                                                const doc = (e.target as HTMLIFrameElement).contentDocument
+                                                if (doc && doc.contentType && !doc.contentType.includes('pdf')) {
+                                                    setPdfLoadError(true)
+                                                }
+                                            } catch { /* cross-origin — ignora */ }
+                                        }}
+                                    />
+                                )
+                            ) : viewerMode === 'office' ? (
 
-                                {/* Cabeçalho doc */}
-                                <div className="flex flex-col items-center gap-3 text-center pb-6 border-b border-slate-100 relative z-10">
-                                    <div className="w-14 h-14 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
-                                        <ShieldCheck className="h-7 w-7 text-slate-400" />
+                                /* DOCX sem PDF: mostra card de download */
+                                <div className="flex flex-col items-center justify-center gap-5 min-h-[300px] sm:min-h-[500px] lg:min-h-[700px] text-center px-8">
+                                    <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+                                        <FileText className="h-8 w-8 text-blue-500" />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Estado de Minas Gerais</p>
-                                        <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Prefeitura Municipal de Cataguases</p>
+                                        <p className="text-sm font-bold text-slate-700">Rascunho Word disponível</p>
+                                        <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                                            O documento ainda está em elaboração. Baixe o arquivo Word para visualizar o layout completo.
+                                        </p>
                                     </div>
+                                    <Button
+                                        variant="outline"
+                                        className="gap-2 font-semibold border-blue-200 text-blue-700 hover:bg-blue-50"
+                                        onClick={() => {
+                                            const link = document.createElement('a')
+                                            link.href = `/api/portarias/${id}/stream?type=docx`
+                                            link.download = 'rascunho.docx'
+                                            document.body.appendChild(link)
+                                            link.click()
+                                            document.body.removeChild(link)
+                                        }}
+                                    >
+                                        <Download size={14} /> Baixar Rascunho (.docx)
+                                    </Button>
                                 </div>
-
-                                {/* Corpo */}
-                                <div className="text-center space-y-3 relative z-10">
-                                    <h1 className="text-base font-black text-slate-900 uppercase tracking-tight">
-                                        Portaria nº {portaria.numeroOficial ?? '___/____'}
-                                    </h1>
-                                    <p className="text-xs text-slate-600 italic text-justify font-medium leading-relaxed">
-                                        Dispõe sobre {portaria.titulo.toLowerCase()} e dá outras providências.
-                                    </p>
-                                </div>
-
-                                <div className="text-xs text-slate-700 leading-relaxed space-y-3 text-justify font-medium relative z-10">
-                                    <p>O PREFEITO MUNICIPAL DE CATAGUASES, no uso de suas atribuições legais e em conformidade com o Art. 68 da Lei Orgânica Municipal:</p>
-                                    <p><strong>RESOLVE:</strong></p>
-                                    <p><strong>Art. 1º</strong> {portaria.titulo} nos termos da legislação vigente.</p>
-                                    {dadosLista.map(([chave, valor]) => (
-                                        <p key={chave}><strong>{chave.replace(/_/g, ' ')}:</strong> {valor}</p>
-                                    ))}
-                                    <p><strong>Art. 2º</strong> Esta Portaria entra em vigor na data de sua publicação, revogando-se as disposições em contrário.</p>
-                                </div>
-
-                                {/* Assinatura */}
-                                <div className="flex flex-col items-center gap-2 pt-10 border-t border-slate-100 mt-auto relative z-10">
-                                    <div className="w-44 h-px bg-slate-400" />
-                                    <p className="text-[10px] font-black text-slate-900 uppercase">Prefeito Municipal</p>
-                                    <p className="text-[9px] text-slate-500 font-medium">
-                                        Cataguases/MG, {isPublicada && portaria.dataPublicacao ? new Date(portaria.dataPublicacao).toLocaleDateString('pt-BR') : '__/__/____'}
-                                    </p>
-                                </div>
-
-                                {/* Selos de Autenticidade (publicada) */}
-                                {(isPublicada || isProntoPublicacao) && portaria.assinaturaStatus === 'ASSINADA_DIGITAL' && (
-                                    <div className="pt-4 border-t border-emerald-100 bg-emerald-50 -mx-14 -mb-14 px-14 pb-6 mt-4 relative z-10">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded border border-emerald-200">
-                                                <ShieldCheck size={14} />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black text-emerald-800 uppercase tracking-wider">Assinado Digitalmente</p>
-                                                <p className="text-[8px] text-emerald-600 font-mono">{portaria.hashIntegridade ?? 'hash-gerado'}</p>
-                                            </div>
+                            ) : (
+                            /* Nenhum documento gerado */
+                            <div className="flex flex-col items-center justify-center gap-4 min-h-[300px] sm:min-h-[500px] lg:min-h-[700px] text-center px-8">
+                                {(isRevisaoAberta || isRevisaoAtribuida) ? (
+                                    /* Em revisão mas sem arquivo — falha na geração */
+                                    <>
+                                        <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
+                                            <AlertTriangle className="h-8 w-8 text-amber-500" />
                                         </div>
-                                    </div>
-                                )}
-                                {(isPublicada || isProntoPublicacao) && portaria.assinaturaStatus === 'DISPENSADA_COM_JUSTIFICATIVA' && (
-                                    <div className="pt-4 border-t border-amber-100 bg-amber-50 -mx-14 -mb-14 px-14 pb-6 mt-4 relative z-10">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-1.5 bg-amber-100 text-amber-600 rounded border border-amber-200">
-                                                <AlertTriangle size={14} />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black text-amber-800 uppercase tracking-wider">Assinatura Excepcional - Dispensada</p>
-                                                <p className="text-[8px] text-amber-600 font-mono">Consulte a timeline para justificativa</p>
-                                            </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-700">Documento não foi gerado</p>
+                                            <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
+                                                A portaria foi submetida mas houve uma falha na geração do arquivo — 
+                                                possivelmente o modelo não possui um template configurado.
+                                            </p>
                                         </div>
-                                    </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50 font-semibold"
+                                            onClick={async () => {
+                                                const res = await portariaService.gerarPdf(id)
+                                                if (res.success && res.data?.url) {
+                                                    setPdfViewerUrl(`/api/portarias/${id}/stream?type=pdf`)
+                                                    setViewerMode('pdf')
+                                                    toast({ title: 'Documento regenerado', description: 'O arquivo foi gerado com sucesso.' })
+                                                    loadPortaria()
+                                                } else {
+                                                    toast({ title: 'Falha na regeneração', description: res.error || 'O modelo pode não ter template configurado.', variant: 'destructive' })
+                                                }
+                                            }}
+                                        >
+                                            <RefreshCw size={14} /> Tentar Regenerar Documento
+                                        </Button>
+                                    </>
+                                ) : (
+                                    /* Rascunho — usuário precisa elaborar */
+                                    <>
+                                        <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center">
+                                            <FileText className="h-8 w-8 text-slate-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-600">Documento ainda não gerado</p>
+                                            <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                                                Clique em "Elaborar Documento" para preencher os dados e gerar o rascunho.
+                                            </p>
+                                        </div>
+                                        {(isPublicada || isProntoPublicacao) && portaria.assinaturaStatus === 'ASSINADA_DIGITAL' && (
+                                            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                                <ShieldCheck size={14} className="text-emerald-600" />
+                                                <p className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">Assinado Digitalmente</p>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
-                            </div>
-                            {!portaria.pdfUrl && (
-                                <p className="text-xs text-slate-400 text-center mt-2 pb-4">
-                                    Pré-visualização dos dados. O PDF oficial será gerado após a submissão do documento.
-                                </p>
-                            )}
                             </div>
                             )}
                         </CardContent>
@@ -266,48 +372,173 @@ function PortariaDetalhesPage() {
 
                 {/* Sidebar */}
                 <div className="lg:col-span-4 space-y-4">
-                    {/* Informações do Registro */}
-                    <Card className="border-slate-200 shadow-sm">
-                        <CardHeader className="bg-slate-50 border-b border-slate-100 p-4">
-                            <CardTitle className="text-xs font-black text-slate-500 uppercase tracking-widest">Informações</CardTitle>
+
+                    {/* ── Resumo do Documento ─────────────────────────────── */}
+                    <Card className="border-slate-200 shadow-sm overflow-hidden">
+                        <CardHeader className="bg-slate-50 border-b border-slate-100 px-4 py-3">
+                            <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Resumo do Documento</CardTitle>
                         </CardHeader>
-                        <CardContent className="p-4 space-y-3">
-                            <InfoRow label="Protocolo" value={`#${id.substring(0, 8).toUpperCase()}`} />
-                            <InfoRow label="Modelo" value={(portaria as any).modelo?.nome || '—'} />
-                            <InfoRow label="Secretaria" value={portaria.secretaria?.nome || '—'} />
-                            <InfoRow label="Registro" value={new Date(portaria.createdAt).toLocaleDateString('pt-BR')} />
+                        <CardContent className="p-0 divide-y divide-slate-100">
+
+                            {/* Título */}
+                            <div className="px-4 py-3">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Título</p>
+                                <p className="text-sm font-bold text-slate-800 leading-snug">{portaria.titulo}</p>
+                            </div>
+
+                            {/* Grid 2 colunas: Secretaria + Setor */}
+                            <div className="grid grid-cols-2 divide-x divide-slate-100">
+                                <div className="px-4 py-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <Building2 className="h-3 w-3 text-slate-400" />
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Secretaria</p>
+                                    </div>
+                                    <p className="text-xs font-semibold text-slate-700 leading-snug">
+                                        {portaria.secretaria?.sigla || portaria.secretaria?.nome || '—'}
+                                    </p>
+                                </div>
+                                <div className="px-4 py-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <FolderOpen className="h-3 w-3 text-slate-400" />
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Setor</p>
+                                    </div>
+                                    <p className="text-xs font-semibold text-slate-700 leading-snug">
+                                        {(portaria as any).setor?.nome || '—'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Autor + Revisor */}
+                            <div className="grid grid-cols-2 divide-x divide-slate-100">
+                                <div className="px-4 py-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <User className="h-3 w-3 text-slate-400" />
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Autor</p>
+                                    </div>
+                                    <p className="text-xs font-semibold text-slate-700 leading-snug">
+                                        {(portaria as any).criadoPor?.name || portaria.autor?.name || '—'}
+                                    </p>
+                                </div>
+                                <div className="px-4 py-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <Eye className="h-3 w-3 text-slate-400" />
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Revisor</p>
+                                    </div>
+                                    <p className={`text-xs font-semibold leading-snug ${portaria.revisorAtual?.name ? 'text-amber-700' : 'text-slate-400 italic'}`}>
+                                        {portaria.revisorAtual?.name || 'Não atribuído'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Modelo */}
+                            <div className="px-4 py-3">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <FileText className="h-3 w-3 text-slate-400" />
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Modelo</p>
+                                </div>
+                                <p className="text-xs font-semibold text-slate-700">
+                                    {(portaria as any).modelo?.nome || '—'}
+                                </p>
+                            </div>
+
+                            {/* Número oficial — só se tiver */}
                             {portaria.numeroOficial && (
-                                <InfoRow label="Número Oficial" value={portaria.numeroOficial} />
+                                <div className="px-4 py-3 bg-primary/5">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <Hash className="h-3 w-3 text-primary" />
+                                        <p className="text-[10px] font-black text-primary/80 uppercase tracking-wider">Número Oficial</p>
+                                    </div>
+                                    <p className="text-sm font-black text-primary">{portaria.numeroOficial}</p>
+                                </div>
                             )}
+
+                            {/* Datas */}
+                            <div className="grid grid-cols-2 divide-x divide-slate-100">
+                                <div className="px-4 py-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <CalendarDays className="h-3 w-3 text-slate-400" />
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Criado em</p>
+                                    </div>
+                                    <p className="text-xs font-semibold text-slate-700">
+                                        {new Date(portaria.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                                    </p>
+                                </div>
+                                <div className="px-4 py-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <RefreshCw className="h-3 w-3 text-slate-400" />
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Atualizado</p>
+                                    </div>
+                                    <p className="text-xs font-semibold text-slate-700">
+                                        {new Date(portaria.updatedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Hash de integridade — só se assinado */}
+                            {portaria.hashIntegridade && (
+                                <div className="px-4 py-3 bg-emerald-50/60">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Hash de Integridade</p>
+                                    </div>
+                                    <p className="text-[9px] font-mono text-emerald-700 break-all leading-relaxed">{portaria.hashIntegridade}</p>
+                                </div>
+                            )}
+
+                            {/* Progressão de Status */}
+                            <StatusProgressTracker status={portaria.status} />
+
+                            {/* SLA Indicator */}
+                            <SlaIndicator status={portaria.status} updatedAt={portaria.updatedAt} />
+
+                            {/* Protocolo interno */}
+                            <div className="px-4 py-2 bg-slate-50">
+                                <p className="text-[9px] text-slate-400 font-mono">
+                                    ID: {id.toUpperCase()}
+                                </p>
+                            </div>
                         </CardContent>
                     </Card>
 
-                    {/* ACTIONS: RASCUNHO → ir para elaboração */}
+                    {/* ACTIONS: RASCUNHO → elaborar direto no sistema */}
                     {portaria.status === STATUS_PORTARIA.RASCUNHO && canEdit && (
                         <Card className="border-slate-300 bg-slate-50 shadow-md">
                             <CardHeader className="p-4 pb-2">
                                 <div className="flex items-center gap-2 text-slate-700">
-                                    <FileText size={16} />
+                                    <Pencil size={16} />
                                     <CardTitle className="text-sm font-black uppercase tracking-tight">Documento em Elaboração</CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-4 space-y-3">
                                 <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                                    Baixe o modelo gerado pelo sistema, edite no Word com os dados corretos e faça o upload do arquivo final para enviar ao revisor.
+                                    Revise os dados abaixo e quando estiver tudo certo, envie para revisão. Você também pode editar os dados antes de enviar.
                                 </p>
+                                {/* Botão primário: Enviar para Revisão */}
+                                <Button
+                                    onClick={handleEnviarParaRevisao}
+                                    disabled={actionLoading}
+                                    className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-11 shadow-md shadow-primary/20"
+                                >
+                                    {actionLoading
+                                        ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando...</>
+                                        : <><Send className="mr-2 h-4 w-4" /> Enviar para Revisão</>
+                                    }
+                                </Button>
+                                {/* Botão secundário: Editar Dados */}
                                 <Button
                                     asChild
-                                    className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold h-10 shadow-md"
+                                    variant="outline"
+                                    className="w-full h-9 font-semibold border-slate-300 text-slate-600 hover:bg-slate-100 text-sm"
                                 >
                                     <Link to="/administrativo/portarias/revisao/$id" params={{ id }}>
-                                        <PenTool className="mr-2 h-4 w-4" /> Elaborar Documento
+                                        <PenTool className="mr-2 h-4 w-4" /> Editar Dados
                                     </Link>
                                 </Button>
                             </CardContent>
                         </Card>
                     )}
 
-                    {/* ACTIONS: CORRECAO_NECESSARIA → corrigir e reenviar */}
+                    {/* ACTIONS: CORRECAO_NECESSARIA → corrigir direto no sistema */}
                     {portaria.status === STATUS_PORTARIA.CORRECAO_NECESSARIA && canEdit && (
                         <Card className="border-rose-300 bg-rose-50 shadow-md">
                             <CardHeader className="p-4 pb-2">
@@ -318,7 +549,7 @@ function PortariaDetalhesPage() {
                             </CardHeader>
                             <CardContent className="p-4 space-y-3">
                                 <p className="text-xs text-rose-700 font-medium leading-relaxed">
-                                    O revisor devolveu este documento com observações. Consulte o histórico abaixo, corrija o arquivo e reenvie.
+                                    O revisor devolveu este documento com observações. Edite os campos diretamente no sistema — o documento será regenerado automaticamente.
                                 </p>
                                 <Button
                                     asChild
@@ -328,6 +559,44 @@ function PortariaDetalhesPage() {
                                         <PenTool className="mr-2 h-4 w-4" /> Corrigir e Reenviar
                                     </Link>
                                 </Button>
+
+                                {/* Rollback para rascunho */}
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            className="w-full h-9 border-rose-300 text-rose-600 hover:bg-rose-100 font-semibold text-xs bg-white"
+                                        >
+                                            <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Voltar para Rascunho
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Reverter para Rascunho?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                O documento voltará ao status <strong>Rascunho</strong>, removendo as marcações de correção pendente. Use esta opção se quiser reiniciar a edição do zero. Esta ação pode ser desfeita reenviando para revisão novamente.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <div className="py-2">
+                                            <Textarea
+                                                placeholder="Motivo do retorno (opcional)..."
+                                                value={justificativaRollback}
+                                                onChange={e => setJustificativaRollback(e.target.value)}
+                                                rows={2}
+                                                className="text-xs"
+                                            />
+                                        </div>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                onClick={() => handleRollbackRascunho(justificativaRollback || undefined)}
+                                                className="bg-slate-700 hover:bg-slate-800 text-white"
+                                            >
+                                                Confirmar Reversão
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </CardContent>
                         </Card>
                     )}
@@ -343,7 +612,7 @@ function PortariaDetalhesPage() {
                             </CardHeader>
                             <CardContent className="p-4 space-y-3">
                                 <p className="text-xs text-amber-700 font-medium leading-relaxed">
-                                    Este documento aguarda análise. Assuma a revisão para bloquear edições de parceiros.
+                                    Este documento aguarda análise. Solicite a revisão para ser atribuído como revisor e bloquear edições.
                                 </p>
                                 <Button
                                     onClick={handleAssumirRevisao}
@@ -352,7 +621,7 @@ function PortariaDetalhesPage() {
                                     className="w-full h-10 border-amber-300 text-amber-700 hover:bg-amber-100 font-bold bg-white"
                                 >
                                     {actionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-                                    Assumir Revisão
+                                    Solicitar Revisão
                                 </Button>
                             </CardContent>
                         </Card>
@@ -413,11 +682,37 @@ function PortariaDetalhesPage() {
                         </Card>
                     )}
 
-                    {/* Alerta se está atribuido pra outro revisor */}
+                    {/* Alerta para outro revisor (canApprove mas não é minha revisão) */}
                     {isRevisaoAtribuida && canApprove && !isMyReview && (
                         <div className="bg-slate-100 border border-slate-200 rounded p-3 text-xs text-slate-500 font-medium text-center">
-                            Portaria sob revisão de outro usuário.
+                            Portaria sob revisão de outro revisor.
                         </div>
+                    )}
+
+                    {/* Aviso de bloqueio para o AUTOR do documento */}
+                    {isRevisaoAtribuida && !canApprove && (
+                        <Card className="border-blue-100 bg-blue-50/60 shadow-sm">
+                            <CardContent className="p-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                                        <Lock size={14} className="text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-blue-800">Documento em revisão</p>
+                                        <p className="text-xs text-blue-600 font-medium mt-1 leading-relaxed">
+                                            Este documento está sendo revisado por{' '}
+                                            <span className="font-bold">
+                                                {(portaria as any).revisorAtual?.name || 'um revisor'}
+                                            </span>
+                                            . A edição está bloqueada até o revisor concluir a análise.
+                                        </p>
+                                        <p className="text-[10px] text-blue-500 font-medium mt-2">
+                                            Você será notificado quando a revisão for concluída.
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     )}
 
                     {/* ACTIONS: AGUARDANDO_ASSINATURA -> ASSINAR */}
@@ -463,7 +758,7 @@ function PortariaDetalhesPage() {
                                 </p>
                                 {ability.can('publicar', 'Portaria') && (
                                     <Button
-                                        onClick={() => handleAction(() => portariaService.publicarPortaria(id), `Portaria publicada com sucesso!`)}
+                                        onClick={() => handleAction(() => portariaService.publicarPortaria(id), 'Portaria publicada com sucesso!', true)}
                                         disabled={actionLoading}
                                         className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 shadow-md"
                                     >
@@ -488,19 +783,17 @@ function PortariaDetalhesPage() {
                 portariaId={id}
                 onSigned={loadPortaria}
             />
+
+            <HistoricoDocumentoModal
+                portariaId={id}
+                portariaTitulo={portaria.titulo}
+                isOpen={isHistoricoOpen}
+                onOpenChange={setIsHistoricoOpen}
+            />
         </div>
     )
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-    if (!value) return null
-    return (
-        <div className="flex justify-between items-start gap-4">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 mt-0.5">{label}</span>
-            <span className="text-xs font-semibold text-slate-700 text-right break-all">{value}</span>
-        </div>
-    )
-}
 
 function StatusBadge({ status }: { status: string }) {
     switch (status) {
@@ -576,12 +869,142 @@ function AssinaturaStatusInfo({
     return null
 }
 
+// ─── SLA Visual ───────────────────────────────────────────────────────────────
+
+const SLA_POR_STATUS: Record<string, { dias: number; label: string }> = {
+    CORRECAO_NECESSARIA:    { dias: 3, label: 'p/ corrigir' },
+    EM_REVISAO_ABERTA:      { dias: 2, label: 'p/ assumir revisão' },
+    EM_REVISAO_ATRIBUIDA:   { dias: 4, label: 'p/ concluir revisão' },
+    AGUARDANDO_ASSINATURA:  { dias: 2, label: 'p/ assinar' },
+    PRONTO_PUBLICACAO:      { dias: 1, label: 'p/ publicar' },
+}
+
+function SlaIndicator({ status, updatedAt }: { status: string; updatedAt: string }) {
+    const sla = SLA_POR_STATUS[status]
+    if (!sla) return null
+
+    const elapsed = (Date.now() - new Date(updatedAt).getTime()) / (1000 * 60 * 60 * 24) // dias
+    const pct = Math.min(100, Math.round((elapsed / sla.dias) * 100))
+    const restante = Math.max(0, sla.dias - elapsed)
+    const atrasado = elapsed > sla.dias
+
+    const cor = atrasado ? 'bg-red-500' : pct >= 75 ? 'bg-amber-400' : 'bg-emerald-500'
+    const textCor = atrasado ? 'text-red-600' : pct >= 75 ? 'text-amber-600' : 'text-emerald-600'
+
+    return (
+        <div className="px-4 py-3 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3 text-slate-400" />
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">SLA {sla.label}</p>
+                </div>
+                <p className={`text-[10px] font-black ${textCor}`}>
+                    {atrasado
+                        ? `${Math.round(elapsed - sla.dias)}d em atraso`
+                        : restante < 1
+                            ? `${Math.round(restante * 24)}h restantes`
+                            : `${restante.toFixed(1)}d restantes`}
+                </p>
+            </div>
+            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                    className={`h-full rounded-full transition-all duration-700 ${cor}`}
+                    style={{ width: `${pct}%` }}
+                />
+            </div>
+            <p className="text-[9px] text-slate-400 mt-1">SLA: {sla.dias} dia{sla.dias > 1 ? 's' : ''} · {pct}% decorrido</p>
+        </div>
+    )
+}
+
+// ─── Progressão de Status (mini stepper) ──────────────────────────────────────
+
+const FLUXO_ETAPAS = [
+    { status: 'RASCUNHO',              label: 'Rascunho',       short: 'Rascunho' },
+    { status: 'EM_REVISAO_ABERTA',     label: 'Enviado',        short: 'Enviado' },
+    { status: 'EM_REVISAO_ATRIBUIDA',  label: 'Em Revisão',     short: 'Revisão' },
+    { status: 'AGUARDANDO_ASSINATURA', label: 'Ag. Assinatura', short: 'Assinatura' },
+    { status: 'PUBLICADA',             label: 'Publicado',      short: 'Publicado' },
+]
+
+// Mapeamento de correção/pronto para o índice correspondente no fluxo
+const STATUS_ETAPA_IDX: Record<string, number> = {
+    RASCUNHO: 0,
+    CORRECAO_NECESSARIA: 1,       // volta à etapa 1 (como ENVIADO mas com erro)
+    EM_REVISAO_ABERTA: 1,
+    EM_REVISAO_ATRIBUIDA: 2,
+    AGUARDANDO_ASSINATURA: 3,
+    PRONTO_PUBLICACAO: 4,
+    PUBLICADA: 4,
+    FALHA_PROCESSAMENTO: 0,
+}
+
+function StatusProgressTracker({ status }: { status: string }) {
+    const etapaAtual = STATUS_ETAPA_IDX[status] ?? 0
+    const isCorrecao = status === 'CORRECAO_NECESSARIA'
+
+    return (
+        <div className="px-4 py-4 border-t border-slate-100">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" /> Progresso do Fluxo
+            </p>
+            <div className="relative">
+                {/* Linha de fundo */}
+                <div className="absolute top-3 left-3 right-3 h-0.5 bg-slate-100" />
+                {/* Linha de progresso */}
+                <div
+                    className="absolute top-3 left-3 h-0.5 bg-primary transition-all duration-700"
+                    style={{ width: `calc(${(etapaAtual / (FLUXO_ETAPAS.length - 1)) * 100}% - ${etapaAtual === 0 ? '0px' : '12px'})` }}
+                />
+                <div className="relative flex justify-between">
+                    {FLUXO_ETAPAS.map((etapa, idx) => {
+                        const concluida = idx < etapaAtual
+                        const atual = idx === etapaAtual
+                        const pendente = idx > etapaAtual
+
+                        return (
+                            <div key={etapa.status} className="flex flex-col items-center gap-1.5 flex-1">
+                                <div
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all z-10 relative
+                                        ${concluida ? 'bg-primary border-primary' : ''}
+                                        ${atual && !isCorrecao ? 'bg-white border-primary ring-2 ring-primary/20' : ''}
+                                        ${atual && isCorrecao && idx === 1 ? 'bg-white border-rose-500 ring-2 ring-rose-200' : ''}
+                                        ${pendente ? 'bg-white border-slate-200' : ''}
+                                    `}
+                                >
+                                    {concluida ? (
+                                        <CheckCircle className="w-3.5 h-3.5 text-white fill-white" />
+                                    ) : atual && isCorrecao && idx === 1 ? (
+                                        <AlertCircle className="w-3 h-3 text-rose-500" />
+                                    ) : atual ? (
+                                        <Circle className="w-2 h-2 text-primary fill-primary" />
+                                    ) : (
+                                        <Circle className="w-2 h-2 text-slate-300" />
+                                    )}
+                                </div>
+                                <p className={`text-[9px] font-bold text-center leading-tight
+                                    ${concluida ? 'text-primary' : ''}
+                                    ${atual && !isCorrecao ? 'text-primary' : ''}
+                                    ${atual && isCorrecao && idx === 1 ? 'text-rose-600' : ''}
+                                    ${pendente ? 'text-slate-300' : ''}
+                                `}>
+                                    {etapa.short}
+                                </p>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+        </div>
+    )
+}
+
 function PortariaSkeleton() {
     return (
         <div className="space-y-6 max-w-6xl">
             <Skeleton className="h-8 w-48" />
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-8"><Skeleton className="h-[700px] rounded-lg" /></div>
+                <div className="lg:col-span-8"><Skeleton className="h-[300px] sm:h-[500px] lg:h-[700px] rounded-lg" /></div>
                 <div className="lg:col-span-4 space-y-4">
                     <Skeleton className="h-64 rounded-lg" />
                     <Skeleton className="h-48 rounded-lg" />

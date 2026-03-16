@@ -1,6 +1,9 @@
 import { createRootRouteWithContext, Outlet, redirect } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import { Toaster } from '@/components/ui/toaster'
+import { NotFound } from '@/components/shared/NotFound'
+import { RouterErrorComponent } from '@/components/shared/ErrorPage'
+import { CookieBanner } from '@/components/shared/CookieBanner'
 import type { useAuthStore } from '@/store/auth.store'
 
 interface MyRouterContext {
@@ -8,13 +11,16 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+    errorComponent: RouterErrorComponent,
+    notFoundComponent: NotFound,
     beforeLoad: ({ context, location }) => {
         console.log('__root beforeLoad:', location.pathname, 'Auth:', context.auth.isAuthenticated)
         // Se não estiver autenticado e não estiver na rota de login ou registro, redireciona
         if (!context.auth.isAuthenticated &&
             !location.pathname.startsWith('/login') &&
             !location.pathname.startsWith('/registro') &&
-            !location.pathname.startsWith('/validar')) {
+            !location.pathname.startsWith('/validar') &&
+            !location.pathname.startsWith('/sobre')) {
             throw redirect({
                 to: '/login',
             })
@@ -48,11 +54,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         }
     },
     component: () => {
-        console.log('Rendering Root Outlet')
         return (
             <>
                 <Outlet />
                 <Toaster />
+                <CookieBanner />
                 {/* Devtools só no ambiente de desenvolvimento */}
                 {import.meta.env.DEV && <TanStackRouterDevtools />}
             </>

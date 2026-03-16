@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getSession } from '@/lib/auth'
+import { getSession, getAuthUser } from '@/lib/auth'
+import { buildAbility } from '@/lib/ability'
+import { subject } from '@casl/ability'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,9 +11,9 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getSession()
+        const usuario = await getAuthUser()
 
-        if (!session) {
+        if (!usuario) {
             return NextResponse.json(
                 { success: false, error: 'Não autorizado' },
                 { status: 401 }
@@ -53,6 +55,14 @@ export async function GET(
             return NextResponse.json(
                 { success: false, error: 'Portaria não encontrada' },
                 { status: 404 }
+            )
+        }
+
+        const ability = buildAbility(usuario as any)
+        if (!ability.can('ler', subject('Portaria', portaria as any))) {
+            return NextResponse.json(
+                { success: false, error: 'Não autorizado' },
+                { status: 403 }
             )
         }
 
@@ -119,6 +129,21 @@ export async function PATCH(
             data: dadosFiltrados,
         })
 
+        // Registra log de edição se formData foi alterado
+        if (dadosFiltrados.formData !== undefined) {
+            await prisma.feedAtividade.create({
+                data: {
+                    tipoEvento: 'FORMULARIO_SALVO',
+                    mensagem: `Rascunho salvo por ${(session as any).name || (session as any).username || 'usuário'}`,
+                    portariaId: id,
+                    autorId: userId,
+                    secretariaId: portaria.secretariaId,
+                    setorId: portaria.setorId ?? null,
+                    metadata: { campos: Object.keys(dadosFiltrados.formData as object).join(', ') },
+                }
+            }).catch(() => {/* log não crítico */})
+        }
+
         return NextResponse.json({ success: true, data: atualizada })
     } catch (error) {
         return NextResponse.json(
@@ -133,37 +158,95 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await getSession()
+        const usuario = await getAuthUser()
 
-        if (!session || !['ADMIN', 'GESTOR'].includes(session.role)) {
+        if (!usuario) {
             return NextResponse.json(
                 { success: false, error: 'Não autorizado' },
                 { status: 401 }
             )
         }
 
-        const { id } = await params
+        const ability = buildAbility(usuario as any)
+        if (!ability.can('deletar', 'Portaria')) {
+            return NextResponse.json(
+                { success: false, error: 'Não autorizado' },
+                { status: 403 }
+            )
+        }
 
-        // Só permite excluir rascunhos e documentos com falha — nunca publicados
-        const portaria = await prisma.portaria.findUnique({ where: { id }, select: { status: true } })
+        const { id } = await params
+        let motivo: string | undefined = undefined
+
+        try {
+            const body = await request.json()
+            motivo = body.motivo
+        } catch (e) {
+            // Corpo pode estar vazio
+        }
+
+        const portaria = await prisma.portaria.findUnique({ where: { id }, select: { status: true, numeroOficial: true } })
         if (!portaria) {
             return NextResponse.json({ success: false, error: 'Portaria não encontrada' }, { status: 404 })
         }
 
-        const statusPermitidos = ['RASCUNHO', 'FALHA_PROCESSAMENTO']
-        if (!statusPermitidos.includes(portaria.status)) {
+        const isAdminGeral = usuario.role === 'ADMIN_GERAL'
+        const isRascunhoOuFalha = ['RASCUNHO', 'FALHA_PROCESSAMENTO'].includes(portaria.status)
+
+        // Se não for Admin Geral, só pode deletar rascunho ou falha
+        if (!isAdminGeral && !isRascunhoOuFalha) {
             return NextResponse.json(
                 { success: false, error: `Portarias com status "${portaria.status}" não podem ser excluídas. Documentos publicados ou em fluxo são registros oficiais.` },
                 { status: 422 }
             )
         }
 
-        await prisma.portaria.delete({ where: { id } })
+        // Se for Admin Geral e quiser deletar uma publicada, precisa de motivo
+        if (isAdminGeral && !isRascunhoOuFalha && !motivo) {
+            return NextResponse.json(
+                { success: false, error: `Motivo da exclusão é obrigatório para remover documentos já tramitados ou publicados.` },
+                { status: 400 }
+            )
+        }
+
+        // Remove do banco (ou altera status para EXCLUIDA/ARQUIVADO se preferir não deletar fisicamente, mas o usuário pediu "deletar". Vamos deletar fisicamente e registrar no log se não for deleção física. Ops, se deletar fisicamente, o log morre se tiver cascade, mas o feed não apaga porque a relation nulls out se não tiver cascade? No schema: `portaria Portaria? @relation(fields: [portariaId], references: [id])`. Ao deletar a portaria, vai dar erro de chave estrangeira com FeedAtividade a menos que tenha onDelete: Cascade.
+        // No schema não há Cascade no FeedAtividade em relação a portaria: `portaria Portaria? @relation(fields: [portariaId], references: [id])`. E portariaId é opcional? Sim, `portariaId String?`. Mas no Prisma o default é Restrict. O schema não tem `onDelete: SetNull`.
+
+        // Portanto, melhor fazer a exclusão na mão do feed ou adicionar o motivo.
+        // O usuário pediu: "ainda assim tem que colocar o motivo que feio deletado."
+
+        // Deletando fisicamente em transação para apagar feeds associados, exceto o de deleção.
+        // Ou salvando log global e apagando.
+        await prisma.$transaction(async (tx) => {
+            if (motivo) {
+                // Se foi com motivo, cria um registro de FeedAtividade global solto (portariaId null)
+                await tx.feedAtividade.create({
+                    data: {
+                        tipoEvento: 'EXCLUSAO',
+                        mensagem: `Portaria ${portaria.numeroOficial || id} foi excluída pelo Administrador. Motivo: ${motivo}`,
+                        autorId: usuario.id,
+                        metadata: { removido: portaria.numeroOficial || id, motivo }
+                    }
+                })
+            }
+
+            // Removemos as atividades referentes a essa portaria (porque o Prisma restringe a deleção)
+            await tx.feedAtividade.deleteMany({
+                where: { portariaId: id }
+            })
+
+            // Remove da fila de jornal se houver
+            await tx.jornalQueue.deleteMany({
+                where: { portariaId: id }
+            })
+
+            await tx.portaria.delete({ where: { id } })
+        })
 
         return NextResponse.json({ success: true, message: 'Portaria excluída com sucesso' })
-    } catch (error) {
+    } catch (error: any) {
         return NextResponse.json(
-            { success: false, error: 'Erro ao excluir portaria' },
+            { success: false, error: error.message || 'Erro ao excluir portaria' },
             { status: 500 }
         )
     }

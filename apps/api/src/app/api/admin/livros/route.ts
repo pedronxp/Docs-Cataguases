@@ -126,8 +126,19 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 })
         }
 
-        const { id, ...data } = await request.json()
+        const { id, pinSeguranca, ...data } = await request.json()
         if (!id) return NextResponse.json({ success: false, error: 'ID do livro é obrigatório' }, { status: 400 })
+
+        const livroAtual = await prisma.livrosNumeracao.findUnique({ where: { id } })
+        if (!livroAtual) return NextResponse.json({ success: false, error: 'Livro não encontrado' }, { status: 404 })
+
+        // Se o próximo número for alterado, validar PIN
+        if (data.proximo_numero !== undefined && Number(data.proximo_numero) !== livroAtual.proximo_numero) {
+            const user = await prisma.user.findUnique({ where: { id: session.id as string } })
+            if (!user?.pinSeguranca || user.pinSeguranca !== pinSeguranca) {
+                return NextResponse.json({ success: false, error: 'PIN de Segurança inválido. Confirme o Token no seu Perfil.' }, { status: 403 })
+            }
+        }
 
         const livro = await prisma.livrosNumeracao.update({
             where: { id },

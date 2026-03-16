@@ -12,14 +12,22 @@ const LABELS: Record<string, string> = {
     PORTARIA_APROVADA: 'Portaria Aprovada',
     PORTARIA_REJEITADA: 'Portaria Rejeitada',
     PORTARIA_SUBMETIDA: 'Nova Portaria Submetida',
-    DOCUMENTO_SUBMETIDO: 'Nova Portaria Submetida',
     PORTARIA_PUBLICADA: 'Portaria Publicada',
     PORTARIA_CRIADA: 'Portaria Criada',
     PORTARIA_FALHA: 'Falha no Processamento',
+    // Revisão
+    MUDANCA_STATUS_SOLICITAR_REVISAO: 'Revisão Assumida',
     MUDANCA_STATUS_ASSUMIR_REVISAO: 'Revisão Assumida',
+    REVISAO_ATRIBUIDA: 'Revisão Atribuída',
     MUDANCA_STATUS_APROVAR_REVISAO: 'Portaria Aprovada na Revisão',
-    MUDANCA_STATUS_REJEITAR_REVISAO: 'Portaria Devolvida para Correção',
+    MUDANCA_STATUS_REJEITAR_REVISAO: 'Documento Devolvido para Correção',
+    DOCUMENTO_DEVOLVIDO_AUTOR: 'Documento Devolvido — Corrija e Reenvie',
     MUDANCA_STATUS_TRANSFERIR_REVISAO: 'Revisão Transferida',
+    // Assinatura
+    ASSINATURA_DIGITAL: 'Assinatura Digital Registrada',
+    ASSINATURA_MANUAL: 'Assinatura Manual Registrada',
+    ASSINATURA_DISPENSADA: 'Assinatura Dispensada',
+    // Modelos
     MODELO_CRIADO: 'Novo Modelo Disponível',
     MODELO_ATUALIZADO: 'Modelo Atualizado',
 }
@@ -93,6 +101,7 @@ export function useNotificationsSSE() {
         const es = new EventSource(url)
         esRef.current = es
 
+        // ── Evento de broadcast por secretaria/setor ──────────────────────────
         es.addEventListener('portaria-update', (e: MessageEvent) => {
             if (!isMountedRef.current) return
             try {
@@ -106,7 +115,9 @@ export function useNotificationsSSE() {
                     portariaNumero: data.portariaNumero ?? null,
                     metadata: data.metadata ?? {},
                     createdAt: data.createdAt,
+                    criadoEm: data.createdAt,
                     lida: false,
+                    direcionada: false,
                 }
                 addNotificacao(notif)
                 toast({
@@ -114,6 +125,36 @@ export function useNotificationsSSE() {
                     description: data.mensagem,
                 })
                 // Reset do contador de retentativas após sucesso
+                retryCountRef.current = 0
+            } catch {
+                // JSON malformado — ignora silenciosamente
+            }
+        })
+
+        // ── Evento direcionado ao usuário (tabela Notificacao) ───────────────
+        es.addEventListener('notificacao', (e: MessageEvent) => {
+            if (!isMountedRef.current) return
+            try {
+                const data = JSON.parse(e.data)
+                const notif: NotificacaoItem = {
+                    id: data.id,
+                    tipo: data.tipo,
+                    tipoEvento: data.tipo,
+                    mensagem: data.mensagem,
+                    portariaId: data.portariaId ?? null,
+                    portariaTitulo: data.portariaTitulo ?? null,
+                    portariaNumero: data.portariaNumero ?? null,
+                    metadata: data.metadata ?? {},
+                    createdAt: data.criadoEm,
+                    criadoEm: data.criadoEm,
+                    lida: data.lida ?? false,
+                    direcionada: true,
+                }
+                addNotificacao(notif)
+                toast({
+                    title: LABELS[data.tipo] ?? 'Notificação',
+                    description: data.mensagem,
+                })
                 retryCountRef.current = 0
             } catch {
                 // JSON malformado — ignora silenciosamente

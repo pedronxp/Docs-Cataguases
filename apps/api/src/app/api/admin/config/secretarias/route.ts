@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
 import { z } from 'zod'
+import { FeedService } from '@/services/feed.service'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,6 +79,12 @@ export async function POST(req: NextRequest) {
                     ativo: true
                 }
             })
+            // Registra no feed
+            await FeedService.registrarEvento({
+                tipoEvento: 'SECRETARIA_CRIADA',
+                mensagem: `Secretaria "${parsed.data.nome}" (${siglaUpper}) criada`,
+                autorId: session.id as string,
+            }).catch(() => {})
             return NextResponse.json({ success: true, data: reativada })
         }
 
@@ -88,6 +95,13 @@ export async function POST(req: NextRequest) {
                 cor: parsed.data.cor,
             },
         })
+
+        // Registra no feed
+        await FeedService.registrarEvento({
+            tipoEvento: 'SECRETARIA_CRIADA',
+            mensagem: `Secretaria "${parsed.data.nome}" (${siglaUpper}) criada`,
+            autorId: session.id as string,
+        }).catch(() => {})
 
         return NextResponse.json({ success: true, data: secretaria }, { status: 201 })
     } catch (error: any) {

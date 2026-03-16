@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState, useEffect, useContext, useCallback } from 'react'
+import { useState, useEffect, useContext, useCallback, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -15,13 +16,14 @@ import {
 import {
   Newspaper, RefreshCw, FileSignature, PenTool, FileX2,
   Loader2, BookOpen, CheckCircle2, Calendar, Hash,
-  TrendingUp, ClipboardList, ChevronRight, AlertCircle
+  TrendingUp, ClipboardList, ChevronRight, AlertCircle,
+  Search, Info, X, ArrowUpDown, Filter
 } from 'lucide-react'
 import { AbilityContext } from '@/lib/ability'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-export const Route = createFileRoute('/_sistema/jornal')({
+export const Route = createFileRoute('/_sistema/diario-oficial')({
   component: JornalPage,
 })
 
@@ -88,30 +90,42 @@ function AssinaturaInfo({ status, justificativa }: { status: string; justificati
   return <Badge variant="outline" className="gap-1.5 text-slate-500"><AlertCircle size={11} /> Pendente</Badge>
 }
 
-function MetricCard({ label, value, sub, icon: Icon, highlight }: {
+function MetricCard({ label, value, sub, icon: Icon, highlight, color }: {
   label: string
   value: string | number
   sub: string
   icon: React.ElementType
   highlight?: boolean
+  color?: string
 }) {
+  const iconBg = color || 'bg-slate-100'
+  const iconColor = color ? 'text-white' : 'text-slate-500'
   return (
-    <Card className={cn('border-slate-200', highlight && 'border-slate-300 bg-slate-50')}>
+    <Card className={cn(
+      'border-slate-200 transition-all hover:shadow-sm',
+      highlight && 'border-[#1351B4]/30 bg-[#1351B4]/5'
+    )}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div className="space-y-1 min-w-0">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
-            <p className={cn('text-2xl font-bold truncate', highlight ? 'text-slate-900 font-mono text-lg' : 'text-slate-900')}>{value}</p>
-            <p className="text-xs text-slate-400">{sub}</p>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+            <p className={cn(
+              'text-2xl font-bold truncate',
+              highlight ? 'text-[#1351B4] font-mono text-lg' : 'text-slate-900'
+            )}>{value}</p>
+            <p className="text-[11px] text-slate-400">{sub}</p>
           </div>
-          <div className="p-2 rounded-lg bg-slate-100 shrink-0 ml-3">
-            <Icon className="h-4 w-4 text-slate-500" />
+          <div className={cn('p-2.5 rounded-xl shrink-0 ml-3', color || 'bg-slate-100')}>
+            <Icon className={cn('h-4 w-4', iconColor)} />
           </div>
         </div>
       </CardContent>
     </Card>
   )
 }
+
+type SortField = 'titulo' | 'secretaria' | 'entrada'
+type SortDir = 'asc' | 'desc'
 
 function JornalPage() {
   const { toast } = useToast()
@@ -120,6 +134,15 @@ function JornalPage() {
   const [fila, setFila] = useState<FilaItem[]>([])
   const [metricas, setMetricas] = useState<Metricas>({ pendentes: 0, publicadasHoje: 0, totalAno: 0, proximoNumero: null })
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+
+  // Filtros e busca
+  const [busca, setBusca] = useState('')
+  const [filtroSecretaria, setFiltroSecretaria] = useState<string | null>(null)
+  const [sortField, setSortField] = useState<SortField>('entrada')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [showInfoBanner, setShowInfoBanner] = useState(() => {
+    try { return localStorage.getItem('diario-info-dismissed') !== '1' } catch { return true }
+  })
 
   // Individual
   const [confirmItem, setConfirmItem] = useState<FilaItem | null>(null)
@@ -132,8 +155,74 @@ function JornalPage() {
   const [batchResults, setBatchResults] = useState<BatchResult[]>([])
 
   const canPublish = ability.can('manage', 'LivrosNumeracao') || ability.can('publicar', 'Portaria')
+
+  // Secretarias únicas para filtro
+  const secretariasUnicas = useMemo(() => {
+    const map = new Map<string, { sigla: string; nome: string; cor: string }>()
+    fila.forEach(item => {
+      const sec = item.portaria.secretaria
+      if (sec.sigla && !map.has(sec.sigla)) map.set(sec.sigla, sec)
+    })
+    return Array.from(map.values()).sort((a, b) => a.sigla.localeCompare(b.sigla))
+  }, [fila])
+
+  // Fila filtrada e ordenada
+  const filaFiltrada = useMemo(() => {
+    let resultado = [...fila]
+
+    // Filtro por busca
+    if (busca.trim()) {
+      const termo = busca.toLowerCase()
+      resultado = resultado.filter(item =>
+        item.portaria.titulo.toLowerCase().includes(termo) ||
+        item.portaria.secretaria.sigla.toLowerCase().includes(termo) ||
+        item.portaria.secretaria.nome.toLowerCase().includes(termo) ||
+        item.portariaId.toLowerCase().includes(termo)
+      )
+    }
+
+    // Filtro por secretaria
+    if (filtroSecretaria) {
+      resultado = resultado.filter(item => item.portaria.secretaria.sigla === filtroSecretaria)
+    }
+
+    // Ordenação
+    resultado.sort((a, b) => {
+      let cmp = 0
+      switch (sortField) {
+        case 'titulo':
+          cmp = a.portaria.titulo.localeCompare(b.portaria.titulo)
+          break
+        case 'secretaria':
+          cmp = (a.portaria.secretaria.sigla || '').localeCompare(b.portaria.secretaria.sigla || '')
+          break
+        case 'entrada':
+        default:
+          cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+      }
+      return sortDir === 'desc' ? -cmp : cmp
+    })
+
+    return resultado
+  }, [fila, busca, filtroSecretaria, sortField, sortDir])
+
   const selectedCount = selectedItems.size
-  const allSelected = fila.length > 0 && selectedItems.size === fila.length
+  const allSelected = filaFiltrada.length > 0 && filaFiltrada.every(i => selectedItems.has(i.id))
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDir('asc')
+    }
+  }
+
+  const dismissInfoBanner = () => {
+    setShowInfoBanner(false)
+    try { localStorage.setItem('diario-info-dismissed', '1') } catch {}
+  }
 
   const carregarDados = useCallback(async () => {
     setLoading(true)
@@ -161,7 +250,7 @@ function JornalPage() {
   }
 
   const toggleAll = () => {
-    setSelectedItems(allSelected ? new Set() : new Set(fila.map(i => i.id)))
+    setSelectedItems(allSelected ? new Set() : new Set(filaFiltrada.map(i => i.id)))
   }
 
   const handleNumerar = async () => {
@@ -226,14 +315,18 @@ function JornalPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <div className="flex items-center gap-2.5">
-            <Newspaper className="h-5 w-5 text-slate-600" />
-            <h1 className="text-xl font-semibold text-slate-900">Publicação Oficial</h1>
+            <div className="p-2 rounded-lg bg-[#1351B4]/10">
+              <Newspaper className="h-5 w-5 text-[#1351B4]" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-slate-900">Diário Oficial</h1>
+              <p className="text-sm text-slate-500 mt-0.5">Numeração e publicação oficial de atos municipais</p>
+            </div>
           </div>
-          <p className="text-sm text-slate-500 mt-0.5 ml-7">Oficialização e numeração de atos municipais.</p>
         </div>
-        <div className="flex items-center gap-2 ml-7 sm:ml-0">
+        <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="sm" className="gap-1.5 text-slate-600">
-            <Link to="/jornal/guia"><BookOpen className="h-3.5 w-3.5" /> Guia</Link>
+            <Link to="/diario-oficial/guia"><BookOpen className="h-3.5 w-3.5" /> Guia</Link>
           </Button>
           <Button onClick={carregarDados} variant="outline" size="sm" disabled={loading} className="gap-1.5 text-slate-600">
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
@@ -242,34 +335,142 @@ function JornalPage() {
         </div>
       </div>
 
+      {/* Banner informativo */}
+      {showInfoBanner && (
+        <div className="relative flex items-start gap-3 p-4 rounded-xl border border-blue-200 bg-blue-50/60">
+          <Info className="h-5 w-5 text-[#1351B4] shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[#1351B4]">Como funciona o Diário Oficial?</p>
+            <p className="text-xs text-blue-700/80 mt-1 leading-relaxed">
+              Esta é a etapa final do fluxo documental. Documentos assinados entram na fila abaixo aguardando numeração oficial.
+              Você pode numerar individualmente ou em lote — o sistema garante números sequenciais e sem duplicatas.
+              Após numerado, o documento recebe status <strong>PUBLICADA</strong> e passa a fazer parte do registro oficial do município.
+            </p>
+            <div className="flex items-center gap-3 mt-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] text-blue-600 font-medium">
+                <span className="w-5 h-5 rounded-full bg-[#1351B4] text-white flex items-center justify-center text-[9px] font-bold">1</span>
+                Criação
+              </div>
+              <ChevronRight className="h-3 w-3 text-blue-300" />
+              <div className="flex items-center gap-1.5 text-[10px] text-blue-600 font-medium">
+                <span className="w-5 h-5 rounded-full bg-[#1351B4] text-white flex items-center justify-center text-[9px] font-bold">2</span>
+                Revisão
+              </div>
+              <ChevronRight className="h-3 w-3 text-blue-300" />
+              <div className="flex items-center gap-1.5 text-[10px] text-blue-600 font-medium">
+                <span className="w-5 h-5 rounded-full bg-[#1351B4] text-white flex items-center justify-center text-[9px] font-bold">3</span>
+                Assinatura
+              </div>
+              <ChevronRight className="h-3 w-3 text-blue-300" />
+              <div className="flex items-center gap-1.5 text-[10px] text-white font-bold bg-[#1351B4] px-2 py-0.5 rounded-full">
+                <span className="w-5 h-5 rounded-full bg-white text-[#1351B4] flex items-center justify-center text-[9px] font-bold">4</span>
+                Publicação
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={dismissInfoBanner}
+            className="absolute top-3 right-3 p-1 rounded-md hover:bg-blue-100 text-blue-400 hover:text-blue-600 transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Métricas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Pendentes"
+          label="Na fila"
           value={metricas.pendentes}
           sub="Aguardando numeração"
           icon={ClipboardList}
+          color={metricas.pendentes > 0 ? 'bg-amber-500' : 'bg-slate-100'}
         />
         <MetricCard
           label="Publicadas hoje"
           value={metricas.publicadasHoje}
           sub={new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
           icon={Calendar}
+          color="bg-emerald-500"
         />
         <MetricCard
           label="Próximo número"
           value={metricas.proximoNumero ?? '—'}
-          sub="A ser atribuído na próxima ação"
+          sub="Será atribuído na próxima numeração"
           icon={Hash}
           highlight
         />
         <MetricCard
-          label={`Total em ${anoAtual}`}
+          label={`Total ${anoAtual}`}
           value={metricas.totalAno}
-          sub={`Desde jan/${anoAtual}`}
+          sub={`Publicados desde jan/${anoAtual}`}
           icon={TrendingUp}
+          color="bg-[#1351B4]"
         />
       </div>
+
+      {/* Barra de busca e filtros */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            placeholder="Buscar por título, secretaria ou ID..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="pl-9 h-9 text-sm border-slate-200"
+          />
+          {busca && (
+            <button onClick={() => setBusca('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {secretariasUnicas.length > 1 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Filter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <button
+              onClick={() => setFiltroSecretaria(null)}
+              className={cn(
+                'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+                !filtroSecretaria ? 'bg-[#1351B4] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              )}
+            >
+              Todas
+            </button>
+            {secretariasUnicas.map(sec => (
+              <button
+                key={sec.sigla}
+                onClick={() => setFiltroSecretaria(filtroSecretaria === sec.sigla ? null : sec.sigla)}
+                className={cn(
+                  'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+                  filtroSecretaria === sec.sigla
+                    ? 'text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                )}
+                style={filtroSecretaria === sec.sigla ? { backgroundColor: sec.cor || '#6366f1' } : undefined}
+              >
+                {sec.sigla}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Contador de resultados */}
+      {(busca || filtroSecretaria) && (
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <span>{filaFiltrada.length} de {fila.length} documentos</span>
+          {(busca || filtroSecretaria) && (
+            <button
+              onClick={() => { setBusca(''); setFiltroSecretaria(null) }}
+              className="text-[#1351B4] hover:underline font-medium"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Tabela */}
       <Card className="border-slate-200 overflow-hidden">
@@ -278,7 +479,7 @@ function JornalPage() {
             <TableHeader>
               <TableRow className="bg-slate-50 hover:bg-slate-50">
                 <TableHead className="w-10 pl-4">
-                  {fila.length > 0 && (
+                  {filaFiltrada.length > 0 && (
                     <Checkbox
                       checked={allSelected}
                       onCheckedChange={toggleAll}
@@ -286,10 +487,25 @@ function JornalPage() {
                     />
                   )}
                 </TableHead>
-                <TableHead className="font-semibold text-slate-600 text-xs uppercase tracking-wide">Secretaria</TableHead>
-                <TableHead className="font-semibold text-slate-600 text-xs uppercase tracking-wide">Documento</TableHead>
+                <TableHead className="font-semibold text-slate-600 text-xs uppercase tracking-wide">
+                  <button onClick={() => toggleSort('secretaria')} className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+                    Secretaria
+                    <ArrowUpDown className={cn('h-3 w-3', sortField === 'secretaria' ? 'text-[#1351B4]' : 'text-slate-300')} />
+                  </button>
+                </TableHead>
+                <TableHead className="font-semibold text-slate-600 text-xs uppercase tracking-wide">
+                  <button onClick={() => toggleSort('titulo')} className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+                    Documento
+                    <ArrowUpDown className={cn('h-3 w-3', sortField === 'titulo' ? 'text-[#1351B4]' : 'text-slate-300')} />
+                  </button>
+                </TableHead>
                 <TableHead className="font-semibold text-slate-600 text-xs uppercase tracking-wide hidden md:table-cell">Assinatura</TableHead>
-                <TableHead className="font-semibold text-slate-600 text-xs uppercase tracking-wide hidden lg:table-cell">Entrada</TableHead>
+                <TableHead className="font-semibold text-slate-600 text-xs uppercase tracking-wide hidden lg:table-cell">
+                  <button onClick={() => toggleSort('entrada')} className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+                    Entrada
+                    <ArrowUpDown className={cn('h-3 w-3', sortField === 'entrada' ? 'text-[#1351B4]' : 'text-slate-300')} />
+                  </button>
+                </TableHead>
                 <TableHead className="text-right font-semibold text-slate-600 text-xs uppercase tracking-wide pr-4">Ação</TableHead>
               </TableRow>
             </TableHeader>
@@ -305,18 +521,41 @@ function JornalPage() {
                 </TableRow>
               ) : fila.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-48 text-center">
-                    <div className="flex flex-col items-center gap-2 text-slate-400">
-                      <div className="p-3 rounded-full bg-slate-100">
-                        <CheckCircle2 className="h-5 w-5 text-slate-400" />
+                  <TableCell colSpan={6} className="h-56 text-center">
+                    <div className="flex flex-col items-center gap-3 text-slate-400">
+                      <div className="p-4 rounded-full bg-emerald-50">
+                        <CheckCircle2 className="h-6 w-6 text-emerald-400" />
                       </div>
-                      <p className="font-medium text-slate-600 text-sm">Fila vazia</p>
-                      <p className="text-xs">Nenhum documento aguardando numeração.</p>
+                      <div>
+                        <p className="font-semibold text-slate-700 text-sm">Nenhum documento na fila</p>
+                        <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                          Documentos assinados aparecem aqui automaticamente. Quando um documento é assinado pelo responsável, ele entra na fila para numeração oficial.
+                        </p>
+                      </div>
+                      <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs mt-1">
+                        <Link to="/diario-oficial/guia"><BookOpen className="h-3.5 w-3.5" /> Ver guia completo</Link>
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filaFiltrada.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-40 text-center">
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <Search className="h-5 w-5 text-slate-300" />
+                      <p className="font-medium text-slate-600 text-sm">Nenhum resultado encontrado</p>
+                      <p className="text-xs">Tente ajustar os filtros ou termos de busca.</p>
+                      <button
+                        onClick={() => { setBusca(''); setFiltroSecretaria(null) }}
+                        className="text-xs text-[#1351B4] hover:underline font-medium mt-1"
+                      >
+                        Limpar filtros
+                      </button>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                fila.map((item) => (
+                filaFiltrada.map((item) => (
                   <TableRow
                     key={item.id}
                     className={cn(

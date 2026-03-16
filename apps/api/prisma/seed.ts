@@ -5,7 +5,7 @@ async function main() {
 
     // Livros de Numeração — um por tipo de documento
     const livrosPadrao = [
-        { nome: 'Portarias Cataguases',   tipoDocumento: 'PORTARIA',  formato_base: 'PORT-{N}/CATAGUASES' },
+        { nome: 'Portarias Cataguases',   tipoDocumento: 'PORTARIA',  formato_base: 'PORT-{N}/{ANO}' },
         { nome: 'Memorandos Cataguases',  tipoDocumento: 'MEMORANDO', formato_base: 'MEM-{N}/{ANO}'       },
         { nome: 'Ofícios Cataguases',     tipoDocumento: 'OFICIO',    formato_base: 'OF-{N}/{ANO}'        },
         { nome: 'Leis Cataguases',        tipoDocumento: 'LEI',       formato_base: 'LEI-{N}/{ANO}'       },
@@ -27,7 +27,7 @@ async function main() {
         {
             chave: 'SYS_NUMERO',
             valor: 'Gerado na publicação',
-            descricao: 'Número sequencial oficial gerado com lock atômico — ex: PORT-0001/CATAGUASES.',
+            descricao: 'Número sequencial oficial gerado com lock atômico — ex: PORT-001/2026.',
             resolvidaAutomaticamente: true
         },
         {

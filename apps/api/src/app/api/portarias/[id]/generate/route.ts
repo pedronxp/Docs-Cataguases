@@ -49,18 +49,14 @@ export async function POST(
         htmlFinal = htmlFinal.replace(/{{NUMERO_OFICIAL}}/g, portaria.numeroOficial)
         htmlFinal = htmlFinal.replace(/{{DATA_ATUAL}}/g, new Date().toLocaleDateString('pt-BR'))
 
-        // 3. Gera o Hash de Integridade
-        const hash = PdfService.gerarHash(htmlFinal)
-
         // 4. Gera o PDF
-        const pdfResult = await PdfService.gerarPDF(htmlFinal, portaria.numeroOficial, hash)
+        const pdfResult = await PdfService.htmlToPdf(htmlFinal)
 
         if (pdfResult.ok) {
-            // 5. Salva o Hash e o status no banco (em uma implementação real, o PDF seria enviado para o Supabase Storage)
+            // 5. Salva o status no banco (em uma implementação real, o PDF seria enviado para o Supabase Storage)
             await prisma.portaria.update({
                 where: { id },
                 data: {
-                    hashIntegridade: hash,
                     // Aqui poderíamos salvar a URL do storage: arquivoUrl: ...
                 }
             })

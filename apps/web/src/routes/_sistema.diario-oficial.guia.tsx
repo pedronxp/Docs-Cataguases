@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export const Route = createFileRoute('/_sistema/jornal/guia')({
+export const Route = createFileRoute('/_sistema/diario-oficial/guia')({
   component: GuiaJornalPage,
 })
 
@@ -169,7 +169,7 @@ function GuiaJornalPage() {
       {/* Header */}
       <div className="space-y-4">
         <Button asChild variant="ghost" size="sm" className="gap-1.5 text-slate-500 -ml-2 h-8">
-          <Link to="/jornal"><ArrowLeft className="h-3.5 w-3.5" /> Voltar ao Dashboard</Link>
+          <Link to="/diario-oficial"><ArrowLeft className="h-3.5 w-3.5" /> Voltar ao Dashboard</Link>
         </Button>
         <div className="flex items-start gap-3">
           <div className="p-2.5 rounded-xl bg-slate-100 shrink-0">
@@ -322,7 +322,7 @@ function GuiaJornalPage() {
           <span className="text-xs">Guia atualizado em mar/2026</span>
         </div>
         <Button asChild variant="outline" size="sm" className="gap-1.5 text-slate-600">
-          <Link to="/jornal"><ArrowLeft className="h-3.5 w-3.5" /> Voltar ao Dashboard</Link>
+          <Link to="/diario-oficial"><ArrowLeft className="h-3.5 w-3.5" /> Voltar ao Dashboard</Link>
         </Button>
       </div>
     </div>

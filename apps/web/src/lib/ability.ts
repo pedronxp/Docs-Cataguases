@@ -41,6 +41,9 @@ export function buildAbility(user: Usuario): AppAbility {
         can('rejeitar', 'Portaria', { secretariaId: user.secretariaId! })
         can('publicar', 'Portaria', { secretariaId: user.secretariaId! })
         can('ler', 'FeedAtividade', { secretariaId: user.secretariaId! })
+        // Secretário pode monitorar revisões da sua secretaria
+        can('gerenciar', 'Revisao')
+        can('ler', 'Revisao')
     }
 
     if (user.role === 'REVISOR') {

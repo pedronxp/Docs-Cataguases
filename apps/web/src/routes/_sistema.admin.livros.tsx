@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import {
     Plus, Book, Edit, History, RefreshCcw, RefreshCw,
-    User as UserIcon, Calendar, Network, Loader2, Trash2, Search
+    User as UserIcon, Calendar, Network, Loader2, Trash2, Search,
+    ShieldAlert
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -38,6 +39,10 @@ function LivrosNumeracaoPage() {
     const [deleteTarget, setDeleteTarget] = useState<LivrosNumeracao | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
+    
+    // Auth & PIN
+    const [pinSeguranca, setPinSeguranca] = useState('')
+    const [resetTarget, setResetTarget] = useState<LivrosNumeracao | null>(null)
 
     useEffect(() => {
         loadLivros()
@@ -55,20 +60,25 @@ function LivrosNumeracaoPage() {
     }
 
     const handleUpdate = async (payload: any) => {
-        const res = await livroService.atualizarLivro(payload)
+        const res = await livroService.atualizarLivro({ ...payload, pinSeguranca })
         if (res.success) {
             toast({ title: 'Sucesso', description: 'Livro atualizado com sucesso.' })
             setIsEditOpen(false)
+            setResetTarget(null)
+            setPinSeguranca('')
             loadLivros()
         } else {
             toast({ title: 'Erro', description: res.error, variant: 'destructive' })
         }
     }
 
-    const handleReset = (livro: LivrosNumeracao) => {
-        if (confirm(`Deseja realmente resetar o contador do livro "${livro.nome}" para o número inicial (${livro.numero_inicial})?`)) {
-            handleUpdate({ id: livro.id, proximo_numero: livro.numero_inicial })
+    const handleResetConfirm = () => {
+        if (!resetTarget) return
+        if (!pinSeguranca) {
+            toast({ title: 'PIN Obrigatório', description: 'Informe seu PIN de Segurança para confirmar.', variant: 'destructive' })
+            return
         }
+        handleUpdate({ id: resetTarget.id, proximo_numero: resetTarget.numero_inicial })
     }
 
     const handleDelete = async () => {
@@ -235,7 +245,7 @@ function LivrosNumeracaoPage() {
                                         <Button
                                             variant="ghost" size="icon"
                                             className="h-8 w-8 text-slate-400 hover:text-amber-600 hover:bg-amber-50 shrink-0"
-                                            onClick={() => handleReset(livro)}
+                                            onClick={() => setResetTarget(livro)}
                                             title="Resetar Contador"
                                         >
                                             <RefreshCcw className="h-4 w-4" />
@@ -368,9 +378,28 @@ function LivrosNumeracaoPage() {
                                     onChange={e => setEditLivro({ ...editLivro, proximo_numero: Number(e.target.value) })}
                                 />
                                 <p className="text-[11px] mt-1 font-medium text-amber-600 bg-amber-50 p-2 rounded border border-amber-100">
-                                    Atenção: Mudar este valor manualmente pode causar descompasso caso ajustado indevidamente.
+                                    Atenção: Mudar este valor manualmente exige o seu PIN de Segurança.
                                 </p>
                             </div>
+                            
+                            {/* Mostra PIN se número mudou */}
+                            {livros.find(l => l.id === editLivro.id)?.proximo_numero !== editLivro.proximo_numero && (
+                                <div className="grid gap-2 border-t pt-4 mt-2">
+                                    <Label htmlFor="pin-edit" className="text-red-700 font-bold flex items-center gap-1">
+                                        <ShieldAlert className="h-4 w-4" /> PIN de Segurança
+                                    </Label>
+                                    <Input
+                                        id="pin-edit"
+                                        type="password"
+                                        maxLength={6}
+                                        placeholder="••••••"
+                                        value={pinSeguranca}
+                                        onChange={e => setPinSeguranca(e.target.value)}
+                                        className="font-mono text-xl tracking-widest text-center"
+                                    />
+                                    <p className="text-[10px] text-slate-500 text-center">Digite seu PIN para autorizar a alteração do contador.</p>
+                                </div>
+                            )}
                         </div>
                     )}
                     <DialogFooter>

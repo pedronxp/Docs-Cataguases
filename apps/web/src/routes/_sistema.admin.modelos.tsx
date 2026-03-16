@@ -11,6 +11,17 @@ import { useToast } from '@/hooks/use-toast'
 import { useState, useEffect } from 'react'
 import { modeloService } from '@/services/modelo.service'
 import type { ModeloDocumento } from '@/types/domain'
+import { Trash2 } from 'lucide-react'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export const Route = createFileRoute('/_sistema/admin/modelos')({
     component: ModelosDocumentoPage,
@@ -22,6 +33,8 @@ function ModelosDocumentoPage() {
     const location = useLocation()
     const [modelos, setModelos] = useState<ModeloDocumento[]>([])
     const [loading, setLoading] = useState(true)
+    const [deleteId, setDeleteId] = useState<string | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     // Se a rota atual não for a base de modelos, renderiza o filho (Outlet)
     // Usamos split para evitar problemas com prefixos de layout como /_sistema
@@ -44,6 +57,25 @@ function ModelosDocumentoPage() {
             toast({ title: 'Erro ao carregar modelos', description: res.error, variant: 'destructive' })
         }
         setLoading(false)
+    }
+
+    const handleConfirmDelete = async () => {
+        if (!deleteId) return
+        setIsDeleting(true)
+        try {
+            const res = await modeloService.deletarModelo(deleteId)
+            if (!res.success) {
+                toast({ title: 'Erro', description: res.error || 'Erro ao excluir modelo', variant: 'destructive' })
+            } else {
+                toast({ title: 'Modelo excluído com sucesso' })
+                setDeleteId(null)
+                loadModelos()
+            }
+        } catch (e: any) {
+            toast({ title: 'Erro', description: e?.response?.data?.error || 'Erro ao excluir modelo', variant: 'destructive' })
+        } finally {
+            setIsDeleting(false)
+        }
     }
 
     const handleAcao = (acao: string) => {
@@ -144,6 +176,15 @@ function ModelosDocumentoPage() {
                                                 <Button onClick={() => navigate({ to: '/admin/modelos/$id', params: { id: modelo.id } })} variant="ghost" size="icon" className="text-slate-500 hover:text-[#1351B4]" title="Configurar / Editar">
                                                     <Settings className="h-4 w-4" />
                                                 </Button>
+                                                <Button 
+                                                    onClick={() => setDeleteId(modelo.id)} 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="text-slate-500 hover:text-red-600 focus:text-red-700" 
+                                                    title="Excluir"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -153,6 +194,23 @@ function ModelosDocumentoPage() {
                     </Table>
                 </CardContent>
             </Card>
+
+            <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null) }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir Modelo</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tem certeza que deseja excluir este modelo de documento? Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white">
+                            {isDeleting ? 'Excluindo...' : 'Sim, excluir'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

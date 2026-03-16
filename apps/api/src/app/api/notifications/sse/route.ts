@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         return new Response('Token SSE inválido ou expirado.', { status: 401 })
     }
 
-    const { secretariaId, setorId, role } = payload
+    const { userId, secretariaId, setorId, role } = payload
 
     // Filtro ABAC: ADMIN/PREFEITO veem tudo; outros veem eventos da sua secretaria
     // + eventos globais (secretariaId = null, ex: novos modelos de documento)
@@ -65,6 +65,8 @@ export async function GET(request: NextRequest) {
     const lastEventAtParam = request.nextUrl.searchParams.get('lastEventAt')
     const encoder = new TextEncoder()
     let lastEventAt = lastEventAtParam ? new Date(lastEventAtParam) : new Date()
+    // Cursor separado para notificações diretas (tabela Notificacao)
+    let lastNotifAt = lastEventAtParam ? new Date(lastEventAtParam) : new Date()
     let pollInterval: ReturnType<typeof setInterval> | null = null
     let heartbeatInterval: ReturnType<typeof setInterval> | null = null
     let gracefulTimeout: ReturnType<typeof setTimeout> | null = null
@@ -74,6 +76,7 @@ export async function GET(request: NextRequest) {
             // Poll por novos eventos a cada 5s
             pollInterval = setInterval(async () => {
                 try {
+                    // ── 1. FeedAtividade (broadcast por secretaria/setor) ──────────────
                     const eventos = await prisma.feedAtividade.findMany({
                         where: { ...where, createdAt: { gt: lastEventAt } },
                         include: {
@@ -103,6 +106,42 @@ export async function GET(request: NextRequest) {
                                     `id: ${evento.id}\nevent: portaria-update\ndata: ${data}\n\n`
                                 )
                             )
+                        }
+                    }
+
+                    // ── 2. Notificacoes diretas por userId ────────────────────────────
+                    if (userId) {
+                        const notifs: any[] = await prisma.$queryRaw`
+                            SELECT n.*, p.titulo as "portariaTitulo", p."numeroOficial" as "portariaNumero"
+                            FROM "Notificacao" n
+                            LEFT JOIN "Portaria" p ON p.id = n."portariaId"
+                            WHERE n."userId" = ${userId as string}
+                              AND n."criadoEm" > ${lastNotifAt}
+                            ORDER BY n."criadoEm" ASC
+                            LIMIT 20
+                        `
+
+                        if (notifs.length > 0) {
+                            lastNotifAt = new Date(notifs[notifs.length - 1].criadoEm)
+
+                            for (const notif of notifs) {
+                                const data = JSON.stringify({
+                                    id: notif.id,
+                                    tipo: notif.tipo,
+                                    mensagem: notif.mensagem,
+                                    lida: notif.lida,
+                                    portariaId: notif.portariaId ?? null,
+                                    portariaTitulo: notif.portariaTitulo ?? null,
+                                    portariaNumero: notif.portariaNumero ?? null,
+                                    metadata: notif.metadata ?? {},
+                                    criadoEm: new Date(notif.criadoEm).toISOString(),
+                                })
+                                controller.enqueue(
+                                    encoder.encode(
+                                        `id: notif-${notif.id}\nevent: notificacao\ndata: ${data}\n\n`
+                                    )
+                                )
+                            }
                         }
                     }
                 } catch {

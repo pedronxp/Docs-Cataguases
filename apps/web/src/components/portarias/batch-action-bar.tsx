@@ -6,9 +6,11 @@ interface BatchActionBarProps {
     selectedCount: number
     onClear: () => void
     onAction: () => void
+    onDeleteAction?: () => void
+    canDelete?: boolean
 }
 
-export function BatchActionBar({ selectedCount, onClear, onAction }: BatchActionBarProps) {
+export function BatchActionBar({ selectedCount, onClear, onAction, onDeleteAction, canDelete }: BatchActionBarProps) {
     if (selectedCount === 0) return null
 
     return (
@@ -33,6 +35,18 @@ export function BatchActionBar({ selectedCount, onClear, onAction }: BatchAction
                         <PenTool className="mr-2 h-4 w-4" />
                         Assinar Selecionados
                     </Button>
+
+                    {canDelete && onDeleteAction && (
+                        <Button
+                            size="sm"
+                            onClick={onDeleteAction}
+                            variant="destructive"
+                            className="font-black h-10 px-6 rounded-xl shadow-lg"
+                        >
+                            <X className="mr-2 h-4 w-4" />
+                            Excluir Lote
+                        </Button>
+                    )}
 
                     <Button
                         variant="ghost"

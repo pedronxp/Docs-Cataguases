@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { portariaService } from '@/services/portaria.service'
 import type { Portaria, StatusPortaria } from '@/types/domain'
 
@@ -8,13 +8,16 @@ interface PortariaFilters {
     secretariaId?: string
 }
 
+// Auto-refresh a cada 15s para listas de portarias (revisão, fila, etc.)
+const PORTARIAS_REFRESH_MS = 15_000
+
 export function usePortarias(initialFilters: PortariaFilters = {}) {
     const [loading, setLoading] = useState(true)
     const [portarias, setPortarias] = useState<Portaria[]>([])
     const [filters, setFilters] = useState<PortariaFilters>(initialFilters)
 
-    const fetchPortarias = async () => {
-        setLoading(true)
+    const fetchPortarias = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true)
         try {
             const result = await portariaService.listarPortarias({
                 ...filters,
@@ -26,13 +29,17 @@ export function usePortarias(initialFilters: PortariaFilters = {}) {
         } catch (error) {
             console.error('Erro ao buscar portarias:', error)
         } finally {
-            setLoading(false)
+            if (!silent) setLoading(false)
         }
-    }
+    }, [filters])
 
     useEffect(() => {
         fetchPortarias()
-    }, [filters])
+
+        // Polling silencioso a cada 15s para detectar mudanças de status em tempo real
+        const interval = setInterval(() => fetchPortarias(true), PORTARIAS_REFRESH_MS)
+        return () => clearInterval(interval)
+    }, [fetchPortarias])
 
     const updateFilters = (newFilters: Partial<PortariaFilters>) => {
         setFilters(prev => ({ ...prev, ...newFilters }))
@@ -43,6 +50,6 @@ export function usePortarias(initialFilters: PortariaFilters = {}) {
         loading,
         filters,
         updateFilters,
-        refresh: fetchPortarias
+        refresh: () => fetchPortarias(false),
     }
 }

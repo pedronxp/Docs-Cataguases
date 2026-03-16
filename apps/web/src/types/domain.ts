@@ -22,19 +22,47 @@ export const ROLES = {
 export type RoleUsuario = (typeof ROLES)[keyof typeof ROLES]
 
 export const TIPO_EVENTO_FEED = {
+    // Portarias – ciclo de vida
     PORTARIA_CRIADA: 'PORTARIA_CRIADA',
     PORTARIA_SUBMETIDA: 'PORTARIA_SUBMETIDA',
     PORTARIA_APROVADA: 'PORTARIA_APROVADA',
     PORTARIA_REJEITADA: 'PORTARIA_REJEITADA',
     PORTARIA_PUBLICADA: 'PORTARIA_PUBLICADA',
     PORTARIA_FALHA: 'PORTARIA_FALHA',
+    PORTARIA_RETRY: 'PORTARIA_RETRY',
+    // Revisão
+    REVISAO_ATRIBUIDA: 'REVISAO_ATRIBUIDA',
+    DOCUMENTO_DEVOLVIDO_AUTOR: 'DOCUMENTO_DEVOLVIDO_AUTOR',
+    // Mudanças de status via fluxo
+    MUDANCA_STATUS_SOLICITAR_REVISAO: 'MUDANCA_STATUS_SOLICITAR_REVISAO',
+    MUDANCA_STATUS_ASSUMIR_REVISAO: 'MUDANCA_STATUS_ASSUMIR_REVISAO',
+    MUDANCA_STATUS_APROVAR_REVISAO: 'MUDANCA_STATUS_APROVAR_REVISAO',
+    MUDANCA_STATUS_REJEITAR_REVISAO: 'MUDANCA_STATUS_REJEITAR_REVISAO',
+    MUDANCA_STATUS_TRANSFERIR_REVISAO: 'MUDANCA_STATUS_TRANSFERIR_REVISAO',
+    // Assinaturas
+    ASSINATURA_DIGITAL: 'ASSINATURA_DIGITAL',
+    ASSINATURA_MANUAL: 'ASSINATURA_MANUAL',
+    ASSINATURA_DISPENSADA: 'ASSINATURA_DISPENSADA',
+    ASSINATURA_LOTE: 'ASSINATURA_LOTE',
+    // Exclusão
+    EXCLUSAO: 'EXCLUSAO',
+    EXCLUSAO_LOTE: 'EXCLUSAO_LOTE',
+    // Modelos e variáveis
     MODELO_CRIADO: 'MODELO_CRIADO',
     MODELO_ATUALIZADO: 'MODELO_ATUALIZADO',
     VARIAVEL_CRIADA: 'VARIAVEL_CRIADA',
     VARIAVEL_EDITADA: 'VARIAVEL_EDITADA',
     VARIAVEL_EXCLUIDA: 'VARIAVEL_EXCLUIDA',
+    // Assistente IA
+    ACAO_ASSISTENTE_IA: 'ACAO_ASSISTENTE_IA',
+    // Rastreamento de documento (por portaria)
+    DOCX_VISUALIZADO: 'DOCX_VISUALIZADO',
+    DOCX_BAIXADO: 'DOCX_BAIXADO',
+    PDF_VISUALIZADO: 'PDF_VISUALIZADO',
+    FORMULARIO_SALVO: 'FORMULARIO_SALVO',
 } as const
-export type TipoEventoFeed = (typeof TIPO_EVENTO_FEED)[keyof typeof TIPO_EVENTO_FEED]
+// string permite eventos dinâmicos como MUDANCA_STATUS_SOLICITAR_REVISAO sem quebrar o tipo
+export type TipoEventoFeed = (typeof TIPO_EVENTO_FEED)[keyof typeof TIPO_EVENTO_FEED] | string
 
 export interface Secretaria {
     id: string; nome: string; sigla: string; cor: string;
@@ -125,12 +153,20 @@ export interface FeedAtividade {
 
 export interface NotificacaoItem {
     id: string
-    tipoEvento: string
+    /** Evento do FeedAtividade (broadcast) */
+    tipoEvento?: string
+    /** Tipo da Notificacao (direcionada por userId) */
+    tipo?: string
     mensagem: string
     portariaId: string | null
     portariaTitulo: string | null
     portariaNumero: string | null
-    createdAt: string
+    /** Data de criação no FeedAtividade */
+    createdAt?: string
+    /** Data de criação na tabela Notificacao */
+    criadoEm?: string
     lida: boolean
     metadata?: Record<string, string>
+    /** true se veio da tabela Notificacao (direcionada); false se é broadcast */
+    direcionada?: boolean
 }
