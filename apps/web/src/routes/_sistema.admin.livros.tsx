@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import {
     Dialog, DialogContent, DialogDescription,
@@ -35,7 +36,7 @@ function LivrosNumeracaoPage() {
     const [viewLogs, setViewLogs] = useState<LivrosNumeracao | null>(null)
     const [isCreateOpen, setIsCreateOpen] = useState(false)
     const [isCreating, setIsCreating] = useState(false)
-    const [newLivro, setNewLivro] = useState({ nome: '', formato_base: 'PORT-{N}/CATAGUASES', numero_inicial: 1 })
+    const [newLivro, setNewLivro] = useState({ nome: '', formato_base: 'PORT-{N}/CATAGUASES', numero_inicial: 1, reinicia_por_ano: true })
     const [deleteTarget, setDeleteTarget] = useState<LivrosNumeracao | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
@@ -110,12 +111,13 @@ function LivrosNumeracaoPage() {
             formato_base: newLivro.formato_base.trim(),
             numero_inicial: newLivro.numero_inicial,
             proximo_numero: newLivro.numero_inicial,
+            reinicia_por_ano: newLivro.reinicia_por_ano
         })
         setIsCreating(false)
         if (res.success) {
             toast({ title: 'Livro criado', description: `"${res.data.nome}" foi criado com sucesso.` })
             setIsCreateOpen(false)
-            setNewLivro({ nome: '', formato_base: 'PORT-{N}/CATAGUASES', numero_inicial: 1 })
+            setNewLivro({ nome: '', formato_base: 'PORT-{N}/CATAGUASES', numero_inicial: 1, reinicia_por_ano: true })
             loadLivros()
         } else {
             toast({ title: 'Erro ao criar', description: res.error, variant: 'destructive' })
@@ -205,6 +207,11 @@ function LivrosNumeracaoPage() {
                                                 <Badge variant="secondary" className="font-mono text-[10px] text-slate-500 bg-slate-100/80 hover:bg-slate-100/80">
                                                     {livro.formato_base}
                                                 </Badge>
+                                                {livro.reinicia_por_ano ? (
+                                                    <span className="text-[11px] text-primary/80 font-medium bg-primary/5 px-1.5 py-0.5 rounded">Reseta Anualmente</span>
+                                                ) : (
+                                                    <span className="text-[11px] text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded">Numeração Contínua</span>
+                                                )}
                                                 <span className="text-[11px] text-slate-400 font-medium">
                                                     {(livro.proximo_numero - livro.numero_inicial).toLocaleString('pt-BR')} alocados
                                                 </span>
@@ -316,6 +323,21 @@ function LivrosNumeracaoPage() {
                             />
                             <p className="text-[11px] text-slate-500">O contador iniciará a partir deste número. Geralmente inicia em 1.</p>
                         </div>
+
+                        <div className="flex items-center justify-between mt-2">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="novo-reinicia">Reiniciar Numeração a Cada Ano?</Label>
+                                <p className="text-[11px] text-slate-500">
+                                    Se ativo, a numeração volta ao número inicial todo ano (ex: 1/2024, 1/2025). <br/>
+                                    Se inativo, a numeração continua de onde parou (ex: 299/2024, 300/2025).
+                                </p>
+                            </div>
+                            <Switch
+                                id="novo-reinicia"
+                                checked={newLivro.reinicia_por_ano}
+                                onCheckedChange={checked => setNewLivro({ ...newLivro, reinicia_por_ano: checked })}
+                            />
+                        </div>
                     </div>
 
                     <DialogFooter>
@@ -380,6 +402,20 @@ function LivrosNumeracaoPage() {
                                 <p className="text-[11px] mt-1 font-medium text-amber-600 bg-amber-50 p-2 rounded border border-amber-100">
                                     Atenção: Mudar este valor manualmente exige o seu PIN de Segurança.
                                 </p>
+                            </div>
+
+                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
+                                <div className="space-y-0.5 pr-4">
+                                    <Label htmlFor="edit-reinicia">Reiniciar Numeração a Cada Ano?</Label>
+                                    <p className="text-[11px] text-slate-500">
+                                        Se ativo (On), a numeração volta ao início (geralmente 1) na virada do ano. Se inativo (Off), o contador nunca é reiniciado automaticamente.
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="edit-reinicia"
+                                    checked={editLivro.reinicia_por_ano}
+                                    onCheckedChange={checked => setEditLivro({ ...editLivro, reinicia_por_ano: checked })}
+                                />
                             </div>
                             
                             {/* Mostra PIN se número mudou */}

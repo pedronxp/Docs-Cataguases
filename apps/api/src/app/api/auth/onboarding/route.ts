@@ -1,20 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getSession } from '@/lib/auth'
 import { UsuarioService } from '@/services/usuario.service'
 
 export const dynamic = 'force-dynamic'
 
 const onboardingSchema = z.object({
-    secretariaId: z.string().uuid('ID da secretaria inválido'),
-    setorId: z.string().uuid('ID do setor inválido').optional()
+    secretariaId: z.string().min(1, 'Secretaria é obrigatória'),
+    setorId: z.string().optional()
 })
 
 export async function PATCH(request: NextRequest) {
     try {
-        const usuario = await getAuthUser()
+        // Tenta autenticar via DB lookup primeiro
+        let usuario = await getAuthUser()
+
+        // Fallback: se getAuthUser falhar (ex: user não encontrado no DB),
+        // usa getSession() para pegar o ID do JWT diretamente
         if (!usuario) {
-            return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 })
+            const session = await getSession()
+            if (!session?.id) {
+                console.warn('[onboarding] Token JWT inválido ou ausente')
+                return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 })
+            }
+            // Usa o ID do JWT diretamente para o onboarding
+            usuario = { id: session.id } as any
+            console.warn(`[onboarding] getAuthUser() retornou null, usando session.id: ${session.id}`)
         }
 
         const body = await request.json()
@@ -28,7 +39,7 @@ export async function PATCH(request: NextRequest) {
             }, { status: 400 })
         }
 
-        const result = await UsuarioService.completarOnboarding(usuario.id as string, parsed.data)
+        const result = await UsuarioService.completarOnboarding(usuario!.id as string, parsed.data)
 
         if (!result.ok) {
             return NextResponse.json({

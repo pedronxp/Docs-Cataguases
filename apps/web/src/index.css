@@ -78,10 +78,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Fix: cursor desaparecendo em inputs/textareas com bg-transparent */
-  input, textarea, [contenteditable] {
-    caret-color: hsl(var(--foreground));
-  }
+  /* Removido o fix antigo do caret-color pois estava bugando o cursor (deixando branco/invisível) */
 
   input::placeholder, textarea::placeholder {
     color: hsl(var(--muted-foreground));

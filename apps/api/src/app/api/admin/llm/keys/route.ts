@@ -45,11 +45,11 @@ export async function GET(_req: NextRequest) {
         }
     }
 
-    // Agrupar por provider para retornar estatísticas do pool
     const groq = keys.filter(k => k.provider === 'groq')
     const openrouter = keys.filter(k => k.provider === 'openrouter')
     const cerebras = keys.filter(k => k.provider === 'cerebras')
     const mistral = keys.filter(k => k.provider === 'mistral')
+    const kimi = keys.filter(k => k.provider === 'kimi')
 
     return NextResponse.json({
         keys,
@@ -74,6 +74,11 @@ export async function GET(_req: NextRequest) {
                 ativas: openrouter.filter(k => k.ativo && !k.esgotada).length,
                 esgotadas: openrouter.filter(k => k.esgotada).length,
             },
+            kimi: {
+                total: kimi.length,
+                ativas: kimi.filter(k => k.ativo && !k.esgotada).length,
+                esgotadas: kimi.filter(k => k.esgotada).length,
+            },
         },
     })
 }
@@ -91,8 +96,8 @@ export async function POST(req: NextRequest) {
 
     const { provider, label, key } = body
 
-    if (!provider || !['groq', 'openrouter', 'cerebras', 'mistral'].includes(provider)) {
-        return NextResponse.json({ error: 'Provider inválido. Use "cerebras", "mistral", "groq" ou "openrouter".' }, { status: 400 })
+    if (!provider || !['groq', 'openrouter', 'cerebras', 'mistral', 'kimi'].includes(provider)) {
+        return NextResponse.json({ error: 'Provider inválido. Use "cerebras", "mistral", "groq", "openrouter" ou "kimi".' }, { status: 400 })
     }
     if (!label || label.trim().length < 3) {
         return NextResponse.json({ error: 'Label deve ter pelo menos 3 caracteres.' }, { status: 400 })

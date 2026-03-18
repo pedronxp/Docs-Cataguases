@@ -48,7 +48,7 @@ export class PortariaService {
             return ok(portaria)
         } catch (error) {
             console.error('Erro no PortariaService.criar:', error)
-            return err('Falha ao criar portaria no banco de dados.')
+            return err(error instanceof Error ? error.message : 'Falha ao criar portaria no banco de dados.')
         }
     }
 

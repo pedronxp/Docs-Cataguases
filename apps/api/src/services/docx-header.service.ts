@@ -182,8 +182,8 @@ export class DocxHeaderService {
                     const mediaPath = mediaTarget.startsWith('media/')
                         ? `word/${mediaTarget}`
                         : mediaTarget.startsWith('../')
-                        ? `word/${mediaTarget.slice(3)}`
-                        : `word/media/${path.basename(mediaTarget)}`
+                            ? `word/${mediaTarget.slice(3)}`
+                            : `word/media/${path.basename(mediaTarget)}`
 
                     const mediaFile = zip.files[mediaPath]
                     if (!mediaFile) {
@@ -228,7 +228,7 @@ export class DocxHeaderService {
         const headerText = this.extractHeaderText(headerXml)
 
         // ── 5. Montar HTML do cabeçalho ───────────────────────────────────
-        if (imageDataUris.length === 0 && !headerText) {
+        if (imageDataUris.length === 0 && headerText.length === 0) {
             console.warn('[DocxHeaderService] Cabeçalho sem imagem nem texto')
             return ''
         }
@@ -238,30 +238,58 @@ export class DocxHeaderService {
             .join('')
 
         const textHtml = headerText
-            ? `<p style="text-align:center;font-weight:bold;font-size:13px;margin:4px 0 0;color:#1a1a1a;letter-spacing:0.5px;">${headerText}</p>`
-            : ''
+            .map(line => `<p style="text-align:center;font-weight:bold;font-size:12px;margin:2px 0;color:#1a1a1a;letter-spacing:0.3px;font-family:'Times New Roman',serif;">${line}</p>`)
+            .join('\n')
 
-        console.log(`[DocxHeaderService] OK: ${imageDataUris.length} img(s), texto="${headerText.slice(0, 60)}"`)
+        console.log(`[DocxHeaderService] OK: ${imageDataUris.length} img(s), ${headerText.length} linha(s) de texto`)
 
-        return `<div class="doc-header" style="text-align:center;padding:18px 0 14px;margin-bottom:20px;border-bottom:2px solid #333;">
+        return `<div class="doc-header" style="text-align:center;padding:18px 0 14px;margin-bottom:20px;">
 ${imgHtml}
 ${textHtml}
 </div>`
     }
 
     /**
-     * Extrai texto visível do cabeçalho a partir dos elementos <w:t>.
-     * Preserva espaços de elementos com xml:space="preserve".
+     * Extrai texto visível do cabeçalho por parágrafo (<w:p>) e deduplica linhas iguais.
+     * Retorna array de linhas únicas (cada <w:p> vira uma linha).
      */
-    private static extractHeaderText(headerXml: string): string {
-        const matches = headerXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/gi)
-        const parts: string[] = []
-        for (const m of matches) {
-            // Do NOT trim here: xml:space="preserve" elements may have significant spaces
-            if (m[1].length > 0) parts.push(m[1])
+    private static extractHeaderText(headerXml: string): string[] {
+        // Extrai cada bloco <w:p>...</w:p>
+        const paragraphs = headerXml.match(/<w:p[\s>][\s\S]*?<\/w:p>/gi) || []
+        const lines: string[] = []
+
+        for (const para of paragraphs) {
+            // Extrai todos os <w:t> dentro deste parágrafo
+            const textMatches = para.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/gi)
+            const parts: string[] = []
+            for (const m of textMatches) {
+                if (m[1].length > 0) parts.push(m[1])
+            }
+            let line = parts.join('').replace(/\s+/g, ' ').trim()
+            
+            if (line) {
+                // Tenta deduplicar caso a linha inteira seja um texto duplicado (ex: "PREFEITURA PREFEITURA")
+                // Devido a fragmentação do Word
+                const mid = Math.floor(line.length / 2)
+                if (line[mid] === ' ' && line.substring(0, mid) === line.substring(mid + 1)) {
+                    line = line.substring(0, mid)
+                }
+                lines.push(line)
+            }
         }
-        // Only trim the final joined string to remove leading/trailing whitespace
-        return parts.join('').replace(/\s+/g, ' ').trim()
+
+        // Deduplica linhas idênticas (mantém ordem, remove duplicatas)
+        const seen = new Set<string>()
+        const unique: string[] = []
+        for (const line of lines) {
+            const key = line.toUpperCase()
+            if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(line)
+            }
+        }
+
+        return unique
     }
 
     // ── Busca de imagem alternativa ─────────────────────────────────────────

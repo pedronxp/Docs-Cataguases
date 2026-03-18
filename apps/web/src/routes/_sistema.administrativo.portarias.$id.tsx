@@ -26,6 +26,78 @@ import { useAuthStore } from '@/store/auth.store'
 import { AssinaturaModal } from '@/components/portarias/AssinaturaModal'
 import { HistoricoDocumentoModal } from '@/components/portarias/HistoricoDocumentoModal'
 
+// ── Helpers para preview inline ──────────────────────────────────────────────
+
+const MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']
+
+/**
+ * Substitui variáveis {{CHAVE}} no HTML do modelo.
+ * 1. Aplica os valores de formData (variáveis do usuário)
+ * 2. Resolve variáveis SYS_* disponíveis no objeto da portaria (data, secretaria, número…)
+ * 3. Aplica variáveis de sistema vindas do backend (sysVarsPreview: prefeito, secretários, etc.)
+ * 4. Variáveis não resolvidas aparecem como marcadores cinzas visíveis — nunca em branco.
+ */
+function substituirVariaveis(html: string, formData: Record<string, any>, portaria?: any): string {
+    let resultado = html
+
+    // 1. Variáveis do usuário (formData)
+    for (const [key, value] of Object.entries(formData)) {
+        resultado = resultado.split(`{{${key}}}`).join(String(value ?? ''))
+    }
+
+    // 2. Variáveis de sistema derivadas do objeto portaria (data atual, secretaria, setor…)
+    if (portaria) {
+        const hoje = new Date()
+        const sysVars: Record<string, string> = {
+            SYS_DATA: hoje.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+            SYS_DATA_EXTENSO: `${hoje.getDate()}º de ${MESES_PT[hoje.getMonth()]} de ${hoje.getFullYear()}`,
+            SYS_MES_ANO: `${MESES_PT[hoje.getMonth()]} de ${hoje.getFullYear()}`,
+            SYS_NUMERO: portaria.numeroOficial || '______',
+            SYS_CIDADE: 'Cataguases',
+            SYS_SECRETARIA: portaria.secretaria?.nome || '',
+            SYS_SECRETARIA_SIGLA: portaria.secretaria?.sigla || '',
+            SYS_SETOR: (portaria as any).setor?.nome || '',
+            SYS_SETOR_SIGLA: (portaria as any).setor?.sigla || '',
+            SYS_AUTOR: (portaria as any).criadoPor?.name || '',
+        }
+        for (const [key, value] of Object.entries(sysVars)) {
+            resultado = resultado.split(`{{${key}}}`).join(value)
+        }
+    }
+
+    // 3. Variáveis de sistema vindas do backend (prefeito, secretários, etc.)
+    const sysVarsPreview = (portaria as any)?.sysVarsPreview as Record<string, string> | undefined
+    if (sysVarsPreview) {
+        for (const [key, value] of Object.entries(sysVarsPreview)) {
+            resultado = resultado.split(`{{${key}}}`).join(String(value ?? ''))
+        }
+    }
+
+    // 4. Demais variáveis não resolvidas → marcador cinza visível (não remove)
+    resultado = resultado.replace(/\{\{([^}]+)\}\}/g, (_, tag) =>
+        `<span style="background:#f1f5f9;color:#94a3b8;border:1px dashed #cbd5e1;padding:1px 6px;border-radius:3px;font-size:0.8em;font-style:italic;">[${tag}]</span>`
+    )
+
+    return resultado
+}
+
+/** Retorna o nome do nomeado/servidor a partir do formData */
+function getNomeado(formData: Record<string, any>): string | null {
+    const CHAVES_PESSOA = ['NOMEADO', 'NOME', 'SERVIDOR', 'DESIGNADO', 'EXONERADO', 'CONTRATADO', 'INTERESSADO']
+    return (
+        CHAVES_PESSOA
+            .map(k => formData[k] || formData[k.toLowerCase()])
+            .find(v => v && String(v).trim() !== '') || null
+    )
+}
+
+/** Monta o nome do arquivo para download do rascunho */
+function montarNomeArquivoRascunho(modeloNome: string, formData: Record<string, any>): string {
+    const nomeado = getNomeado(formData)
+    const sufixo = nomeado ? ` - ${String(nomeado).trim()}` : ''
+    return `Rascunho - ${modeloNome}${sufixo}.docx`.replace(/[<>:"/\\|?*]/g, '').trim()
+}
+
 export const Route = createFileRoute('/_sistema/administrativo/portarias/$id')({
     component: PortariaDetalhesPage,
 })
@@ -62,8 +134,9 @@ function PortariaDetalhesPage() {
             setPortaria(res.data)
             const p = res.data as any
             if (p.pdfUrl) {
-                // Tem PDF → usa endpoint de proxy same-origin (evita CORS/CSP do Supabase)
-                setPdfViewerUrl(`/api/portarias/${p.id}/stream?type=pdf`)
+                // Usa URL assinada do Supabase retornada pelo backend (evita CORS/proxy/auth)
+                const pdfUrl = p.pdfSignedUrl || `/api/portarias/${p.id}/stream?type=pdf`
+                setPdfViewerUrl(pdfUrl)
                 setViewerMode('pdf')
             } else if (p.docxRascunhoUrl) {
                 // Tem DOCX mas não PDF → marca modo 'office' para mostrar card de download
@@ -111,15 +184,28 @@ function PortariaDetalhesPage() {
         handleAction(() => portariaService.rejeitarPortaria(id, observacaoRejeicao), 'Portaria devolvida para correção.')
     }
 
-    const handleDownloadPdf = () => {
-        // Usa endpoint de proxy same-origin — evita popup blocker, funciona com <a download>
-        const link = document.createElement('a')
-        link.href = `/api/portarias/${id}/stream?type=pdf`
-        link.download = `portaria-${id}.pdf`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        toast({ title: 'Download iniciado', description: 'O PDF está sendo baixado.' })
+    const handleDownloadPdf = async (e?: React.MouseEvent) => {
+        if (e) {
+            e.stopPropagation()
+            e.preventDefault()
+        }
+        try {
+            // Usa URL assinada do Supabase (evita problemas de proxy/auth)
+            const p = portaria as any
+            const pdfUrl = p?.pdfSignedUrl || `/api/portarias/${id}/stream?type=pdf`
+            const blob = await fetch(pdfUrl).then(r => r.blob())
+            const blobUrl = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = blobUrl
+            link.download = `portaria-${(portaria as any)?.numeroOficial?.replace('/', '-') || id}.pdf`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(blobUrl)
+            toast({ title: 'Download iniciado', description: 'O PDF está sendo baixado.' })
+        } catch {
+            toast({ title: 'Erro ao baixar PDF', description: 'Tente novamente.', variant: 'destructive' })
+        }
     }
 
     const handleRollbackRascunho = (justificativa?: string) =>
@@ -254,9 +340,14 @@ function PortariaDetalhesPage() {
                                                 variant="outline"
                                                 size="sm"
                                                 className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50"
-                                                onClick={() => {
+                                                onClick={async () => {
                                                     setPdfLoadError(false)
-                                                    setPdfViewerUrl(`/api/portarias/${id}/stream?type=pdf&t=${Date.now()}`)
+                                                    // Recarrega a portaria para obter nova URL assinada
+                                                    const refreshed = await portariaService.buscarPortaria(id)
+                                                    if (refreshed.success) {
+                                                        const rp = refreshed.data as any
+                                                        setPdfViewerUrl(rp.pdfSignedUrl || `/api/portarias/${id}/stream?type=pdf&t=${Date.now()}`)
+                                                    }
                                                 }}
                                             >
                                                 <RefreshCw size={14} /> Tentar novamente
@@ -282,33 +373,103 @@ function PortariaDetalhesPage() {
                                     />
                                 )
                             ) : viewerMode === 'office' ? (
+                                /* DOCX disponível: mostra preview HTML inline quando possível */
+                                (() => {
+                                    const conteudoHtml = (portaria as any).modelo?.conteudoHtml as string | undefined
+                                    const formDataPortaria = ((portaria as any).formData || {}) as Record<string, any>
+                                    const modeloNome = (portaria as any).modelo?.nome || 'Documento'
+                                    const fileName = montarNomeArquivoRascunho(modeloNome, formDataPortaria)
 
-                                /* DOCX sem PDF: mostra card de download */
-                                <div className="flex flex-col items-center justify-center gap-5 min-h-[300px] sm:min-h-[500px] lg:min-h-[700px] text-center px-8">
-                                    <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-                                        <FileText className="h-8 w-8 text-blue-500" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-700">Rascunho Word disponível</p>
-                                        <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                                            O documento ainda está em elaboração. Baixe o arquivo Word para visualizar o layout completo.
-                                        </p>
-                                    </div>
-                                    <Button
-                                        variant="outline"
-                                        className="gap-2 font-semibold border-blue-200 text-blue-700 hover:bg-blue-50"
-                                        onClick={() => {
+                                    // Rascunho: sempre regenera o DOCX antes de baixar
+                                    // (garante formData e template atuais — ?regenerar=true)
+                                    // Usa a URL assinada do Supabase retornada pelo backend,
+                                    // evitando problemas de CORS/proxy/auth com URLs relativas.
+                                    const handleDownloadDocx = async (e?: React.MouseEvent) => {
+                                        if (e) {
+                                            e.stopPropagation()
+                                            e.preventDefault()
+                                        }
+                                        try {
+                                            const res = await portariaService.downloadDocx(id, true)
+                                            if (!res.success) {
+                                                toast({ title: 'Erro ao gerar DOCX', description: (res as any).error, variant: 'destructive' })
+                                                return
+                                            }
+                                            // downloadDocx retorna { url: signedUrl } — URL assinada do Supabase Storage
+                                            const signedUrl = (res as any).value?.url || (res as any).data?.url
+                                            if (!signedUrl) {
+                                                toast({ title: 'Erro', description: 'URL do documento não retornada pelo servidor.', variant: 'destructive' })
+                                                return
+                                            }
+                                            // Faz fetch da URL assinada e força download com nome amigável
+                                            const blob = await fetch(signedUrl).then(r => r.blob())
+                                            const blobUrl = URL.createObjectURL(blob)
                                             const link = document.createElement('a')
-                                            link.href = `/api/portarias/${id}/stream?type=docx`
-                                            link.download = 'rascunho.docx'
+                                            link.href = blobUrl
+                                            link.download = fileName
                                             document.body.appendChild(link)
                                             link.click()
                                             document.body.removeChild(link)
-                                        }}
-                                    >
-                                        <Download size={14} /> Baixar Rascunho (.docx)
-                                    </Button>
-                                </div>
+                                            URL.revokeObjectURL(blobUrl)
+                                        } catch {
+                                            toast({ title: 'Erro ao baixar DOCX', description: 'Tente novamente.', variant: 'destructive' })
+                                        }
+                                    }
+
+                                    if (conteudoHtml) {
+                                        const htmlPreenchido = substituirVariaveis(conteudoHtml, formDataPortaria, portaria)
+                                        return (
+                                            <div className="flex flex-col h-full min-h-[700px]">
+                                                {/* Barra superior com info + botão download */}
+                                                <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border-b border-blue-100 shrink-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <FileText size={14} className="text-blue-500" />
+                                                        <span className="text-xs font-semibold text-blue-700">Pré-visualização do Rascunho</span>
+                                                        <span className="text-[10px] text-blue-400 font-medium hidden sm:inline">— as variáveis do sistema serão aplicadas na versão final</span>
+                                                    </div>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="gap-1.5 h-7 text-xs font-semibold border-blue-200 text-blue-700 hover:bg-blue-50 shrink-0"
+                                                        onClick={handleDownloadDocx}
+                                                    >
+                                                        <Download size={12} /> Baixar .docx
+                                                    </Button>
+                                                </div>
+                                                {/* Conteúdo HTML do documento */}
+                                                <div className="flex-1 overflow-auto bg-white">
+                                                    <div
+                                                        className="max-w-[800px] mx-auto my-8 px-12 py-10 shadow-sm border border-slate-100"
+                                                        style={{ fontFamily: 'Georgia, "Times New Roman", serif', lineHeight: '1.8', fontSize: '14px', color: '#1a1a1a', minHeight: '600px' }}
+                                                        dangerouslySetInnerHTML={{ __html: htmlPreenchido }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+
+                                    // Fallback: sem conteúdo HTML → só botão de download
+                                    return (
+                                        <div className="flex flex-col items-center justify-center gap-5 min-h-[300px] sm:min-h-[500px] lg:min-h-[700px] text-center px-8">
+                                            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+                                                <FileText className="h-8 w-8 text-blue-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-700">Rascunho Word disponível</p>
+                                                <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                                                    O documento está disponível para download.
+                                                </p>
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                className="gap-2 font-semibold border-blue-200 text-blue-700 hover:bg-blue-50"
+                                                onClick={handleDownloadDocx}
+                                            >
+                                                <Download size={14} /> Baixar Rascunho (.docx)
+                                            </Button>
+                                        </div>
+                                    )
+                                })()
                             ) : (
                             /* Nenhum documento gerado */
                             <div className="flex flex-col items-center justify-center gap-4 min-h-[300px] sm:min-h-[500px] lg:min-h-[700px] text-center px-8">
@@ -711,6 +872,70 @@ function PortariaDetalhesPage() {
                                         </p>
                                     </div>
                                 </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* INFO: EM_REVISAO_ABERTA — autor vê mensagem de aguardando */}
+                    {isRevisaoAberta && !canApprove && (
+                        <Card className="border-amber-100 bg-amber-50/60 shadow-sm">
+                            <CardContent className="p-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                                        <Clock size={14} className="text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-amber-800">Aguardando Revisor</p>
+                                        <p className="text-xs text-amber-600 font-medium mt-1 leading-relaxed">
+                                            Seu documento foi enviado para revisão e está na fila esperando um revisor assumir a análise.
+                                            Você será notificado quando a revisão iniciar.
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* INFO: AGUARDANDO_ASSINATURA — não pode assinar → mensagem de aguardando */}
+                    {isAguardandoAssinatura && !canSign && (
+                        <Card className="border-primary/10 bg-primary/5 shadow-sm">
+                            <CardContent className="p-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                                        <PenTool size={14} className="text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Aguardando Assinatura</p>
+                                        <p className="text-xs text-slate-600 font-medium mt-1 leading-relaxed">
+                                            O documento foi aprovado na revisão e aguarda a assinatura do responsável (Secretário ou Prefeito).
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* ACTIONS: FALHA_PROCESSAMENTO → RETRY */}
+                    {portaria.status === STATUS_PORTARIA.FALHA_PROCESSAMENTO && (
+                        <Card className="border-red-300 bg-red-50 shadow-md">
+                            <CardHeader className="p-4 pb-2">
+                                <div className="flex items-center gap-2 text-red-700">
+                                    <AlertTriangle size={16} />
+                                    <CardTitle className="text-sm font-black uppercase tracking-tight">Falha no Processamento</CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-3">
+                                <p className="text-xs text-red-700 font-medium leading-relaxed">
+                                    Ocorreu um erro ao processar o documento. Tente reprocessar para resolver o problema.
+                                </p>
+                                <Button
+                                    onClick={() => handleAction(() => portariaService.tentarNovamente(id), 'Reprocessamento iniciado.')}
+                                    disabled={actionLoading}
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-10 shadow-md"
+                                >
+                                    {actionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                                    Tentar Novamente
+                                </Button>
                             </CardContent>
                         </Card>
                     )}

@@ -27,11 +27,13 @@ interface ChatMessage {
 // ── Modelos disponíveis para seleção manual (com mapeamento para provider) ───
 const MODELS = [
     { value: '', provider: '',          label: '⚡ Automático (Sistema escolhe)', sub: 'Cerebras por padrão' },
-    { value: 'llama-3.3-70b',    provider: 'cerebras', label: 'Llama 3.3 70B ⚡',     sub: 'Licitações e textos formais' },
-    { value: 'qwen-3-32b',       provider: 'cerebras', label: 'Qwen3 32B ⚡',          sub: 'Técnicos e advertências' },
-    { value: 'llama-4-maverick', provider: 'cerebras', label: 'Llama 4 Maverick ⚡',   sub: 'Tarefas complexas e longas' },
+    { value: 'llama3.1-8b',    provider: 'cerebras', label: 'Llama 3.1 8B ⚡',     sub: 'Padrão e textos rápidos' },
+    { value: 'llama3.3-70b',  provider: 'cerebras', label: 'Llama 3.3 70B ⚡',    sub: 'Tarefas complexas e longas' },
     { value: 'mistral-large-latest', provider: 'mistral', label: 'Mistral Large',      sub: 'Raciocínio avançado' },
     { value: 'llama-3.3-70b-versatile', provider: 'groq', label: 'Llama 3.3 70B (Groq)', sub: 'Fallback rápido' },
+    { value: 'deepseek-r1-distill-llama-70b', provider: 'groq', label: 'DeepSeek R1 70B', sub: 'Raciocínio longo' },
+    { value: 'moonshot-v1-8k', provider: 'kimi', label: 'Kimi (Moonshot 8K)', sub: 'Inteligência chinesa' },
+    { value: 'moonshot-v1-32k', provider: 'kimi', label: 'Kimi (Moonshot 32K)', sub: 'Janela estendida' },
 ]
 
 // ── Sugestões de perguntas por role ───────────────────────────────────────────
@@ -162,6 +164,11 @@ function ProviderBadge({ provider }: { provider: string }) {
             cls: 'text-purple-600 border-purple-200 bg-purple-50',
             icon: <Zap className="h-2.5 w-2.5 mr-0.5" />,
             label: 'groq',
+        },
+        kimi: {
+            cls: 'text-teal-600 border-teal-200 bg-teal-50',
+            icon: <Sparkles className="h-2.5 w-2.5 mr-0.5" />,
+            label: 'kimi',
         },
     }
     const c = config[provider] ?? {

@@ -70,10 +70,8 @@ export class UsuarioService {
                 data: {
                     secretariaId: data.secretariaId,
                     setorId: data.setorId || null,
-                    // Ao completar onboarding, ainda pode precisar de aprovação admin
-                    // mas definimos como OPERADOR por padrão se a política permitir
-                    role: 'OPERADOR',
-                    ativo: true // Ativamos após definir lotação
+                    // O usuário permanece como PENDENTE e inativo (ativo: false) 
+                    // até que um admin aprove a entrada dele na fila de aprovação.
                 }
             })
 

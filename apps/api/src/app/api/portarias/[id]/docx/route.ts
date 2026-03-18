@@ -129,9 +129,15 @@ export async function GET(
         const varsistema = await resolverVariaveisSistema(portaria)
         const allVariables: Record<string, any> = { ...varsistema, ...formData }
 
+        console.log('[/docx] Template path:', templatePath)
+        console.log('[/docx] Variáveis do formData:', Object.keys(formData))
+        console.log('[/docx] Variáveis de sistema:', Object.keys(varsistema))
+        console.log('[/docx] Total variáveis:', Object.keys(allVariables).length)
+
         let filledBuffer: Buffer
         try {
             filledBuffer = await DocxGeneratorService.generate(templatePath, allVariables)
+            console.log('[/docx] DOCX gerado com sucesso, tamanho:', filledBuffer.byteLength, 'bytes')
         } catch (genError: any) {
             console.error('[/docx] Erro ao preencher template:', genError)
             return NextResponse.json(

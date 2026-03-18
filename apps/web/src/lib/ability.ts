@@ -44,6 +44,7 @@ export function buildAbility(user: Usuario): AppAbility {
         // Secretário pode monitorar revisões da sua secretaria
         can('gerenciar', 'Revisao')
         can('ler', 'Revisao')
+        can('ler', 'Analytics')
     }
 
     if (user.role === 'REVISOR') {

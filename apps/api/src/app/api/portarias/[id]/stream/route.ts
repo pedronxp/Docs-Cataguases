@@ -83,26 +83,25 @@ export async function GET(
             )
         }
 
-        const buffer = Buffer.from(await blob.arrayBuffer())
-
-        // Registra log de download (não crítico)
+        // Registra log de download (não crítico) sem bloquear o stream
         prisma.feedAtividade.create({
             data: {
                 tipoEvento: type === 'pdf' ? 'PDF_BAIXADO' : 'DOCX_BAIXADO',
                 mensagem: `Arquivo ${type.toUpperCase()} baixado por ${usuario.name || usuario.username}`,
                 portariaId: id,
-                autorId: usuario.id,
+                autorId: usuario.id as string,
                 secretariaId: portaria.secretariaId,
                 metadata: { acao: 'stream_download', tipo: type },
             }
         }).catch(() => {/* log não crítico */})
 
-        return new NextResponse(buffer, {
+        // Retorna o Blob do Supabase diretamente (Next.js gerencia compressão e chunking)
+        // NÃO definir 'Content-Length' manualmente para evitar ERR_CONTENT_LENGTH_MISMATCH se houver gzip
+        return new NextResponse(blob, {
             status: 200,
             headers: {
                 'Content-Type': contentType,
                 'Content-Disposition': `${disposition}; filename="${fileName}"`,
-                'Content-Length': String(buffer.byteLength),
                 'Cache-Control': 'private, no-cache, no-store, must-revalidate',
                 'X-Content-Type-Options': 'nosniff',
             }

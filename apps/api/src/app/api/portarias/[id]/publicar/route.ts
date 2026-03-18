@@ -291,7 +291,7 @@ export async function POST(
                 await criarNotificacao({
                     userId: portariaComAutor.criadoPorId,
                     tipo: 'PORTARIA_PUBLICADA',
-                    mensagem: `Sua portaria foi publicada com número ${numeroOficial} por ${nomeAutor}`,
+                    mensagem: `"${portaria.titulo}" foi publicada com número ${numeroOficial} por ${nomeAutor}. Acesse para visualizar o documento final.`,
                     portariaId: id,
                     metadata: { numeroOficial },
                 })

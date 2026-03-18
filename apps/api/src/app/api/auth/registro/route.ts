@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { UsuarioService } from '@/services/usuario.service'
+import { createToken } from '@/lib/auth'
 
 const registroSchema = z.object({
     name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -32,9 +33,17 @@ export async function POST(request: NextRequest) {
             }, { status: 400 })
         }
 
+        const usuario = result.value
+        const token = await createToken({
+            id: usuario.id,
+            email: usuario.email,
+            role: usuario.role,
+        })
+
         return NextResponse.json({
             success: true,
-            data: result.value
+            data: usuario,
+            token: token
         })
     } catch (error) {
         console.error('Erro no endpoint de registro:', error)

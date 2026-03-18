@@ -200,7 +200,7 @@ export const LLM_TOOLS = [
         type: 'function',
         function: {
             name: 'criar_portaria',
-            description: 'Cria uma nova portaria (rascunho) no sistema. Precisa do modeloId (use listar_modelos) e secretariaId (use listar_secretarias). Permitido para OPERADOR, SECRETARIO e ADMIN_GERAL.',
+            description: 'Cria uma nova portaria (rascunho) no sistema. Precisa do modeloId (use listar_modelos) e secretariaId (use listar_secretarias). Permitido para OPERADOR, SECRETARIO, REVISOR, PREFEITO e ADMIN_GERAL.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -546,9 +546,9 @@ export async function executeToolCall(
 
             const where: any = {}
             if (status) where.status = status
-            // Operadores só veem as suas; demais veem da secretaria ou tudo
+            // Operadores só veem as suas; Secretário/Revisor veem da secretaria; Admin/Prefeito veem tudo
             if (dbUser.role === 'OPERADOR') where.criadoPorId = dbUser.id
-            else if (dbUser.role === 'SECRETARIO' && dbUser.secretariaId) where.secretariaId = dbUser.secretariaId
+            else if (['SECRETARIO', 'REVISOR'].includes(dbUser.role) && dbUser.secretariaId) where.secretariaId = dbUser.secretariaId
 
             const portarias = await prisma.portaria.findMany({
                 where,
@@ -575,7 +575,7 @@ export async function executeToolCall(
 
         case 'criar_portaria': {
             if (!context?.userAuth?.email) return { erro: 'Ação negada. Usuário não identificado.' }
-            const perm = await verificarPermissao(context.userAuth.email, ['OPERADOR', 'SECRETARIO', 'ADMIN_GERAL'])
+            const perm = await verificarPermissao(context.userAuth.email, ['OPERADOR', 'SECRETARIO', 'REVISOR', 'PREFEITO', 'ADMIN_GERAL'])
             if (!perm.ok) return { erro: perm.erro }
 
             const { titulo, descricao, modeloId, secretariaId, formData = {} } = args
@@ -618,7 +618,7 @@ export async function executeToolCall(
 
             const where: any = {}
             if (dbUser.role === 'OPERADOR') where.criadoPorId = dbUser.id
-            else if (dbUser.role === 'SECRETARIO' && dbUser.secretariaId) where.secretariaId = dbUser.secretariaId
+            else if (['SECRETARIO', 'REVISOR'].includes(dbUser.role) && dbUser.secretariaId) where.secretariaId = dbUser.secretariaId
 
             const [totalRascunho, totalRevisao, totalAssinatura, totalPublicadas, recentes] = await Promise.all([
                 prisma.portaria.count({ where: { ...where, status: 'RASCUNHO' } }),

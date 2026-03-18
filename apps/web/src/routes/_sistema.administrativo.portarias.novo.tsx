@@ -128,7 +128,8 @@ function PortariaWizardPage() {
             })
             navigate({ to: '/administrativo/portarias/$id', params: { id: res.data.id } })
         } else {
-            toast({ title: 'Erro ao gerar rascunho', description: 'Tente novamente.', variant: 'destructive' })
+            const msgErro = res?.error || 'Erro desconhecido. Tente novamente.'
+            toast({ title: 'Erro ao gerar rascunho', description: msgErro, variant: 'destructive' })
         }
     }
 

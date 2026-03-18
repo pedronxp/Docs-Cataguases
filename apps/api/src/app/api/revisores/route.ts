@@ -26,7 +26,14 @@ export async function GET(request: Request) {
         }
 
         const revisores = await prisma.user.findMany({
-            where: { role: 'REVISOR', ativo: true, secretariaId },
+            where: { 
+                role: { in: ['REVISOR', 'SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'] },
+                ativo: true,
+                OR: [
+                    { secretariaId: secretariaId },
+                    { role: { in: ['ADMIN_GERAL', 'PREFEITO'] } } // Admins e Prefeito podem revisar por qualquer secretaria
+                ]
+            },
             select: { id: true, name: true, email: true },
             orderBy: { name: 'asc' },
         })

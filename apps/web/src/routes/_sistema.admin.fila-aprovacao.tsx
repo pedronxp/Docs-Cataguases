@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, Navigate } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +28,7 @@ import { atualizarUsuario } from '@/services/usuario.service'
 import { listarSetores, type Setor } from '@/services/secretaria.service'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { Can } from '@/lib/ability'
 
 export const Route = createFileRoute('/_sistema/admin/fila-aprovacao' as any)({
     component: FilaAprovacaoPage,
@@ -98,7 +99,7 @@ function FilaAprovacaoPage() {
     }, [secretariaSelecionada])
 
     const pendentes = useMemo(() => {
-        let lista = usuarios.filter(u => u.role === 'PENDENTE')
+        let lista = usuarios.filter(u => u.role === 'PENDENTE' && u.ativo !== false)
         if (busca.trim()) {
             const q = busca.toLowerCase()
             lista = lista.filter(u =>
@@ -162,9 +163,15 @@ function FilaAprovacaoPage() {
         }
         setRejeitando(false)
     }
-
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto">
+        <Can I="gerenciar" a="Usuario" passThrough>
+            {(allowed) => {
+                if (!allowed) {
+                    return <Navigate to="/dashboard" replace />
+                }
+
+                return (
+                    <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto">
 
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -487,5 +494,8 @@ function FilaAprovacaoPage() {
                 </DialogContent>
             </Dialog>
         </div>
+                )
+            }}
+        </Can>
     )
 }

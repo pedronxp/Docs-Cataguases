@@ -59,7 +59,7 @@ function OnboardingPage() {
     if (res.success) {
       updateUsuario(res.data)
       toast({ title: "Lotação definida!", description: "Sua solicitação foi enviada para análise." })
-      navigate({ to: '/_auth/aguardando' as any })
+      navigate({ to: '/aguardando' })
     } else {
       toast({ variant: "destructive", title: "Erro ao salvar", description: res.error })
     }

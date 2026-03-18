@@ -17,16 +17,18 @@ model LivrosNumeracao {
   numero_inicial   Int           @default(1)
   logs             Json          @default("[]")
   ativo            Boolean       @default(true)
+  reinicia_por_ano Boolean       @default(true)
+  ano_atual        Int?
   criado_em        DateTime      @default(now())
   atualizado_em    DateTime      @updatedAt
 }
 
 model Portaria {
-  id              String   @id @default(cuid())
+  id              String          @id @default(cuid())
   titulo          String
   descricao       String?
   numeroOficial   String?
-  status          String   @default("RASCUNHO") // RASCUNHO, PROCESSANDO, ASSINADO, PUBLICADO, ARQUIVADO
+  status          String          @default("RASCUNHO") // RASCUNHO, PROCESSANDO, ASSINADO, PUBLICADO, ARQUIVADO
   criadoPorId     String
   secretariaId    String
   setorId         String?
@@ -37,57 +39,65 @@ model Portaria {
   setor           Setor?          @relation(fields: [setorId], references: [id])
   pdfUrl          String?
   docxRascunhoUrl String?
-  hashIntegridade String?  @unique // SHA-256 do conteúdo
+  hashIntegridade String?         @unique // SHA-256 do conteúdo
   assinadoEm      DateTime?
   assinadoPorId   String?
   assinadoPor     User?           @relation("AssinadoPor", fields: [assinadoPorId], references: [id])
   dataPublicacao  DateTime?
-  formData        Json     @default("{}")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  formData        Json            @default("{}")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   atividades      FeedAtividade[]
+  notificacoes    Notificacao[]   @relation("NotificacaoPortaria")
 
   // Controle de Revisão
-  revisorAtualId           String?
-  revisorAtual             User?           @relation("RevisorAtual", fields: [revisorAtualId], references: [id])
-  revisoesCount            Int             @default(0)
-  
+  revisorAtualId String?
+  revisorAtual   User?   @relation("RevisorAtual", fields: [revisorAtualId], references: [id])
+  revisoesCount  Int     @default(0)
+
   // Controle de Assinatura Avançado
-  assinaturaStatus         String          @default("NAO_ASSINADA") // NAO_ASSINADA, ASSINADA_DIGITAL, ASSINADA_MANUAL, DISPENSADA_COM_JUSTIFICATIVA
-  assinaturaJustificativa  String?         @db.Text
+  assinaturaStatus         String  @default("NAO_ASSINADA") // NAO_ASSINADA, ASSINADA_DIGITAL, ASSINADA_MANUAL, DISPENSADA_COM_JUSTIFICATIVA
+  assinaturaJustificativa  String? @db.Text
   assinaturaComprovanteUrl String?
 
-  motivoExclusao           String?         @db.Text
+  motivoExclusao String? @db.Text
 
-  jornalQueue              JornalQueue?
+  jornalQueue JornalQueue?
+  chatMensagens ChatMessage[] @relation("MessageAnexo")
 }
 
 // Atualizar User para ter a relação inversa
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  username        String   @unique
-  email         String?   @unique
-  password        String
-  cpf             String?  @unique
-  emailVerified DateTime?
-  image         String?
-  role          String    @default("USER")             // ADMIN_GERAL, ADMIN_SETORIAL, USER
-  ativo           Boolean  @default(true)
-  pinSeguranca  String?   // B1: token gerado para ações destrutivas críticas pelo Admin
-  permissoesExtra String[] @default([])
-  setorId       String?
-  secretariaId  String?
-  setor         Setor?    @relation(fields: [setorId], references: [id])
-  secretaria    Secretaria? @relation("MembrosSecretaria", fields: [secretariaId], references: [id])
-  secretariasTitular Secretaria[] @relation("SecretarioTitular")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  portarias          Portaria[] @relation("CriadoPor")
-  portariasRevisadas Portaria[] @relation("RevisorAtual")
-  portariasAssinadas Portaria[] @relation("AssinadoPor")
-  atividades      FeedAtividade[]
-  llmPromptsCriados LlmPrompt[] @relation("LlmPromptsCriados")
+  id                    String          @id @default(cuid())
+  name                  String?
+  username              String          @unique
+  email                 String?         @unique
+  password              String
+  cpf                   String?         @unique
+  emailVerified         DateTime?
+  image                 String?
+  role                  String          @default("USER") // ADMIN_GERAL, ADMIN_SETORIAL, USER
+  ativo                 Boolean         @default(true)
+  pinSeguranca          String? // B1: token gerado para ações destrutivas críticas pelo Admin
+  permissoesExtra       String[]        @default([])
+  setorId               String?
+  secretariaId          String?
+  limiteTokensLlm       Int             @default(500000) // Limite de 500k tokens por mês padrão
+  tokensUsadosMesLlm    Int             @default(0) // Resetado via cron/job
+  ultimoResetTokensLlm  DateTime?       
+  setor                 Setor?          @relation(fields: [setorId], references: [id])
+  secretaria            Secretaria?     @relation("MembrosSecretaria", fields: [secretariaId], references: [id])
+  secretariasTitular    Secretaria[]    @relation("SecretarioTitular")
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  portarias             Portaria[]      @relation("CriadoPor")
+  portariasRevisadas    Portaria[]      @relation("RevisorAtual")
+  portariasAssinadas    Portaria[]      @relation("AssinadoPor")
+  atividades            FeedAtividade[]
+  llmPromptsCriados     LlmPrompt[]     @relation("LlmPromptsCriados")
+  feedbacksEnviados     Feedback[]      @relation("FeedbacksEnviados")
+  notificacoesRecebidas Notificacao[]   @relation("NotificacoesRecebidas")
+  chatSessions          ChatSession[]   @relation("UserChatSessions")
 }
 
 model FeedAtividade {
@@ -105,15 +115,15 @@ model FeedAtividade {
 }
 
 model ModeloDocumento {
-  id              String           @id @default(cuid())
+  id              String            @id @default(cuid())
   nome            String
   descricao       String
-  tipoDocumento   TipoDocumento    @default(PORTARIA)
+  tipoDocumento   TipoDocumento     @default(PORTARIA)
   secretariaId    String?
   docxTemplateUrl String
-  conteudoHtml    String           @default("") @db.Text
-  ativo           Boolean          @default(true)
-  versao          Int              @default(1)
+  conteudoHtml    String            @default("") @db.Text
+  ativo           Boolean           @default(true)
+  versao          Int               @default(1)
   modeloPaiId     String?
   modeloPai       ModeloDocumento?  @relation("Versoes", fields: [modeloPaiId], references: [id])
   versoes         ModeloDocumento[] @relation("Versoes")
@@ -122,18 +132,18 @@ model ModeloDocumento {
 }
 
 model ModeloVariavel {
-  id          String          @id @default(cuid())
-  modeloId    String
-  modelo      ModeloDocumento @relation(fields: [modeloId], references: [id])
-  chave       String
-  label       String
-  tipo        String          @default("texto")
-  opcoes      String[]        @default([])
-  obrigatorio Boolean         @default(true)
-  ordem       Int             @default(0)
-  valorPadrao String?         // B1: valor pré-preenchido no formulário de portaria
-  grupo            String?         // B3: agrupa campos em seções no formulário de portaria
-  regraCondicional Json?           // B2: { dependeDe: "CHAVE", valor: "valor" } — exibe campo só se condição satisfeita
+  id               String          @id @default(cuid())
+  modeloId         String
+  modelo           ModeloDocumento @relation(fields: [modeloId], references: [id])
+  chave            String
+  label            String
+  tipo             String          @default("texto")
+  opcoes           String[]        @default([])
+  obrigatorio      Boolean         @default(true)
+  ordem            Int             @default(0)
+  valorPadrao      String? // B1: valor pré-preenchido no formulário de portaria
+  grupo            String? // B3: agrupa campos em seções no formulário de portaria
+  regraCondicional Json? // B2: { dependeDe: "CHAVE", valor: "valor" } — exibe campo só se condição satisfeita
 }
 
 model VariavelSistema {
@@ -145,16 +155,16 @@ model VariavelSistema {
 }
 
 model Secretaria {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   nome      String
-  sigla     String   @unique
-  cor       String   @default("#6366f1")
+  sigla     String     @unique
+  cor       String     @default("#6366f1")
   titularId String?
-  titular   User?    @relation("SecretarioTitular", fields: [titularId], references: [id])
+  titular   User?      @relation("SecretarioTitular", fields: [titularId], references: [id])
   setores   Setor[]
-  usuarios  User[]   @relation("MembrosSecretaria")
+  usuarios  User[]     @relation("MembrosSecretaria")
   portarias Portaria[]
-  ativo     Boolean  @default(true)
+  ativo     Boolean    @default(true)
 }
 
 model Setor {
@@ -166,7 +176,7 @@ model Setor {
   usuarios     User[]
   portarias    Portaria[]
   ativo        Boolean    @default(true)
-  
+
   @@unique([secretariaId, sigla])
 }
 
@@ -175,27 +185,41 @@ enum TipoDocumento {
   MEMORANDO
   OFICIO
   LEI
+  DECRETO
+}
+
+// ── Avisos do Sistema (Admin posta, todos vêem no dashboard) ──────────────────
+model AvisoSistema {
+  id          String   @id @default(cuid())
+  titulo      String
+  mensagem    String   @db.Text
+  tipo        String   @default("INFO") // INFO, AVISO, NOVIDADE
+  ativo       Boolean  @default(true)
+  expiresAt   DateTime? // null = não expira
+  criadoPorId String?
+  criadoEm   DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 }
 
 model JornalQueue {
-  id              String        @id @default(cuid())
-  portariaId      String        @unique
-  tipoDocumento   TipoDocumento @default(PORTARIA)
-  numeroSugerido  String?
-  numeroFinal     String?
-  status          String        @default("PENDENTE") // PENDENTE, CONCLUIDA
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  portariaId     String        @unique
+  tipoDocumento  TipoDocumento @default(PORTARIA)
+  numeroSugerido String?
+  numeroFinal    String?
+  status         String        @default("PENDENTE") // PENDENTE, CONCLUIDA
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  portaria        Portaria      @relation(fields: [portariaId], references: [id], onDelete: Cascade)
+  portaria Portaria @relation(fields: [portariaId], references: [id], onDelete: Cascade)
 }
 
 model LlmApiKey {
   id           String    @id @default(cuid())
-  provider     String    // "groq" | "openrouter" | "cerebras" | "mistral"
-  label        String    // Ex: "Groq - Conta TI Prefeitura"
+  provider     String // "groq" | "openrouter" | "cerebras" | "mistral"
+  label        String // Ex: "Groq - Conta TI Prefeitura"
   keyEncrypted String    @unique // Chave real (nunca exposta ao front)
-  mask         String    // Ex: "gsk-••••••••1234" (exibição no painel)
+  mask         String // Ex: "gsk-••••••••1234" (exibição no painel)
   ativo        Boolean   @default(true)
   requisicoes  Int       @default(0)
   tokensTotal  Int       @default(0)
@@ -210,8 +234,8 @@ model LlmApiKey {
 // São combinados com o system prompt base antes de cada chamada ao LLM.
 model LlmPrompt {
   id           String   @id @default(cuid())
-  nome         String   // Nome amigável, ex: "Instruções de Revisão"
-  categoria    String   // "SISTEMA" | "PORTARIA" | "REVISAO" | "CHAT_GERAL" | "MODELO" | "CUSTOM"
+  nome         String // Nome amigável, ex: "Instruções de Revisão"
+  categoria    String // "SISTEMA" | "PORTARIA" | "REVISAO" | "CHAT_GERAL" | "MODELO" | "CUSTOM"
   conteudo     String   @db.Text // Texto do prompt (pode ser longo)
   ativo        Boolean  @default(true)
   ordem        Int      @default(0) // Menor = injetado primeiro
@@ -219,5 +243,62 @@ model LlmPrompt {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  criadoPor    User?    @relation("LlmPromptsCriados", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  criadoPor User? @relation("LlmPromptsCriados", fields: [criadoPorId], references: [id], onDelete: SetNull)
+}
+
+// ── Feedback dos Usuários ──────────────────────────────────────────────────────
+model Feedback {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation("FeedbacksEnviados", fields: [userId], references: [id], onDelete: Cascade)
+  tipo         String // BUG, SUGESTAO, DUVIDA
+  titulo       String
+  descricao    String   @db.Text
+  prioridade   String   @default("MEDIA") // BAIXA, MEDIA, ALTA
+  status       String   @default("ABERTO") // ABERTO, EM_ANALISE, RESOLVIDO
+  resposta     String?  @db.Text // Resposta do admin ao feedback
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+// ── Notificações ─────────────────────────────────────────────────────────────
+model Notificacao {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation("NotificacoesRecebidas", fields: [userId], references: [id], onDelete: Cascade)
+  tipo       String
+  mensagem   String    @db.Text
+  lida       Boolean   @default(false)
+  portariaId String?
+  portaria   Portaria? @relation("NotificacaoPortaria", fields: [portariaId], references: [id], onDelete: SetNull)
+  metadata   Json?
+  criadoEm   DateTime  @default(now())
+}
+
+// ── ChatGPT Clone (Histórico e Sessões) ──────────────────────────────────────
+model ChatSession {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation("UserChatSessions", fields: [userId], references: [id], onDelete: Cascade)
+  titulo    String
+  provider  String?       @default("cerebras")
+  model     String?       @default("llama3.1-8b")
+  mensagens ChatMessage[] @relation("SessionMessages")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ChatMessage {
+  id         String      @id @default(cuid())
+  sessionId  String
+  session    ChatSession @relation("SessionMessages", fields: [sessionId], references: [id], onDelete: Cascade)
+  role       String      // "user", "assistant", "system" ou "tool"
+  content    String      @db.Text
+  tokens     Int         @default(0)
+  provider   String?
+  model      String?
+  metadata   Json?       // tool_calls, erros, etc.
+  anexoId    String?
+  anexo      Portaria?   @relation("MessageAnexo", fields: [anexoId], references: [id], onDelete: SetNull)
+  createdAt  DateTime    @default(now())
 }

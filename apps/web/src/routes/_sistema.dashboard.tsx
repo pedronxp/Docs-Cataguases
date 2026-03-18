@@ -5,6 +5,14 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select'
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger
+} from '@/components/ui/dialog'
 import { Can } from '@casl/react'
 import { useAbility } from '@casl/react'
 import { AbilityContext } from '@/lib/ability'
@@ -17,6 +25,7 @@ import {
     ClipboardList, TrendingUp, Building2, Newspaper, BarChart2,
     Send, Eye, Save, Download, Bot, UserCheck, AlertCircle,
     FileSignature, ScrollText, Loader2, ChevronRight,
+    Bell, Megaphone, Trash2,
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -26,6 +35,7 @@ import {
     Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import { Skeleton } from '@/components/ui/skeleton'
+import api from '@/lib/api'
 
 const BANNER_KEY = 'docs_tutorial_banner_dismissed'
 
@@ -170,6 +180,183 @@ function ModeloBanner() {
     )
 }
 
+// ─── Avisos do Sistema ────────────────────────────────────────────────────────
+
+type Aviso = {
+    id: string
+    titulo: string
+    mensagem: string
+    tipo: 'INFO' | 'AVISO' | 'NOVIDADE'
+    criadoEm: string
+    expiresAt?: string | null
+}
+
+const AVISO_CONFIG = {
+    INFO: { cls: 'bg-blue-50 border-blue-200', bar: 'bg-blue-500', titleCls: 'text-blue-900', textCls: 'text-blue-700', badge: 'bg-blue-100 text-blue-700', icon: <Bell className="h-4 w-4 text-blue-500" />, label: 'Informação' },
+    AVISO: { cls: 'bg-amber-50 border-amber-200', bar: 'bg-amber-500', titleCls: 'text-amber-900', textCls: 'text-amber-700', badge: 'bg-amber-100 text-amber-700', icon: <AlertCircle className="h-4 w-4 text-amber-500" />, label: 'Atenção' },
+    NOVIDADE: { cls: 'bg-emerald-50 border-emerald-200', bar: 'bg-emerald-500', titleCls: 'text-emerald-900', textCls: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700', icon: <Sparkles className="h-4 w-4 text-emerald-500" />, label: 'Novidade' },
+}
+
+function AvisosSection({ isAdmin }: { isAdmin: boolean }) {
+    const [avisos, setAvisos] = useState<Aviso[]>([])
+    const [loading, setLoading] = useState(true)
+    const [modalOpen, setModalOpen] = useState(false)
+    const [titulo, setTitulo] = useState('')
+    const [mensagem, setMensagem] = useState('')
+    const [tipo, setTipo] = useState<'INFO' | 'AVISO' | 'NOVIDADE'>('NOVIDADE')
+    const [expiresAt, setExpiresAt] = useState('')
+    const [salvando, setSalvando] = useState(false)
+    const [dismissed, setDismissed] = useState<string[]>(() => {
+        try { return JSON.parse(localStorage.getItem('avisos_dismissed') || '[]') } catch { return [] }
+    })
+
+    const carregar = async () => {
+        try {
+            const res = await api.get('/api/avisos')
+            setAvisos(res.data?.data || [])
+        } catch { /* silencioso */ }
+        finally { setLoading(false) }
+    }
+
+    useEffect(() => { carregar() }, [])
+
+    const dispensar = (id: string) => {
+        const next = [...dismissed, id]
+        setDismissed(next)
+        try { localStorage.setItem('avisos_dismissed', JSON.stringify(next)) } catch { /* noop */ }
+    }
+
+    const excluir = async (id: string) => {
+        await api.delete(`/api/avisos/${id}`)
+        carregar()
+    }
+
+    const salvar = async () => {
+        if (!titulo || !mensagem) return
+        setSalvando(true)
+        try {
+            await api.post('/api/avisos', { titulo, mensagem, tipo, expiresAt: expiresAt || null })
+            setModalOpen(false)
+            setTitulo('')
+            setMensagem('')
+            setExpiresAt('')
+            setTipo('NOVIDADE')
+            carregar()
+        } finally { setSalvando(false) }
+    }
+
+    const visiveis = avisos.filter(a => !dismissed.includes(a.id))
+
+    if (!isAdmin && visiveis.length === 0 && !loading) return null
+
+    return (
+        <div className="space-y-2">
+            {/* Card visível a todos com avisos ativos */}
+            {visiveis.map(aviso => {
+                const conf = AVISO_CONFIG[aviso.tipo] ?? AVISO_CONFIG.INFO
+                return (
+                    <div key={aviso.id} className={`relative border px-5 py-4 flex items-start justify-between gap-4 rounded-xl overflow-hidden ${conf.cls}`}>
+                        <div className={`absolute inset-y-0 left-0 w-1 rounded-l-xl ${conf.bar}`} />
+                        <div className="flex items-start gap-3 pl-2">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-white/60">
+                                {conf.icon}
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2 mb-0.5">
+                                    <p className={`text-sm font-bold ${conf.titleCls}`}>{aviso.titulo}</p>
+                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${conf.badge}`}>{conf.label}</span>
+                                </div>
+                                <p className={`text-xs leading-relaxed ${conf.textCls}`}>{aviso.mensagem}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">
+                                    {formatDistanceToNow(new Date(aviso.criadoEm), { addSuffix: true, locale: ptBR })}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                            {isAdmin && (
+                                <button onClick={() => excluir(aviso.id)} className="text-slate-300 hover:text-red-500 transition-colors" title="Excluir aviso">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                            )}
+                            <button onClick={() => dispensar(aviso.id)} className="text-slate-300 hover:text-slate-500 transition-colors">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                )
+            })}
+
+            {/* Botão de postar novo aviso (somente admin) */}
+            {isAdmin && (
+                <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+                    <DialogTrigger asChild>
+                        <button className="w-full flex items-center gap-2 px-4 py-2.5 bg-white border border-dashed border-slate-300 rounded-xl text-xs font-semibold text-slate-500 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all">
+                            <Megaphone className="h-3.5 w-3.5" />
+                            Postar aviso para todos os usuários
+                        </button>
+                    </DialogTrigger>
+                    <DialogContent className="rounded-2xl max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Megaphone className="h-4 w-4 text-primary" /> Novo Aviso do Sistema
+                            </DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-slate-700">Tipo</label>
+                                <Select value={tipo} onValueChange={v => setTipo(v as any)}>
+                                    <SelectTrigger className="rounded-xl h-9 text-sm">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="NOVIDADE">✨ Novidade / Nova Função</SelectItem>
+                                        <SelectItem value="INFO">ℹ️ Informação</SelectItem>
+                                        <SelectItem value="AVISO">⚠️ Atenção / Manutenção</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-slate-700">Título</label>
+                                <Input
+                                    placeholder="Ex: Nova funcionalidade de assinatura digital"
+                                    value={titulo}
+                                    onChange={e => setTitulo(e.target.value)}
+                                    className="rounded-xl"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-slate-700">Mensagem</label>
+                                <Textarea
+                                    placeholder="Descreva a atualização ou aviso..."
+                                    value={mensagem}
+                                    onChange={e => setMensagem(e.target.value)}
+                                    className="rounded-xl min-h-[80px] resize-none text-sm"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-slate-700">Expira em <span className="text-slate-400 font-normal">(opcional)</span></label>
+                                <Input
+                                    type="datetime-local"
+                                    value={expiresAt}
+                                    onChange={e => setExpiresAt(e.target.value)}
+                                    className="rounded-xl text-sm"
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setModalOpen(false)} className="rounded-xl">Cancelar</Button>
+                            <Button onClick={salvar} disabled={salvando || !titulo || !mensagem}
+                                className="bg-primary hover:bg-primary/90 font-bold rounded-xl">
+                                {salvando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Postando...</> : <><Megaphone className="mr-2 h-4 w-4" /> Publicar Aviso</>}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </div>
+    )
+}
+
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({ title, value, description, icon, iconBg, valueCls }: {
@@ -250,6 +437,7 @@ function DashboardPage() {
         <div className="space-y-5 animate-in fade-in duration-500">
             <WelcomeBanner />
             <ModeloBanner />
+            <AvisosSection isAdmin={isAdmin} />
 
             {/* Cabeçalho */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-1">
