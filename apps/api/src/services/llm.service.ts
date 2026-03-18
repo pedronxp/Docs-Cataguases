@@ -16,11 +16,14 @@
 
 import prisma from '@/lib/prisma'
 
-export type LLMProvider = 'cerebras' | 'mistral' | 'groq' | 'openrouter'
+export type LLMProvider = 'cerebras' | 'mistral' | 'groq' | 'openrouter' | 'kimi'
 
 export interface LLMMessage {
-    role: 'system' | 'user' | 'assistant'
-    content: string
+    role: 'system' | 'user' | 'assistant' | 'tool'
+    content: string | null
+    tool_calls?: any[]
+    tool_call_id?: string
+    name?: string
 }
 
 export interface LLMChatOptions {
@@ -54,15 +57,14 @@ const GROQ_BASE = 'https://api.groq.com/openai/v1'
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
 const CEREBRAS_BASE = 'https://api.cerebras.ai/v1'
 const MISTRAL_BASE = 'https://api.mistral.ai/v1'
+const KIMI_BASE = 'https://api.moonshot.cn/v1'
 
 // ── Catálogo de Modelos ────────────────────────────────────────────────────────
 
-// CEREBRAS — Motor principal (wafer-scale ⚡, gratuito até 1M tokens/dia)
+// CEREBRAS — Motor principal (wafer-scale ⚡, gratuito)
 export const CEREBRAS_MODELS = [
-    { id: 'llama-3.3-70b', label: 'Llama 3.3 70B ⚡ (Textos formais e licitações)', contextWindow: 128000 },
-    { id: 'qwen-3-32b',    label: 'Qwen3 32B ⚡ (Técnicos e advertências)', contextWindow: 32768 },
-    { id: 'llama-4-maverick', label: 'Llama 4 Maverick ⚡ (Tarefas complexas e longas)', contextWindow: 256000 },
-    { id: 'llama3.1-8b',  label: 'Llama 3.1 8B ⚡ (Respostas rápidas)', contextWindow: 128000 },
+    { id: 'llama3.1-8b',  label: 'Llama 3.1 8B ⚡ (Padrão)', contextWindow: 8192 },
+    { id: 'llama3.3-70b', label: 'Llama 3.3 70B ⚡ (Alta Capacidade)', contextWindow: 8192 },
 ]
 
 // MISTRAL — Alta qualidade, raciocínio estruturado
@@ -76,8 +78,8 @@ export const MISTRAL_MODELS = [
 export const GROQ_MODELS = [
     { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Versatile)', contextWindow: 128000 },
     { id: 'llama-3.1-8b-instant',    label: 'Llama 3.1 8B (Instant)', contextWindow: 131072 },
-    { id: 'qwen-qwq-32b',            label: 'QwQ 32B (Raciocínio)', contextWindow: 32768 },
-    { id: 'llama-4-scout-17b',       label: 'Llama 4 Scout (Contexto longo)', contextWindow: 1048576 },
+    { id: 'qwen-2.5-32b',            label: 'Qwen 2.5 32B (Raciocínio)', contextWindow: 32768 },
+    { id: 'deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 (Contexto longo)', contextWindow: 128000 },
 ]
 
 // OPENROUTER — Fallback final
@@ -85,6 +87,12 @@ export const OPENROUTER_FREE_MODELS = [
     { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (free)' },
     { id: 'google/gemma-3-27b-it:free', label: 'Gemma 3 27B (free)' },
     { id: 'deepseek/deepseek-r1:free', label: 'DeepSeek R1 (free)' },
+]
+
+// KIMI — Moonshot AI
+export const KIMI_MODELS = [
+    { id: 'moonshot-v1-8k', label: 'Moonshot v1 8K', contextWindow: 8192 },
+    { id: 'moonshot-v1-32k', label: 'Moonshot v1 32K', contextWindow: 32768 },
 ]
 
 // ── Estado de rastreamento em memória ─────────────────────────────────────────
@@ -136,6 +144,7 @@ const stats: Record<LLMProvider, LLMProviderStats> = {
     mistral:    emptyStats(),
     groq:       emptyStats(),
     openrouter: emptyStats(),
+    kimi:       emptyStats(),
 }
 
 const requestLog: LLMRequestLog[] = []
@@ -162,11 +171,12 @@ interface ModelChoice {
 }
 
 function getDefaultModelForProvider(provider: LLMProvider): string {
-    if (provider === 'cerebras') return 'llama-3.3-70b'
+    if (provider === 'cerebras') return 'llama3.1-8b'
     if (provider === 'mistral') return 'mistral-large-latest'
     if (provider === 'groq') return 'llama-3.3-70b-versatile'
     if (provider === 'openrouter') return 'meta-llama/llama-3.3-70b-instruct:free'
-    return 'llama-3.3-70b'
+    if (provider === 'kimi') return 'moonshot-v1-8k'
+    return 'llama3.1-8b'
 }
 
 function chooseModel(options: LLMChatOptions): ModelChoice {
@@ -193,10 +203,11 @@ function chooseModel(options: LLMChatOptions): ModelChoice {
 
     // Modelos por provider para cada cenário
     const modelMap: Record<LLMProvider, { tools: string; fast: string; long: string; default: string }> = {
-        cerebras:   { tools: 'llama-3.3-70b', fast: 'llama3.1-8b', long: 'llama-4-maverick', default: 'llama-3.3-70b' },
+        cerebras:   { tools: 'llama3.3-70b', fast: 'llama3.1-8b', long: 'llama3.3-70b', default: 'llama3.1-8b' },
         mistral:    { tools: 'mistral-large-latest', fast: 'mistral-small-latest', long: 'mistral-large-latest', default: 'mistral-large-latest' },
-        groq:       { tools: 'llama-3.3-70b-versatile', fast: 'llama-3.1-8b-instant', long: 'llama-4-scout-17b', default: 'llama-3.3-70b-versatile' },
+        groq:       { tools: 'llama-3.3-70b-versatile', fast: 'llama-3.1-8b-instant', long: 'deepseek-r1-distill-llama-70b', default: 'llama-3.3-70b-versatile' },
         openrouter: { tools: 'meta-llama/llama-3.3-70b-instruct:free', fast: 'meta-llama/llama-3.3-70b-instruct:free', long: 'deepseek/deepseek-r1:free', default: 'meta-llama/llama-3.3-70b-instruct:free' },
+        kimi:       { tools: 'moonshot-v1-8k', fast: 'moonshot-v1-8k', long: 'moonshot-v1-32k', default: 'moonshot-v1-8k' },
     }
 
     const models = modelMap[preferred]
@@ -283,7 +294,7 @@ async function incrementKeyUsage(keyId: string, tokens: number) {
 // ── Circuit Breaker — Chamada com Retry Automático ────────────────────────────
 
 // Motivo pelo qual um provider não foi usado
-type SkipReason = 'no_key' | 'rate_limited'
+type SkipReason = 'no_key' | 'rate_limited' | 'api_error'
 
 async function callWithCircuitBreaker(
     provider: LLMProvider,
@@ -302,6 +313,8 @@ async function callWithCircuitBreaker(
                 ? process.env.CEREBRAS_API_KEY
                 : provider === 'mistral'
                 ? process.env.MISTRAL_API_KEY
+                : provider === 'kimi'
+                ? process.env.KIMI_API_KEY
                 : process.env.OPENROUTER_API_KEY
 
             if (!envKey) {
@@ -327,9 +340,9 @@ async function callWithCircuitBreaker(
                     console.warn(`[LLM Pool] ${provider} ENV key inválida/expirada (${status}) → próximo provider`)
                     return { tried: false, skipReason: 'no_key' } as any
                 }
-                // Outros erros (400, 500, timeout): pula mas registra
-                console.error(`[LLM Pool] ${provider} erro inesperado (${status}): ${err.message?.slice(0, 120)} → próximo provider`)
-                return { tried: false, skipReason: 'no_key' } as any
+                // Outros erros (400, 404, 500, timeout): pula mas registra como api_error
+                console.error(`[LLM Pool] ${provider} erro da API (${status}): ${err.message?.slice(0, 120)} → próximo provider`)
+                return { tried: false, skipReason: 'api_error' } as any
             }
         }
 
@@ -351,9 +364,13 @@ async function callWithCircuitBreaker(
                 await markKeyExhausted(key.id, 24 * 60) // Cooldown de 24h para chave inválida
                 continue  // Tenta a próxima chave do mesmo provider
             }
-            // Erro inesperado: marca como esgotada por 5 minutos e passa para próximo provider
+            // Erro inesperado (500) ou formato inválido / modelo inexistente (400, 404)
             console.error(`[LLM Pool] Chave ${key.mask} do ${provider} erro (${status}): ${err.message?.slice(0, 80)}`)
             await markKeyExhausted(key.id, 5)
+            // Para 404/400 (Client Errors), não adianta tentar outra chave do mesmo provider para o mesmo modelo com mesmo prompt
+            if (status === 400 || status === 404) {
+                return { tried: false, skipReason: 'api_error' } as any
+            }
             continue
         }
     }
@@ -377,7 +394,7 @@ export async function llmChat(options: LLMChatOptions): Promise<LLMChatResult> {
     resetDailyIfNeeded()
 
     const choice = options.skipSmartRouter
-        ? { provider: (options.provider || 'cerebras') as LLMProvider, model: options.model || 'llama-3.3-70b', reason: 'Manual' }
+        ? { provider: (options.provider || 'cerebras') as LLMProvider, model: options.model || 'llama3.1-8b', reason: 'Manual' }
         : chooseModel(options)
 
     console.log(`[LLM Router] ${choice.reason} → ${choice.provider}/${choice.model}`)
@@ -397,7 +414,7 @@ export async function llmChat(options: LLMChatOptions): Promise<LLMChatResult> {
         console.log(`[LLM Router] Modo manual: usando APENAS ${choice.provider}/${choice.model} (sem fallback)`)
     } else {
         // Modo automático: tentar em ordem de disponibilidade
-        const allProviders: LLMProvider[] = ['cerebras', 'mistral', 'groq', 'openrouter']
+        const allProviders: LLMProvider[] = ['cerebras', 'mistral', 'kimi', 'groq', 'openrouter']
         const base = Array.from(new Set([choice.provider, ...allProviders]))
         providerOrder = [
             ...base.filter(p => hasEnvKey(p)),   // providers com chave ENV primeiro
@@ -413,9 +430,10 @@ export async function llmChat(options: LLMChatOptions): Promise<LLMChatResult> {
         // Seleciona modelo padrão do provider se houve failover
         let modelToUse = choice.model
         if (provider !== choice.provider || modelToUse.includes('/')) {
-            if (provider === 'cerebras') modelToUse = 'llama-3.3-70b'
+            if (provider === 'cerebras') modelToUse = 'llama3.1-8b'
             else if (provider === 'mistral') modelToUse = 'mistral-large-latest'
             else if (provider === 'groq') modelToUse = 'llama-3.3-70b-versatile'
+            else if (provider === 'kimi') modelToUse = 'moonshot-v1-8k'
             else modelToUse = 'meta-llama/llama-3.3-70b-instruct:free'
         }
 
@@ -460,10 +478,18 @@ export async function llmChat(options: LLMChatOptions): Promise<LLMChatResult> {
     // Diagnóstico: quantos falharam por qual motivo
     const noKey = Object.entries(failReasons).filter(([, r]) => r === 'no_key').map(([p]) => p)
     const rateLimited = Object.entries(failReasons).filter(([, r]) => r === 'rate_limited').map(([p]) => p)
+    const apiError = Object.entries(failReasons).filter(([, r]) => r === 'api_error').map(([p]) => p)
 
     console.error('[LLM Pool] Todos os providers falharam:', JSON.stringify(failReasons))
 
     // ── Mensagens de erro com branding "Doc's Cataguases" ────────────────────
+    if (options.skipSmartRouter && apiError.includes(choice.provider)) {
+        throw new Error(
+            `Doc's Cataguases — A API retornou um erro para o modelo selecionado (${choice.provider}). ` +
+            `Verifique se o modelo está indisponível ou tente outra opção.`
+        )
+    }
+
     if (options.skipSmartRouter && rateLimited.includes(choice.provider)) {
         // Modo manual: provider escolhido está com rate limit
         throw new Error(
@@ -518,6 +544,7 @@ async function callProviderRaw(
     const baseUrl = provider === 'cerebras' ? CEREBRAS_BASE
         : provider === 'mistral' ? MISTRAL_BASE
         : provider === 'groq' ? GROQ_BASE
+        : provider === 'kimi' ? KIMI_BASE
         : OPENROUTER_BASE
 
     const headers: Record<string, string> = {
@@ -533,10 +560,24 @@ async function callProviderRaw(
         headers['Accept'] = 'application/json'
     }
 
+    // Garantir que a estrutura de histórico atende às APIS (ex: Cerebras, Groq)
+    // Se o frontend (ou db) salvou argumentos como objeto, serializar de volta para string
+    const normalizedMessages = options.messages.map(msg => {
+        if (msg.role === 'assistant' && msg.tool_calls) {
+            msg.tool_calls = msg.tool_calls.map((tc: any) => {
+                if (tc.function && typeof tc.function.arguments === 'object') {
+                    tc.function.arguments = JSON.stringify(tc.function.arguments)
+                }
+                return tc
+            })
+        }
+        return msg
+    })
+
     const body: any = {
         model,
-        messages: options.messages,
-        max_tokens: options.maxTokens ?? 4096,
+        messages: normalizedMessages,
+        max_tokens: options.maxTokens ?? 2048,
         temperature: options.temperature ?? 0.7,
     }
 
@@ -560,6 +601,7 @@ async function callProviderRaw(
 
     if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: res.statusText }))
+        require('fs').writeFileSync(`${provider}_err.json`, JSON.stringify({status: res.status, url: `${baseUrl}/chat/completions`, errBody, reqBody: body}, null, 2))
         console.error(`[LLM Provider ${provider}] Status ${res.status}:`, JSON.stringify(errBody))
         const err = new Error(errBody?.error?.message || errBody?.error || res.statusText) as any
         err.status = res.status
@@ -570,9 +612,51 @@ async function callProviderRaw(
     const data = await res.json()
     const choice = data.choices?.[0]
 
+    let content = choice?.message?.content ?? ''
+    let tool_calls = choice?.message?.tool_calls
+
+    // Normalização: alguns provedores (Cerebras) podem retornar arguments como objeto, mas a API (incluindo eles mesmos depois) 
+    // exige que seja uma string JSON válida.
+    if (tool_calls && Array.isArray(tool_calls)) {
+        tool_calls = tool_calls.map((tc: any) => {
+            if (tc.function && typeof tc.function.arguments === 'object') {
+                tc.function.arguments = JSON.stringify(tc.function.arguments)
+            }
+            return tc
+        })
+    }
+
+    // Fallback: Modelos (ex: Cerebras llama3.1-8b) às vezes retornam a chamada da tool como string JSON pura no content
+    if (!tool_calls && content && content.includes('"type":') && content.includes('"name":')) {
+        try {
+            let cleanJson = content.trim()
+            cleanJson = cleanJson.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/, '').trim()
+            if (cleanJson.startsWith('`') && cleanJson.endsWith('`')) {
+                cleanJson = cleanJson.slice(1, -1).trim()
+            }
+            
+            if (cleanJson.startsWith('{') && cleanJson.endsWith('}')) {
+                const parsed = JSON.parse(cleanJson)
+                if ((parsed.type === 'function' || parsed.function) && parsed.name) {
+                    tool_calls = [{
+                        id: 'call_' + Math.random().toString(36).slice(2, 9),
+                        type: 'function',
+                        function: {
+                            name: parsed.name,
+                            arguments: typeof parsed.parameters === 'object' ? JSON.stringify(parsed.parameters) : (parsed.parameters || parsed.arguments || '{}')
+                        }
+                    }]
+                    content = '' // Zera o content já que era um tool call
+                }
+            }
+        } catch (e) {
+            // Se não for JSON válido, ignora e mantém o content como texto
+        }
+    }
+
     return {
-        content: choice?.message?.content ?? '',
-        tool_calls: choice?.message?.tool_calls,
+        content,
+        tool_calls,
         provider,
         model: data.model || model,
         keyId,

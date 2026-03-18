@@ -14,4 +14,14 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      // Redireciona chamadas /api/* para o backend Next.js (porta 3000)
+      // Isso permite que <a href="/api/..."> e <iframe src="/api/..."> funcionem
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      }
+    }
+  },
 })

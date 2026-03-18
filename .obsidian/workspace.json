@@ -1,0 +1,221 @@
+{
+  "main": {
+    "id": "d4700e7dfe846551",
+    "type": "split",
+    "children": [
+      {
+        "id": "67d766c5aa84c482",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "faa6b506a9030f0a",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "Nova aba"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "6cf5462db8094360",
+    "type": "split",
+    "children": [
+      {
+        "id": "5484e2bc0e7a9f52",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "318b6bd9f158b6a6",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de arquivos"
+            }
+          },
+          {
+            "id": "da4ad25860712696",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Procurar"
+            }
+          },
+          {
+            "id": "e4e19368e1755456",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "0bd41980e7f22663",
+    "type": "split",
+    "children": [
+      {
+        "id": "87eead4e15ad6446",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "210dd520b27584be",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Links inversos"
+            }
+          },
+          {
+            "id": "bc60befce948a1ed",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Links de saída"
+            }
+          },
+          {
+            "id": "4f3a92f33cde0f0f",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "6cc48d56a2dfd63d",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas as propriedades"
+            }
+          },
+          {
+            "id": "7f3e05addaa9df07",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Sumário"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir a troca rápida": false,
+      "graph:Abrir visualização em gráfico": false,
+      "canvas:Criar novo canvas": false,
+      "daily-notes:Abrir a nota de hoje": false,
+      "templates:Inserir modelo": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Criar nova base": false
+    }
+  },
+  "active": "faa6b506a9030f0a",
+  "lastOpenFiles": [
+    "apps/web/node_modules/mdast-util-phrasing/lib/index.js",
+    "apps/web/node_modules/mdast-util-phrasing/lib/index.d.ts",
+    "apps/web/node_modules/mdast-util-phrasing/lib",
+    "apps/web/node_modules/mdast-util-phrasing/license",
+    "apps/web/node_modules/mdast-util-phrasing/readme.md",
+    "apps/web/node_modules/mdast-util-phrasing/package.json",
+    "apps/web/node_modules/mdast-util-phrasing/index.d.ts",
+    "apps/web/node_modules/mdast-util-phrasing/index.js",
+    "apps/web/node_modules/mdast-util-phrasing",
+    "apps/web/node_modules/caniuse-lite/data/features/selectlist.js",
+    "apps/web/node_modules/mdast-util-to-markdown/lib/util/track.js",
+    "apps/web/node_modules/mdast-util-to-markdown/lib/util/track.d.ts.map",
+    "apps/web/node_modules/mdast-util-to-markdown/readme.md",
+    "apps/web/node_modules/micromark-util-combine-extensions/readme.md",
+    "apps/web/node_modules/zwitch/readme.md",
+    "apps/web/node_modules/readdirp/node_modules/picomatch/README.md",
+    "apps/web/node_modules/readdirp/node_modules/picomatch/CHANGELOG.md",
+    "apps/web/node_modules/longest-streak/readme.md",
+    "apps/web/node_modules/micromark-extension-gfm-tagfilter/readme.md",
+    "apps/web/node_modules/micromark-extension-gfm-footnote/readme.md",
+    "apps/web/node_modules/micromark-factory-space/readme.md",
+    "apps/web/node_modules/micromark-util-chunked/readme.md",
+    "apps/web/node_modules/remark-stringify/readme.md",
+    "apps/web/node_modules/mdast-util-gfm-strikethrough/readme.md",
+    "apps/web/node_modules/mdast-util-gfm-autolink-literal/readme.md",
+    "apps/web/node_modules/mdast-util-gfm-table/readme.md",
+    "apps/web/node_modules/trough/readme.md",
+    "apps/web/node_modules/extend/README.md",
+    "apps/web/node_modules/extend/CHANGELOG.md",
+    "apps/web/node_modules/mdast-util-gfm-footnote/readme.md",
+    "apps/web/node_modules/@radix-ui/react-arrow/node_modules/@radix-ui/react-slot/README.md",
+    "apps/web/node_modules/@radix-ui/react-arrow/node_modules/@radix-ui/react-primitive/README.md",
+    "apps/web/node_modules/micromark-extension-gfm-table/readme.md",
+    "apps/web/node_modules/micromark-util-html-tag-name/readme.md",
+    "apps/web/node_modules/mdast-util-gfm-task-list-item/readme.md",
+    "apps/web/node_modules/mdast-util-to-hast/readme.md",
+    "Sem título.canvas",
+    "Fluxo Portaria.canvas",
+    "Sem título 1.canvas"
+  ]
+}

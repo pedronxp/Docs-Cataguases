@@ -18,7 +18,8 @@ import { useToast } from '@/hooks/use-toast'
 import {
     RefreshCw, Zap, Globe, ArrowLeftRight, CheckCircle2, XCircle,
     Clock, Cpu, MessageSquare, AlertTriangle, Send, BarChart3,
-    KeyRound, Plus, Trash2, PowerOff, Power, ShieldAlert, PlugZap, Sparkles, Loader2
+    KeyRound, Plus, Trash2, PowerOff, Power, ShieldAlert, PlugZap, Sparkles, Loader2,
+    Bot, Shield, Info, Activity
 } from 'lucide-react'
 import {
     getLLMStatus, setLLMProvider, llmChat,
@@ -45,6 +46,7 @@ const PROVIDERS: { name: LLMProvider; label: string; desc: string; icon: React.E
     { name: 'mistral', label: 'Mistral', desc: 'Modelos de ponta', icon: Sparkles, accent: 'text-[#6730a3]', accentBg: 'bg-[#f3f0ff]', accentBorder: 'border-[#6730a3]' },
     { name: 'groq', label: 'Groq', desc: 'Ultra-rápido', icon: Cpu, accent: 'text-[#6730a3]', accentBg: 'bg-[#f3f0ff]', accentBorder: 'border-[#6730a3]' },
     { name: 'openrouter', label: 'OpenRouter', desc: '400+ modelos', icon: Globe, accent: 'text-[#1351b4]', accentBg: 'bg-[#edf5ff]', accentBorder: 'border-[#1351b4]' },
+    { name: 'kimi', label: 'Kimi', desc: 'Moonshot AI', icon: Sparkles, accent: 'text-[#1d9e74]', accentBg: 'bg-[#e6f4f1]', accentBorder: 'border-[#1d9e74]' },
 ]
 
 // ── Provider card ─────────────────────────────────────────────────────────────
@@ -162,6 +164,7 @@ function LogRow({ entry }: { entry: LLMRequestLog }) {
     const providerColor = entry.provider === 'cerebras' ? 'text-[#c55a00] border-[#c55a00] bg-[#fff5eb]'
         : entry.provider === 'mistral' ? 'text-[#6730a3] border-[#6730a3] bg-[#f3f0ff]'
         : entry.provider === 'groq' ? 'text-[#6730a3] border-[#6730a3] bg-[#f3f0ff]'
+        : entry.provider === 'kimi' ? 'text-[#1d9e74] border-[#1d9e74] bg-[#e6f4f1]'
         : 'text-[#1351b4] border-[#1351b4] bg-[#edf5ff]'
     return (
         <TableRow className={`text-xs ${entry.success ? '' : 'bg-[#ffefec]'} border-b border-[#e6e6e6]`}>
@@ -195,7 +198,7 @@ const REFRESH_INTERVAL = 15
 // ── Keys tab types ────────────────────────────────────────────────────────────
 interface LlmKey {
     id: string
-    provider: 'groq' | 'openrouter' | 'cerebras' | 'mistral'
+    provider: 'groq' | 'openrouter' | 'cerebras' | 'mistral' | 'kimi'
     label: string
     mask: string
     ativo: boolean
@@ -219,6 +222,7 @@ const PROVIDER_BADGE_COLOR: Record<string, string> = {
     mistral: 'text-[#6730a3] border-[#6730a3] bg-[#f3f0ff]',
     groq: 'text-[#6730a3] border-[#6730a3] bg-[#f3f0ff]',
     openrouter: 'text-[#1351b4] border-[#1351b4] bg-[#edf5ff]',
+    kimi: 'text-[#1d9e74] border-[#1d9e74] bg-[#e6f4f1]',
 }
 
 // ── Keys Tab ──────────────────────────────────────────────────────────────────
@@ -299,8 +303,8 @@ function KeysTab() {
         <div className="space-y-6">
             {/* Pool Health */}
             {poolStats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {(['cerebras', 'mistral', 'groq', 'openrouter'] as const).map(provider => {
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {(['cerebras', 'mistral', 'groq', 'openrouter', 'kimi'] as const).map(provider => {
                         const p = poolStats[provider]
                         const healthy = p?.ativas > 0 && p?.esgotadas === 0
                         const warning = p?.ativas > 0 && p?.esgotadas > 0
@@ -367,6 +371,7 @@ function KeysTab() {
                                     <SelectItem value="mistral">Mistral</SelectItem>
                                     <SelectItem value="groq">Groq</SelectItem>
                                     <SelectItem value="openrouter">OpenRouter</SelectItem>
+                                    <SelectItem value="kimi">Moonshot AI (Kimi)</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -576,6 +581,9 @@ function LLMDashboard() {
                     <TabsTrigger value="playground" className="gap-1.5 font-bold text-sm data-[state=active]:bg-[#1351b4] data-[state=active]:text-white rounded px-4 py-2">
                         <MessageSquare className="h-4 w-4" /> Playground
                     </TabsTrigger>
+                    <TabsTrigger value="chatdocs" className="gap-1.5 font-bold text-sm data-[state=active]:bg-[#1351b4] data-[state=active]:text-white rounded px-4 py-2">
+                        <Bot className="h-4 w-4" /> chatDoc's
+                    </TabsTrigger>
                 </TabsList>
 
                 {/* ── Monitor ── */}
@@ -718,6 +726,104 @@ function LLMDashboard() {
                             )}
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                {/* ── ChatDoc's ── */}
+                <TabsContent value="chatdocs" className="space-y-6 mt-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Regras de Tokens */}
+                        <Card className="border-[#e6e6e6] shadow-none rounded">
+                            <CardHeader className="border-b border-[#e6e6e6] bg-[#f8f9fa] py-4">
+                                <CardTitle className="text-base font-bold text-[#333333] flex items-center gap-2">
+                                    <Activity className="h-5 w-5 text-[#1351b4]" />
+                                    Limites de Tokens por Perfil
+                                </CardTitle>
+                                <CardDescription className="text-xs text-[#555555]">
+                                    Cotas distribuídas mensalmente de acordo com a hierarquia.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <Table>
+                                    <TableHeader className="bg-[#f8f9fa]">
+                                        <TableRow className="border-[#e6e6e6]">
+                                            <TableHead className="text-xs font-bold text-[#333333]">Cargo / Role</TableHead>
+                                            <TableHead className="text-xs font-bold text-[#333333]">Tokens/mês</TableHead>
+                                            <TableHead className="text-xs font-bold text-[#333333]">Renovação</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow className="border-[#e6e6e6]">
+                                            <TableCell className="py-3 text-sm font-medium text-[#333333]">Administrador Geral</TableCell>
+                                            <TableCell className="py-3 text-sm text-[#1351b4] font-bold">1.000.000</TableCell>
+                                            <TableCell className="py-3 text-xs text-[#555555]">Dia 1</TableCell>
+                                        </TableRow>
+                                        <TableRow className="border-[#e6e6e6]">
+                                            <TableCell className="py-3 text-sm font-medium text-[#333333]">Prefeito</TableCell>
+                                            <TableCell className="py-3 text-sm text-[#1351b4] font-bold">800.000</TableCell>
+                                            <TableCell className="py-3 text-xs text-[#555555]">Dia 1</TableCell>
+                                        </TableRow>
+                                        <TableRow className="border-[#e6e6e6]">
+                                            <TableCell className="py-3 text-sm font-medium text-[#333333]">Secretários</TableCell>
+                                            <TableCell className="py-3 text-sm text-[#1351b4] font-bold">500.000</TableCell>
+                                            <TableCell className="py-3 text-xs text-[#555555]">Dia 1</TableCell>
+                                        </TableRow>
+                                        <TableRow className="border-[#e6e6e6]">
+                                            <TableCell className="py-3 text-sm font-medium text-[#333333]">Revisores / Operadores</TableCell>
+                                            <TableCell className="py-3 text-sm text-[#1351b4] font-bold">200.000</TableCell>
+                                            <TableCell className="py-3 text-xs text-[#555555]">Dia 1</TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                                <div className="p-4 bg-[#edf5ff] border-t border-[#e6e6e6] text-xs text-[#1351b4] flex gap-2">
+                                    <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                                    <span>Os tokens representam aproximadamente 4 letras cada. Quando a cota de um usuário esgota, o chat é bloqueado até a virada do mês, evitando cobranças excessivas de API.</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <div className="space-y-6">
+                            {/* Lei de Privacidade */}
+                            <Card className="border-[#e6e6e6] shadow-none rounded">
+                                <CardHeader className="border-b border-[#e6e6e6] bg-[#f8f9fa] py-4">
+                                    <CardTitle className="text-base font-bold text-[#333333] flex items-center gap-2">
+                                        <Shield className="h-5 w-5 text-[#008833]" />
+                                        Política de Privacidade da IA
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="pt-4 space-y-3">
+                                    <p className="text-sm text-[#555555] leading-relaxed">
+                                        O chatDoc's foi arquitetado para proteger dados corporativos:
+                                    </p>
+                                    <ul className="text-sm text-[#555555] space-y-2 list-disc pl-4">
+                                        <li><strong>Zero Content Training (ZCT):</strong> Nenhum prompt, anexo ou conversa trafegada através das APIs (Mistral, Groq, Cerebras, Kimi) é utilizada para treinar os modelos fundacionais de origem.</li>
+                                        <li><strong>Retenção Efêmera Padrão:</strong> Alguns provedores retêm os logs temporariamente apenas para monitoramento de abusos e detecção de incidentes (normalmente ≤ 30 dias).</li>
+                                        <li><strong>LGPD / Complience:</strong> Documentos de teor ultrassigiloso não devem ter dados de pessoa física alimentados na IA diretamente (Anonimização recomendada).</li>
+                                    </ul>
+                                </CardContent>
+                            </Card>
+
+                            {/* Configuração de Resposta (Context Engine) */}
+                            <Card className="border-[#e6e6e6] shadow-none rounded">
+                                <CardHeader className="border-b border-[#e6e6e6] bg-[#f8f9fa] py-4">
+                                    <CardTitle className="text-base font-bold text-[#333333] flex items-center gap-2">
+                                        <Bot className="h-5 w-5 text-[#6730a3]" />
+                                        Context Engine (Configuração de Resposta)
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="pt-4 space-y-3">
+                                    <p className="text-sm text-[#555555] leading-relaxed">
+                                        Toda vez que o usuário envia uma mensagem, o sistema injeta um <i>System Prompt Oculto</i> para guiar a atuação da IA:
+                                    </p>
+                                    <div className="bg-[#f8f9fa] p-3 rounded font-mono text-[11px] text-[#555555] border border-[#e6e6e6]">
+                                        "Você é o chatDoc's, IA assistente do 'Docs Cataguases'. Responda sempre em Markdown limpo... O papel deste usuário no sistema é [CARGO]. Adapte a resposta para ele."
+                                    </div>
+                                    <p className="text-sm text-[#555555]">
+                                        A IA responderá demandas de <b>Prefeitos</b> focando na Assinatura Gov.br e visão macro, e para <b>Revisores</b> com viés de formatação e trâmites de correção.
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
                 </TabsContent>
             </Tabs>
         </div>

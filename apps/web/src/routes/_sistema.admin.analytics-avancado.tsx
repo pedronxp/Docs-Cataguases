@@ -6,11 +6,13 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Navigate } from '@tanstack/react-router'
 import {
     Clock, TrendingDown, Users, Calendar, BarChart3, Activity,
     Building2, Zap, Target, ArrowUpRight, ArrowDownRight, Timer
 } from 'lucide-react'
 import api from '@/lib/api'
+import { Can } from '@/lib/ability'
 
 export const Route = createFileRoute('/_sistema/admin/analytics-avancado')({
     component: AnalyticsAvancadoPage,
@@ -75,9 +77,16 @@ function AnalyticsAvancadoPage() {
     const totalPipeline = data.pipeline.reduce((a, b) => a + b.quantidade, 0)
 
     return (
-        <div className="space-y-6 max-w-7xl">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <Can I="manage" a="all" passThrough>
+            {(allowed) => {
+                if (!allowed) {
+                    return <Navigate to="/dashboard" replace />
+                }
+
+                return (
+                    <div className="space-y-6 max-w-7xl">
+                        {/* Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700">
@@ -395,5 +404,8 @@ function AnalyticsAvancadoPage() {
                 </Card>
             </div>
         </div>
+                )
+            }}
+        </Can>
     )
 }

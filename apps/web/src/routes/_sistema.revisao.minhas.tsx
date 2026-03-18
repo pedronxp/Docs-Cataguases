@@ -54,7 +54,6 @@ function MinhasRevisoesPage() {
 
     useEffect(() => {
         carregar()
-        carregarRevisores()
     }, [])
 
     const carregar = async () => {
@@ -69,15 +68,18 @@ function MinhasRevisoesPage() {
         setLoading(false)
     }
 
-    const carregarRevisores = async () => {
+    const carregarRevisores = async (secId?: string) => {
         try {
+            const sid = secId || usuario?.secretariaId
+            if (!sid) return setRevisores([])
+            
             const res = await api.get('/api/revisores', {
-                params: { secretariaId: usuario?.secretariaId }
+                params: { secretariaId: sid }
             })
             const lista = (res.data.data || res.data || []) as Pick<Usuario, 'id' | 'name'>[]
             setRevisores(lista.filter((r) => r.id !== usuario?.id))
         } catch {
-            // silencia — lista fica vazia
+            setRevisores([])
         }
     }
 
@@ -222,7 +224,12 @@ function MinhasRevisoesPage() {
                                             size="sm"
                                             variant="outline"
                                             className="font-semibold text-slate-600 border-slate-200 h-9 rounded-xl text-xs"
-                                            onClick={() => { setModalTransferir(p); setRevisorSelecionado(''); setJustificativa('') }}
+                                            onClick={() => { 
+                                                setModalTransferir(p); 
+                                                setRevisorSelecionado(''); 
+                                                setJustificativa('');
+                                                carregarRevisores(p.secretariaId);
+                                            }}
                                         >
                                             <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" /> Transferir
                                         </Button>

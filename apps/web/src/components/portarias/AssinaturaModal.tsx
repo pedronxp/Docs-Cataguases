@@ -42,6 +42,7 @@ export function AssinaturaModal({ isOpen, onOpenChange, portariaId, onSigned }: 
     const [file, setFile] = useState<File | null>(null)
     const [pdfAssinado, setPdfAssinado] = useState<File | null>(null)
     const [pdfBaixado, setPdfBaixado] = useState(false)
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
 
     const resetForm = () => {
         setJustificativa('')
@@ -84,18 +85,37 @@ export function AssinaturaModal({ isOpen, onOpenChange, portariaId, onSigned }: 
         setPdfAssinado(selected)
     }
 
-    const handleBaixarParaAssinar = () => {
-        const link = document.createElement('a')
-        link.href = `/api/portarias/${portariaId}/stream?type=pdf`
-        link.download = `portaria-${portariaId}-para-assinar.pdf`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        setPdfBaixado(true)
-        toast({
-            title: 'PDF baixado!',
-            description: 'Assine o documento no Adobe Acrobat ou outro assinador digital (ICP-Brasil, GOV.BR) e envie de volta.',
-        })
+    const handleBaixarParaAssinar = async () => {
+        try {
+            setIsDownloadingPdf(true)
+            toast({
+                title: 'Preparando PDF...',
+                description: 'Aguarde um instante enquanto geramos o arquivo para assinatura.',
+            })
+            
+            // Força a geração do PDF caso ainda não exista
+            const res = await portariaService.gerarPdf(portariaId)
+            if (res.error) {
+                toast({ title: 'Erro ao gerar', description: res.error, variant: 'destructive' })
+                return
+            }
+
+            const link = document.createElement('a')
+            link.href = `/api/portarias/${portariaId}/stream?type=pdf`
+            link.download = `portaria-${portariaId}-para-assinar.pdf`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            setPdfBaixado(true)
+            toast({
+                title: 'PDF baixado!',
+                description: 'Assine o documento no Adobe Acrobat ou outro assinador digital (ICP-Brasil, GOV.BR) e envie de volta.',
+            })
+        } catch (error) {
+            toast({ title: 'Erro', description: 'Não foi possível baixar o PDF.', variant: 'destructive' })
+        } finally {
+            setIsDownloadingPdf(false)
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -232,9 +252,11 @@ export function AssinaturaModal({ isOpen, onOpenChange, portariaId, onSigned }: 
                                         type="button"
                                         variant="outline"
                                         onClick={handleBaixarParaAssinar}
+                                        disabled={isDownloadingPdf}
                                         className="gap-2 font-semibold border-blue-200 text-blue-700 hover:bg-blue-50 w-full"
                                     >
-                                        <Download className="w-4 h-4" /> Baixar PDF Original
+                                        {isDownloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                        {isDownloadingPdf ? 'Gerando PDF...' : 'Baixar PDF Original'}
                                     </Button>
                                     <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
                                         <a

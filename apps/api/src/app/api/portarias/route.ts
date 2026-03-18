@@ -52,8 +52,17 @@ export async function POST(req: NextRequest) {
             )
         }
 
+        // Resolve setorId: payload > usuário (se compatível com a secretaria)
+        let resolvedSetorId: string | undefined = parsed.data.setorId || undefined
+        if (!resolvedSetorId && (usuario as any).setorId) {
+            // Só usa o setor do usuário se pertence à secretaria selecionada
+            const setorUsuario = await prisma.setor.findFirst({
+                where: { id: (usuario as any).setorId, secretariaId, ativo: true }
+            })
+            if (setorUsuario) resolvedSetorId = (usuario as any).setorId
+        }
+
         // Valida que o setor pertence à secretaria
-        const resolvedSetorId = parsed.data.setorId || (usuario as any).setorId
         if (resolvedSetorId) {
             const setor = await prisma.setor.findFirst({
                 where: { id: resolvedSetorId, secretariaId, ativo: true }
@@ -70,7 +79,7 @@ export async function POST(req: NextRequest) {
             ...parsed.data,
             criadoPorId: usuario.id as string,
             secretariaId,
-            setorId: parsed.data.setorId || (usuario as any).setorId,
+            setorId: resolvedSetorId,
         })
 
         if (!result.ok) {
@@ -78,10 +87,10 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json(result.value, { status: 201 })
-    } catch (error) {
+    } catch (error: any) {
         console.error('Erro ao criar portaria:', error)
         return NextResponse.json(
-            { error: 'Erro interno ao criar portaria' },
+            { error: error?.message || 'Erro interno ao criar portaria' },
             { status: 500 }
         )
     }

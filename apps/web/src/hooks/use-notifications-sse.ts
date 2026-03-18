@@ -119,6 +119,14 @@ export function useNotificationsSSE() {
                     lida: false,
                     direcionada: false,
                 }
+                
+                const storeState = useNotificationsStore.getState()
+                const jaExiste = storeState.notificacoes.some((x) => x.id === notif.id)
+                if (jaExiste) {
+                    useNotificationsStore.setState({ ultimaVista: data.createdAt })
+                    return
+                }
+                
                 addNotificacao(notif)
                 toast({
                     title: LABELS[data.tipoEvento] ?? 'Notificação',
@@ -150,6 +158,14 @@ export function useNotificationsSSE() {
                     lida: data.lida ?? false,
                     direcionada: true,
                 }
+                
+                const storeState = useNotificationsStore.getState()
+                const jaExiste = storeState.notificacoes.some((x) => x.id === notif.id)
+                if (jaExiste) {
+                    useNotificationsStore.setState({ ultimaVista: data.criadoEm })
+                    return
+                }
+
                 addNotificacao(notif)
                 toast({
                     title: LABELS[data.tipo] ?? 'Notificação',

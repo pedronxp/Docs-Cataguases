@@ -16,8 +16,11 @@ import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as SistemaTutorialRouteImport } from './routes/_sistema.tutorial'
 import { Route as SistemaStatusDocumentosRouteImport } from './routes/_sistema.status-documentos'
 import { Route as SistemaPerfilRouteImport } from './routes/_sistema.perfil'
+import { Route as SistemaFeedbackRouteImport } from './routes/_sistema.feedback'
 import { Route as SistemaDiarioOficialRouteImport } from './routes/_sistema.diario-oficial'
 import { Route as SistemaDashboardRouteImport } from './routes/_sistema.dashboard'
+import { Route as SistemaChatRouteImport } from './routes/_sistema.chat'
+import { Route as SistemaAtualizacoesRouteImport } from './routes/_sistema.atualizacoes'
 import { Route as SistemaAcompanhamentoRouteImport } from './routes/_sistema.acompanhamento'
 import { Route as SistemaAcervoRouteImport } from './routes/_sistema.acervo'
 import { Route as AuthRegistroRouteImport } from './routes/_auth.registro'
@@ -28,6 +31,7 @@ import { Route as SistemaRevisaoTodasRouteImport } from './routes/_sistema.revis
 import { Route as SistemaRevisaoMinhasRouteImport } from './routes/_sistema.revisao.minhas'
 import { Route as SistemaRevisaoFilaRouteImport } from './routes/_sistema.revisao.fila'
 import { Route as SistemaDiarioOficialGuiaRouteImport } from './routes/_sistema.diario-oficial.guia'
+import { Route as SistemaAdministrativoMemorandosRouteImport } from './routes/_sistema.administrativo.memorandos'
 import { Route as SistemaAdminVariaveisDicasRouteImport } from './routes/_sistema.admin.variaveis-dicas'
 import { Route as SistemaAdminVariaveisRouteImport } from './routes/_sistema.admin.variaveis'
 import { Route as SistemaAdminUsuariosOrgaoRouteImport } from './routes/_sistema.admin.usuarios-orgao'
@@ -41,13 +45,16 @@ import { Route as SistemaAdminIntegracoesRouteImport } from './routes/_sistema.a
 import { Route as SistemaAdminIaRouteImport } from './routes/_sistema.admin.ia'
 import { Route as SistemaAdminGestaoRouteImport } from './routes/_sistema.admin.gestao'
 import { Route as SistemaAdminFilaAprovacaoRouteImport } from './routes/_sistema.admin.fila-aprovacao'
+import { Route as SistemaAdminFeedbacksRouteImport } from './routes/_sistema.admin.feedbacks'
 import { Route as SistemaAdminCloudconvertRouteImport } from './routes/_sistema.admin.cloudconvert'
 import { Route as SistemaAdminAnalyticsAvancadoRouteImport } from './routes/_sistema.admin.analytics-avancado'
 import { Route as SistemaAdminAnalyticsRouteImport } from './routes/_sistema.admin.analytics'
 import { Route as SistemaAdministrativoPortariasIndexRouteImport } from './routes/_sistema.administrativo.portarias.index'
+import { Route as SistemaAdministrativoDecretosIndexRouteImport } from './routes/_sistema.administrativo.decretos.index'
 import { Route as SistemaAdminUsuariosIndexRouteImport } from './routes/_sistema.admin.usuarios.index'
 import { Route as SistemaAdministrativoPortariasNovoRouteImport } from './routes/_sistema.administrativo.portarias.novo'
 import { Route as SistemaAdministrativoPortariasIdRouteImport } from './routes/_sistema.administrativo.portarias.$id'
+import { Route as SistemaAdministrativoDecretosNovoRouteImport } from './routes/_sistema.administrativo.decretos.novo'
 import { Route as SistemaAdminUsuariosUsuarioIdRouteImport } from './routes/_sistema.admin.usuarios.$usuarioId'
 import { Route as SistemaAdminModelosTutorialRouteImport } from './routes/_sistema.admin.modelos.tutorial'
 import { Route as SistemaAdminModelosNovoRouteImport } from './routes/_sistema.admin.modelos.novo'
@@ -87,6 +94,11 @@ const SistemaPerfilRoute = SistemaPerfilRouteImport.update({
   path: '/perfil',
   getParentRoute: () => SistemaRoute,
 } as any)
+const SistemaFeedbackRoute = SistemaFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => SistemaRoute,
+} as any)
 const SistemaDiarioOficialRoute = SistemaDiarioOficialRouteImport.update({
   id: '/diario-oficial',
   path: '/diario-oficial',
@@ -95,6 +107,16 @@ const SistemaDiarioOficialRoute = SistemaDiarioOficialRouteImport.update({
 const SistemaDashboardRoute = SistemaDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => SistemaRoute,
+} as any)
+const SistemaChatRoute = SistemaChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => SistemaRoute,
+} as any)
+const SistemaAtualizacoesRoute = SistemaAtualizacoesRouteImport.update({
+  id: '/atualizacoes',
+  path: '/atualizacoes',
   getParentRoute: () => SistemaRoute,
 } as any)
 const SistemaAcompanhamentoRoute = SistemaAcompanhamentoRouteImport.update({
@@ -147,6 +169,12 @@ const SistemaDiarioOficialGuiaRoute =
     id: '/guia',
     path: '/guia',
     getParentRoute: () => SistemaDiarioOficialRoute,
+  } as any)
+const SistemaAdministrativoMemorandosRoute =
+  SistemaAdministrativoMemorandosRouteImport.update({
+    id: '/administrativo/memorandos',
+    path: '/administrativo/memorandos',
+    getParentRoute: () => SistemaRoute,
   } as any)
 const SistemaAdminVariaveisDicasRoute =
   SistemaAdminVariaveisDicasRouteImport.update({
@@ -216,6 +244,11 @@ const SistemaAdminFilaAprovacaoRoute =
     path: '/admin/fila-aprovacao',
     getParentRoute: () => SistemaRoute,
   } as any)
+const SistemaAdminFeedbacksRoute = SistemaAdminFeedbacksRouteImport.update({
+  id: '/admin/feedbacks',
+  path: '/admin/feedbacks',
+  getParentRoute: () => SistemaRoute,
+} as any)
 const SistemaAdminCloudconvertRoute =
   SistemaAdminCloudconvertRouteImport.update({
     id: '/admin/cloudconvert',
@@ -239,6 +272,12 @@ const SistemaAdministrativoPortariasIndexRoute =
     path: '/administrativo/portarias/',
     getParentRoute: () => SistemaRoute,
   } as any)
+const SistemaAdministrativoDecretosIndexRoute =
+  SistemaAdministrativoDecretosIndexRouteImport.update({
+    id: '/administrativo/decretos/',
+    path: '/administrativo/decretos/',
+    getParentRoute: () => SistemaRoute,
+  } as any)
 const SistemaAdminUsuariosIndexRoute =
   SistemaAdminUsuariosIndexRouteImport.update({
     id: '/',
@@ -255,6 +294,12 @@ const SistemaAdministrativoPortariasIdRoute =
   SistemaAdministrativoPortariasIdRouteImport.update({
     id: '/administrativo/portarias/$id',
     path: '/administrativo/portarias/$id',
+    getParentRoute: () => SistemaRoute,
+  } as any)
+const SistemaAdministrativoDecretosNovoRoute =
+  SistemaAdministrativoDecretosNovoRouteImport.update({
+    id: '/administrativo/decretos/novo',
+    path: '/administrativo/decretos/novo',
     getParentRoute: () => SistemaRoute,
   } as any)
 const SistemaAdminUsuariosUsuarioIdRoute =
@@ -296,14 +341,18 @@ export interface FileRoutesByFullPath {
   '/registro': typeof AuthRegistroRoute
   '/acervo': typeof SistemaAcervoRoute
   '/acompanhamento': typeof SistemaAcompanhamentoRoute
+  '/atualizacoes': typeof SistemaAtualizacoesRoute
+  '/chat': typeof SistemaChatRoute
   '/dashboard': typeof SistemaDashboardRoute
   '/diario-oficial': typeof SistemaDiarioOficialRouteWithChildren
+  '/feedback': typeof SistemaFeedbackRoute
   '/perfil': typeof SistemaPerfilRoute
   '/status-documentos': typeof SistemaStatusDocumentosRoute
   '/tutorial': typeof SistemaTutorialRoute
   '/admin/analytics': typeof SistemaAdminAnalyticsRoute
   '/admin/analytics-avancado': typeof SistemaAdminAnalyticsAvancadoRoute
   '/admin/cloudconvert': typeof SistemaAdminCloudconvertRoute
+  '/admin/feedbacks': typeof SistemaAdminFeedbacksRoute
   '/admin/fila-aprovacao': typeof SistemaAdminFilaAprovacaoRoute
   '/admin/gestao': typeof SistemaAdminGestaoRoute
   '/admin/ia': typeof SistemaAdminIaRoute
@@ -317,6 +366,7 @@ export interface FileRoutesByFullPath {
   '/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/admin/variaveis-dicas': typeof SistemaAdminVariaveisDicasRoute
+  '/administrativo/memorandos': typeof SistemaAdministrativoMemorandosRoute
   '/diario-oficial/guia': typeof SistemaDiarioOficialGuiaRoute
   '/revisao/fila': typeof SistemaRevisaoFilaRoute
   '/revisao/minhas': typeof SistemaRevisaoMinhasRoute
@@ -325,9 +375,11 @@ export interface FileRoutesByFullPath {
   '/admin/modelos/novo': typeof SistemaAdminModelosNovoRoute
   '/admin/modelos/tutorial': typeof SistemaAdminModelosTutorialRoute
   '/admin/usuarios/$usuarioId': typeof SistemaAdminUsuariosUsuarioIdRoute
+  '/administrativo/decretos/novo': typeof SistemaAdministrativoDecretosNovoRoute
   '/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
   '/administrativo/portarias/novo': typeof SistemaAdministrativoPortariasNovoRoute
   '/admin/usuarios/': typeof SistemaAdminUsuariosIndexRoute
+  '/administrativo/decretos/': typeof SistemaAdministrativoDecretosIndexRoute
   '/administrativo/portarias/': typeof SistemaAdministrativoPortariasIndexRoute
   '/administrativo/portarias/revisao/$id': typeof SistemaAdministrativoPortariasRevisaoIdRoute
 }
@@ -341,14 +393,18 @@ export interface FileRoutesByTo {
   '/registro': typeof AuthRegistroRoute
   '/acervo': typeof SistemaAcervoRoute
   '/acompanhamento': typeof SistemaAcompanhamentoRoute
+  '/atualizacoes': typeof SistemaAtualizacoesRoute
+  '/chat': typeof SistemaChatRoute
   '/dashboard': typeof SistemaDashboardRoute
   '/diario-oficial': typeof SistemaDiarioOficialRouteWithChildren
+  '/feedback': typeof SistemaFeedbackRoute
   '/perfil': typeof SistemaPerfilRoute
   '/status-documentos': typeof SistemaStatusDocumentosRoute
   '/tutorial': typeof SistemaTutorialRoute
   '/admin/analytics': typeof SistemaAdminAnalyticsRoute
   '/admin/analytics-avancado': typeof SistemaAdminAnalyticsAvancadoRoute
   '/admin/cloudconvert': typeof SistemaAdminCloudconvertRoute
+  '/admin/feedbacks': typeof SistemaAdminFeedbacksRoute
   '/admin/fila-aprovacao': typeof SistemaAdminFilaAprovacaoRoute
   '/admin/gestao': typeof SistemaAdminGestaoRoute
   '/admin/ia': typeof SistemaAdminIaRoute
@@ -361,6 +417,7 @@ export interface FileRoutesByTo {
   '/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/admin/variaveis-dicas': typeof SistemaAdminVariaveisDicasRoute
+  '/administrativo/memorandos': typeof SistemaAdministrativoMemorandosRoute
   '/diario-oficial/guia': typeof SistemaDiarioOficialGuiaRoute
   '/revisao/fila': typeof SistemaRevisaoFilaRoute
   '/revisao/minhas': typeof SistemaRevisaoMinhasRoute
@@ -369,9 +426,11 @@ export interface FileRoutesByTo {
   '/admin/modelos/novo': typeof SistemaAdminModelosNovoRoute
   '/admin/modelos/tutorial': typeof SistemaAdminModelosTutorialRoute
   '/admin/usuarios/$usuarioId': typeof SistemaAdminUsuariosUsuarioIdRoute
+  '/administrativo/decretos/novo': typeof SistemaAdministrativoDecretosNovoRoute
   '/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
   '/administrativo/portarias/novo': typeof SistemaAdministrativoPortariasNovoRoute
   '/admin/usuarios': typeof SistemaAdminUsuariosIndexRoute
+  '/administrativo/decretos': typeof SistemaAdministrativoDecretosIndexRoute
   '/administrativo/portarias': typeof SistemaAdministrativoPortariasIndexRoute
   '/administrativo/portarias/revisao/$id': typeof SistemaAdministrativoPortariasRevisaoIdRoute
 }
@@ -387,14 +446,18 @@ export interface FileRoutesById {
   '/_auth/registro': typeof AuthRegistroRoute
   '/_sistema/acervo': typeof SistemaAcervoRoute
   '/_sistema/acompanhamento': typeof SistemaAcompanhamentoRoute
+  '/_sistema/atualizacoes': typeof SistemaAtualizacoesRoute
+  '/_sistema/chat': typeof SistemaChatRoute
   '/_sistema/dashboard': typeof SistemaDashboardRoute
   '/_sistema/diario-oficial': typeof SistemaDiarioOficialRouteWithChildren
+  '/_sistema/feedback': typeof SistemaFeedbackRoute
   '/_sistema/perfil': typeof SistemaPerfilRoute
   '/_sistema/status-documentos': typeof SistemaStatusDocumentosRoute
   '/_sistema/tutorial': typeof SistemaTutorialRoute
   '/_sistema/admin/analytics': typeof SistemaAdminAnalyticsRoute
   '/_sistema/admin/analytics-avancado': typeof SistemaAdminAnalyticsAvancadoRoute
   '/_sistema/admin/cloudconvert': typeof SistemaAdminCloudconvertRoute
+  '/_sistema/admin/feedbacks': typeof SistemaAdminFeedbacksRoute
   '/_sistema/admin/fila-aprovacao': typeof SistemaAdminFilaAprovacaoRoute
   '/_sistema/admin/gestao': typeof SistemaAdminGestaoRoute
   '/_sistema/admin/ia': typeof SistemaAdminIaRoute
@@ -408,6 +471,7 @@ export interface FileRoutesById {
   '/_sistema/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/_sistema/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/_sistema/admin/variaveis-dicas': typeof SistemaAdminVariaveisDicasRoute
+  '/_sistema/administrativo/memorandos': typeof SistemaAdministrativoMemorandosRoute
   '/_sistema/diario-oficial/guia': typeof SistemaDiarioOficialGuiaRoute
   '/_sistema/revisao/fila': typeof SistemaRevisaoFilaRoute
   '/_sistema/revisao/minhas': typeof SistemaRevisaoMinhasRoute
@@ -416,9 +480,11 @@ export interface FileRoutesById {
   '/_sistema/admin/modelos/novo': typeof SistemaAdminModelosNovoRoute
   '/_sistema/admin/modelos/tutorial': typeof SistemaAdminModelosTutorialRoute
   '/_sistema/admin/usuarios/$usuarioId': typeof SistemaAdminUsuariosUsuarioIdRoute
+  '/_sistema/administrativo/decretos/novo': typeof SistemaAdministrativoDecretosNovoRoute
   '/_sistema/administrativo/portarias/$id': typeof SistemaAdministrativoPortariasIdRoute
   '/_sistema/administrativo/portarias/novo': typeof SistemaAdministrativoPortariasNovoRoute
   '/_sistema/admin/usuarios/': typeof SistemaAdminUsuariosIndexRoute
+  '/_sistema/administrativo/decretos/': typeof SistemaAdministrativoDecretosIndexRoute
   '/_sistema/administrativo/portarias/': typeof SistemaAdministrativoPortariasIndexRoute
   '/_sistema/administrativo/portarias/revisao/$id': typeof SistemaAdministrativoPortariasRevisaoIdRoute
 }
@@ -434,14 +500,18 @@ export interface FileRouteTypes {
     | '/registro'
     | '/acervo'
     | '/acompanhamento'
+    | '/atualizacoes'
+    | '/chat'
     | '/dashboard'
     | '/diario-oficial'
+    | '/feedback'
     | '/perfil'
     | '/status-documentos'
     | '/tutorial'
     | '/admin/analytics'
     | '/admin/analytics-avancado'
     | '/admin/cloudconvert'
+    | '/admin/feedbacks'
     | '/admin/fila-aprovacao'
     | '/admin/gestao'
     | '/admin/ia'
@@ -455,6 +525,7 @@ export interface FileRouteTypes {
     | '/admin/usuarios-orgao'
     | '/admin/variaveis'
     | '/admin/variaveis-dicas'
+    | '/administrativo/memorandos'
     | '/diario-oficial/guia'
     | '/revisao/fila'
     | '/revisao/minhas'
@@ -463,9 +534,11 @@ export interface FileRouteTypes {
     | '/admin/modelos/novo'
     | '/admin/modelos/tutorial'
     | '/admin/usuarios/$usuarioId'
+    | '/administrativo/decretos/novo'
     | '/administrativo/portarias/$id'
     | '/administrativo/portarias/novo'
     | '/admin/usuarios/'
+    | '/administrativo/decretos/'
     | '/administrativo/portarias/'
     | '/administrativo/portarias/revisao/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -479,14 +552,18 @@ export interface FileRouteTypes {
     | '/registro'
     | '/acervo'
     | '/acompanhamento'
+    | '/atualizacoes'
+    | '/chat'
     | '/dashboard'
     | '/diario-oficial'
+    | '/feedback'
     | '/perfil'
     | '/status-documentos'
     | '/tutorial'
     | '/admin/analytics'
     | '/admin/analytics-avancado'
     | '/admin/cloudconvert'
+    | '/admin/feedbacks'
     | '/admin/fila-aprovacao'
     | '/admin/gestao'
     | '/admin/ia'
@@ -499,6 +576,7 @@ export interface FileRouteTypes {
     | '/admin/usuarios-orgao'
     | '/admin/variaveis'
     | '/admin/variaveis-dicas'
+    | '/administrativo/memorandos'
     | '/diario-oficial/guia'
     | '/revisao/fila'
     | '/revisao/minhas'
@@ -507,9 +585,11 @@ export interface FileRouteTypes {
     | '/admin/modelos/novo'
     | '/admin/modelos/tutorial'
     | '/admin/usuarios/$usuarioId'
+    | '/administrativo/decretos/novo'
     | '/administrativo/portarias/$id'
     | '/administrativo/portarias/novo'
     | '/admin/usuarios'
+    | '/administrativo/decretos'
     | '/administrativo/portarias'
     | '/administrativo/portarias/revisao/$id'
   id:
@@ -524,14 +604,18 @@ export interface FileRouteTypes {
     | '/_auth/registro'
     | '/_sistema/acervo'
     | '/_sistema/acompanhamento'
+    | '/_sistema/atualizacoes'
+    | '/_sistema/chat'
     | '/_sistema/dashboard'
     | '/_sistema/diario-oficial'
+    | '/_sistema/feedback'
     | '/_sistema/perfil'
     | '/_sistema/status-documentos'
     | '/_sistema/tutorial'
     | '/_sistema/admin/analytics'
     | '/_sistema/admin/analytics-avancado'
     | '/_sistema/admin/cloudconvert'
+    | '/_sistema/admin/feedbacks'
     | '/_sistema/admin/fila-aprovacao'
     | '/_sistema/admin/gestao'
     | '/_sistema/admin/ia'
@@ -545,6 +629,7 @@ export interface FileRouteTypes {
     | '/_sistema/admin/usuarios-orgao'
     | '/_sistema/admin/variaveis'
     | '/_sistema/admin/variaveis-dicas'
+    | '/_sistema/administrativo/memorandos'
     | '/_sistema/diario-oficial/guia'
     | '/_sistema/revisao/fila'
     | '/_sistema/revisao/minhas'
@@ -553,9 +638,11 @@ export interface FileRouteTypes {
     | '/_sistema/admin/modelos/novo'
     | '/_sistema/admin/modelos/tutorial'
     | '/_sistema/admin/usuarios/$usuarioId'
+    | '/_sistema/administrativo/decretos/novo'
     | '/_sistema/administrativo/portarias/$id'
     | '/_sistema/administrativo/portarias/novo'
     | '/_sistema/admin/usuarios/'
+    | '/_sistema/administrativo/decretos/'
     | '/_sistema/administrativo/portarias/'
     | '/_sistema/administrativo/portarias/revisao/$id'
   fileRoutesById: FileRoutesById
@@ -618,6 +705,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SistemaPerfilRouteImport
       parentRoute: typeof SistemaRoute
     }
+    '/_sistema/feedback': {
+      id: '/_sistema/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof SistemaFeedbackRouteImport
+      parentRoute: typeof SistemaRoute
+    }
     '/_sistema/diario-oficial': {
       id: '/_sistema/diario-oficial'
       path: '/diario-oficial'
@@ -630,6 +724,20 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof SistemaDashboardRouteImport
+      parentRoute: typeof SistemaRoute
+    }
+    '/_sistema/chat': {
+      id: '/_sistema/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof SistemaChatRouteImport
+      parentRoute: typeof SistemaRoute
+    }
+    '/_sistema/atualizacoes': {
+      id: '/_sistema/atualizacoes'
+      path: '/atualizacoes'
+      fullPath: '/atualizacoes'
+      preLoaderRoute: typeof SistemaAtualizacoesRouteImport
       parentRoute: typeof SistemaRoute
     }
     '/_sistema/acompanhamento': {
@@ -701,6 +809,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/diario-oficial/guia'
       preLoaderRoute: typeof SistemaDiarioOficialGuiaRouteImport
       parentRoute: typeof SistemaDiarioOficialRoute
+    }
+    '/_sistema/administrativo/memorandos': {
+      id: '/_sistema/administrativo/memorandos'
+      path: '/administrativo/memorandos'
+      fullPath: '/administrativo/memorandos'
+      preLoaderRoute: typeof SistemaAdministrativoMemorandosRouteImport
+      parentRoute: typeof SistemaRoute
     }
     '/_sistema/admin/variaveis-dicas': {
       id: '/_sistema/admin/variaveis-dicas'
@@ -793,6 +908,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SistemaAdminFilaAprovacaoRouteImport
       parentRoute: typeof SistemaRoute
     }
+    '/_sistema/admin/feedbacks': {
+      id: '/_sistema/admin/feedbacks'
+      path: '/admin/feedbacks'
+      fullPath: '/admin/feedbacks'
+      preLoaderRoute: typeof SistemaAdminFeedbacksRouteImport
+      parentRoute: typeof SistemaRoute
+    }
     '/_sistema/admin/cloudconvert': {
       id: '/_sistema/admin/cloudconvert'
       path: '/admin/cloudconvert'
@@ -821,6 +943,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SistemaAdministrativoPortariasIndexRouteImport
       parentRoute: typeof SistemaRoute
     }
+    '/_sistema/administrativo/decretos/': {
+      id: '/_sistema/administrativo/decretos/'
+      path: '/administrativo/decretos'
+      fullPath: '/administrativo/decretos/'
+      preLoaderRoute: typeof SistemaAdministrativoDecretosIndexRouteImport
+      parentRoute: typeof SistemaRoute
+    }
     '/_sistema/admin/usuarios/': {
       id: '/_sistema/admin/usuarios/'
       path: '/'
@@ -840,6 +969,13 @@ declare module '@tanstack/react-router' {
       path: '/administrativo/portarias/$id'
       fullPath: '/administrativo/portarias/$id'
       preLoaderRoute: typeof SistemaAdministrativoPortariasIdRouteImport
+      parentRoute: typeof SistemaRoute
+    }
+    '/_sistema/administrativo/decretos/novo': {
+      id: '/_sistema/administrativo/decretos/novo'
+      path: '/administrativo/decretos/novo'
+      fullPath: '/administrativo/decretos/novo'
+      preLoaderRoute: typeof SistemaAdministrativoDecretosNovoRouteImport
       parentRoute: typeof SistemaRoute
     }
     '/_sistema/admin/usuarios/$usuarioId': {
@@ -938,14 +1074,18 @@ const SistemaAdminUsuariosRouteWithChildren =
 interface SistemaRouteChildren {
   SistemaAcervoRoute: typeof SistemaAcervoRoute
   SistemaAcompanhamentoRoute: typeof SistemaAcompanhamentoRoute
+  SistemaAtualizacoesRoute: typeof SistemaAtualizacoesRoute
+  SistemaChatRoute: typeof SistemaChatRoute
   SistemaDashboardRoute: typeof SistemaDashboardRoute
   SistemaDiarioOficialRoute: typeof SistemaDiarioOficialRouteWithChildren
+  SistemaFeedbackRoute: typeof SistemaFeedbackRoute
   SistemaPerfilRoute: typeof SistemaPerfilRoute
   SistemaStatusDocumentosRoute: typeof SistemaStatusDocumentosRoute
   SistemaTutorialRoute: typeof SistemaTutorialRoute
   SistemaAdminAnalyticsRoute: typeof SistemaAdminAnalyticsRoute
   SistemaAdminAnalyticsAvancadoRoute: typeof SistemaAdminAnalyticsAvancadoRoute
   SistemaAdminCloudconvertRoute: typeof SistemaAdminCloudconvertRoute
+  SistemaAdminFeedbacksRoute: typeof SistemaAdminFeedbacksRoute
   SistemaAdminFilaAprovacaoRoute: typeof SistemaAdminFilaAprovacaoRoute
   SistemaAdminGestaoRoute: typeof SistemaAdminGestaoRoute
   SistemaAdminIaRoute: typeof SistemaAdminIaRoute
@@ -959,11 +1099,14 @@ interface SistemaRouteChildren {
   SistemaAdminUsuariosOrgaoRoute: typeof SistemaAdminUsuariosOrgaoRoute
   SistemaAdminVariaveisRoute: typeof SistemaAdminVariaveisRoute
   SistemaAdminVariaveisDicasRoute: typeof SistemaAdminVariaveisDicasRoute
+  SistemaAdministrativoMemorandosRoute: typeof SistemaAdministrativoMemorandosRoute
   SistemaRevisaoFilaRoute: typeof SistemaRevisaoFilaRoute
   SistemaRevisaoMinhasRoute: typeof SistemaRevisaoMinhasRoute
   SistemaRevisaoTodasRoute: typeof SistemaRevisaoTodasRoute
+  SistemaAdministrativoDecretosNovoRoute: typeof SistemaAdministrativoDecretosNovoRoute
   SistemaAdministrativoPortariasIdRoute: typeof SistemaAdministrativoPortariasIdRoute
   SistemaAdministrativoPortariasNovoRoute: typeof SistemaAdministrativoPortariasNovoRoute
+  SistemaAdministrativoDecretosIndexRoute: typeof SistemaAdministrativoDecretosIndexRoute
   SistemaAdministrativoPortariasIndexRoute: typeof SistemaAdministrativoPortariasIndexRoute
   SistemaAdministrativoPortariasRevisaoIdRoute: typeof SistemaAdministrativoPortariasRevisaoIdRoute
 }
@@ -971,14 +1114,18 @@ interface SistemaRouteChildren {
 const SistemaRouteChildren: SistemaRouteChildren = {
   SistemaAcervoRoute: SistemaAcervoRoute,
   SistemaAcompanhamentoRoute: SistemaAcompanhamentoRoute,
+  SistemaAtualizacoesRoute: SistemaAtualizacoesRoute,
+  SistemaChatRoute: SistemaChatRoute,
   SistemaDashboardRoute: SistemaDashboardRoute,
   SistemaDiarioOficialRoute: SistemaDiarioOficialRouteWithChildren,
+  SistemaFeedbackRoute: SistemaFeedbackRoute,
   SistemaPerfilRoute: SistemaPerfilRoute,
   SistemaStatusDocumentosRoute: SistemaStatusDocumentosRoute,
   SistemaTutorialRoute: SistemaTutorialRoute,
   SistemaAdminAnalyticsRoute: SistemaAdminAnalyticsRoute,
   SistemaAdminAnalyticsAvancadoRoute: SistemaAdminAnalyticsAvancadoRoute,
   SistemaAdminCloudconvertRoute: SistemaAdminCloudconvertRoute,
+  SistemaAdminFeedbacksRoute: SistemaAdminFeedbacksRoute,
   SistemaAdminFilaAprovacaoRoute: SistemaAdminFilaAprovacaoRoute,
   SistemaAdminGestaoRoute: SistemaAdminGestaoRoute,
   SistemaAdminIaRoute: SistemaAdminIaRoute,
@@ -992,12 +1139,17 @@ const SistemaRouteChildren: SistemaRouteChildren = {
   SistemaAdminUsuariosOrgaoRoute: SistemaAdminUsuariosOrgaoRoute,
   SistemaAdminVariaveisRoute: SistemaAdminVariaveisRoute,
   SistemaAdminVariaveisDicasRoute: SistemaAdminVariaveisDicasRoute,
+  SistemaAdministrativoMemorandosRoute: SistemaAdministrativoMemorandosRoute,
   SistemaRevisaoFilaRoute: SistemaRevisaoFilaRoute,
   SistemaRevisaoMinhasRoute: SistemaRevisaoMinhasRoute,
   SistemaRevisaoTodasRoute: SistemaRevisaoTodasRoute,
+  SistemaAdministrativoDecretosNovoRoute:
+    SistemaAdministrativoDecretosNovoRoute,
   SistemaAdministrativoPortariasIdRoute: SistemaAdministrativoPortariasIdRoute,
   SistemaAdministrativoPortariasNovoRoute:
     SistemaAdministrativoPortariasNovoRoute,
+  SistemaAdministrativoDecretosIndexRoute:
+    SistemaAdministrativoDecretosIndexRoute,
   SistemaAdministrativoPortariasIndexRoute:
     SistemaAdministrativoPortariasIndexRoute,
   SistemaAdministrativoPortariasRevisaoIdRoute:

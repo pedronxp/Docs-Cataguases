@@ -15,10 +15,6 @@ const setorSchema = z.object({
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params
-        const session = await getAuthUser()
-        if (!session || !['ADMIN_GERAL', 'PREFEITO', 'SECRETARIO'].includes((session as any).role)) {
-            return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 })
-        }
 
         const setores = await prisma.setor.findMany({
             where: { secretariaId: id, ativo: true },

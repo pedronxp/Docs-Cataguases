@@ -75,7 +75,7 @@ export async function GET() {
 
             // Fila de aprovação de usuários (apenas para admins)
             isAdminOrPrefeito
-                ? prisma.$queryRaw`SELECT COUNT(*)::int as total FROM "User" WHERE role = 'PENDENTE'`
+                ? prisma.$queryRaw`SELECT COUNT(*)::int as total FROM "User" WHERE role = 'PENDENTE' AND ativo = true`
                 : Promise.resolve([{ total: 0 }]),
         ])
 

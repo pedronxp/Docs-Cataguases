@@ -147,9 +147,11 @@ function UsuariosPage() {
             .finally(() => setCarregandoSetores(false))
     }, [orgSecretaria])
 
-    // Filtered active users (tab Servidores)
+    // Filtered active users (tab Servidores) - includes active/inactive but excludes pending approval/rejected
     const ativos = useMemo(() => usuarios.filter(u => u.role !== 'PENDENTE'), [usuarios])
-    const pendentesCount = useMemo(() => usuarios.filter(u => u.role === 'PENDENTE').length, [usuarios])
+    
+    // Filtra apenas os pendentes REAIS (não rejeitados)
+    const pendentesCount = useMemo(() => usuarios.filter(u => u.role === 'PENDENTE' && u.ativo !== false).length, [usuarios])
 
     const filtrados = useMemo(() => {
         return ativos.filter(u => {

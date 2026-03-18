@@ -7,7 +7,8 @@ import {
     Newspaper, Activity, ChevronLeft, ChevronRight,
     ClipboardList, ClipboardCheck, GraduationCap, ScrollText,
     PlusCircle, List, Puzzle, ChevronDown, ChevronUp, Bot, Brain,
-    Library,
+    Library, RefreshCcw, MessageSquarePlus, Stamp, MessageSquareWarning,
+    Construction,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useUIStore } from '@/hooks/use-ui'
@@ -48,6 +49,14 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
                 ]
             },
             {
+                label: 'Decretos', icon: Stamp, action: 'ler', subject: 'Portaria',
+                children: [
+                    { to: '/administrativo/decretos', label: 'Listar Decretos', icon: List, action: 'ler', subject: 'Portaria' },
+                    { to: '/administrativo/decretos/novo', label: 'Novo Decreto', icon: PlusCircle, action: 'criar', subject: 'Portaria' },
+                ]
+            },
+            { to: '/administrativo/memorandos', label: 'Memorandos', icon: Construction, action: 'ler', subject: 'Portaria' },
+            {
                 label: 'Revisão', icon: ClipboardList, action: 'claim', subject: 'Revisao',
                 children: [
                     { to: '/revisao/todas', label: 'Revisões', icon: Activity, action: 'gerenciar', subject: 'Revisao' },
@@ -64,6 +73,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
         items: [
             { to: '/acervo', label: 'Portal de Publicações', icon: Library, action: 'ler', subject: 'Portaria' },
             { to: '/admin/modelos', label: 'Modelos', icon: BookOpen, action: 'gerenciar', subject: 'Modelo' },
+            { to: '/chat', label: 'Chat Inteligente (IA)', icon: Bot, action: 'ler', subject: 'all' },
             { to: '/tutorial', label: 'Tutorial', icon: GraduationCap, action: 'ler', subject: 'Portaria' },
         ]
     },
@@ -74,13 +84,21 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
             { to: '/admin/variaveis', label: 'Variáveis Globais', icon: Braces, action: 'gerenciar', subject: 'VariavelSistema' },
             { to: '/admin/logs', label: 'Logs de Auditoria', icon: ScrollText, action: 'gerenciar', subject: 'all' },
             { to: '/admin/analytics', label: 'Painel Analytics', icon: BarChart2, action: 'ler', subject: 'Analytics' },
-            { to: '/admin/analytics-avancado', label: 'Analytics Avançado', icon: BarChart2, action: 'gerenciar', subject: 'all' },
+            { to: '/admin/analytics-avancado', label: 'Analytics Avançado', icon: Activity, action: 'manage', subject: 'all' },
             { to: '/admin/integracoes', label: 'Integrações', icon: Puzzle, action: 'gerenciar', subject: 'Configuracoes' },
             { to: '/admin/livros', label: 'Numeração/Livros', icon: Settings, action: 'gerenciar', subject: 'LivrosNumeracao' },
             { to: '/admin/llm', label: 'Painel de IA', icon: Bot, action: 'gerenciar', subject: 'Configuracoes' },
-            { to: '/admin/ia', label: 'Treinamento da IA', icon: Brain, action: 'gerenciar', subject: 'Configuracoes' },
+            { to: '/admin/ia', label: 'Treinamento da IA', icon: Brain, action: 'manage', subject: 'all' },
             { to: '/admin/usuarios', label: 'Usuários', icon: Users, action: 'gerenciar', subject: 'Usuario' },
-            { to: '/admin/fila-aprovacao', label: 'Fila de Aprovação', icon: ClipboardCheck, action: 'gerenciar', subject: 'Usuario' },
+            { to: '/admin/fila-aprovacao', label: 'Fila de Aprovação', icon: ClipboardCheck, action: 'manage', subject: 'all' },
+            { to: '/admin/feedbacks', label: 'Gerenciar Feedbacks', icon: MessageSquareWarning, action: 'manage', subject: 'all' },
+        ]
+    },
+    {
+        label: 'Sistema & Comunidade',
+        items: [
+            { to: '/atualizacoes', label: 'Quadro de Atualizações', icon: RefreshCcw, action: 'ler', subject: 'FeedAtividade' },
+            { to: '/feedback', label: 'Deixar Feedback', icon: MessageSquarePlus, action: 'ler', subject: 'FeedAtividade' },
         ]
     }
 ]

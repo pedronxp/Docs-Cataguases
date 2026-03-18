@@ -9,19 +9,20 @@ import prisma from '@/lib/prisma'
 // Mapa modelo → provider (para determinar o provider correto quando o usuário escolhe um modelo específico)
 const MODEL_TO_PROVIDER: Record<string, LLMProvider> = {
     // Cerebras
-    'llama-3.3-70b':      'cerebras',
-    'qwen-3-32b':         'cerebras',
-    'llama-4-maverick':   'cerebras',
-    'llama3.1-8b':        'cerebras',
+    'llama3.1-8b':                    'cerebras',
+    'llama3.3-70b':                   'cerebras',
     // Mistral
     'mistral-large-latest': 'mistral',
     'mistral-small-latest': 'mistral',
     'open-mistral-nemo':    'mistral',
     // Groq
-    'llama-3.3-70b-versatile': 'groq',
-    'llama-3.1-8b-instant':    'groq',
-    'qwen-qwq-32b':            'groq',
-    'llama-4-scout-17b':       'groq',
+    'llama-3.3-70b-versatile':       'groq',
+    'llama-3.1-8b-instant':          'groq',
+    'qwen-2.5-32b':                  'groq',
+    'deepseek-r1-distill-llama-70b': 'groq',
+    // Kimi
+    'moonshot-v1-8k':                'kimi',
+    'moonshot-v1-32k':               'kimi',
 }
 
 // Timeout para evitar que o request fique pendurado (30s)
@@ -140,8 +141,8 @@ export async function POST(req: NextRequest) {
         ? [{ role: 'system', content: systemPrompt }, ...messages]
         : messages
 
-    // Modelo padrão: Cerebras Llama 3.3 70B (motor principal)
-    const defaultModel = 'llama-3.3-70b'
+    // Modelo padrão: Cerebras Llama 3.1 8B (motor principal)
+    const defaultModel = 'llama3.1-8b'
 
     // Se o usuário escolheu um modelo específico no seletor do chat, respeitar
     const finalModel = selectedModel || model || defaultModel
@@ -187,7 +188,7 @@ export async function POST(req: NextRequest) {
                 // LLM quer chamar ferramentas
                 currentMessages.push({
                     role: 'assistant',
-                    content: result.content || null,
+                    content: result.content || '', // Alguns provedores rejeitam null
                     tool_calls: result.tool_calls,
                 } as any)
 
@@ -223,7 +224,7 @@ export async function POST(req: NextRequest) {
                     })
                 )
                 // Sanitizar respostas das ferramentas antes de devolver ao LLM
-                currentMessages.push(...sanitizeMessages(toolResults))
+                currentMessages.push(...(sanitizeMessages(toolResults) as any))
 
                 // O loop repete e o LLM recebe o resultado das tools para gerar a resposta final
                 continue
@@ -235,7 +236,16 @@ export async function POST(req: NextRequest) {
         }
 
         if (!finalResult) {
-            throw new Error('LLM atingiu número máximo de execuções de tools sem resposta final.')
+            // Se atingir o limite de loops e ainda não tiver resposta final, retorna uma mensagem amigável no lugar de um erro técnico
+            console.warn('[LLM API] Loop limite atingido pelas ferramentas do modelo', { model: finalModel })
+            finalResult = {
+                content: "Eu precisei consultar muitas ferramentas em sequência e precisei interromper a busca para não travar o sistema. Posso ajudar com mais alguma dúvida específica baseada no que conversamos?",
+                provider: derivedProvider || provider || 'unknown',
+                model: finalModel,
+                usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+                fallbackUsed: false,
+                requestedProvider: null
+            }
         }
 
         return NextResponse.json({

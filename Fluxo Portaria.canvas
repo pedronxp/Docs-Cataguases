@@ -1,0 +1,31 @@
+{
+	"nodes":[
+		{"id":"9411c9effcbc54eb","type":"text","text":"\tRASCUNHO : criada pelo operador, ainda não submetida","x":-645,"y":-2730,"width":250,"height":105,"color":"3"},
+		{"id":"f9c84f42081fbb4f","type":"text","text":"\tEM REVISÃO: submetida, aguardando um revisor para assumir documento.","x":-395,"y":-2610,"width":350,"height":140,"color":"5"},
+		{"id":"1f3c376cbe079388","type":"text","text":"\t CORRECAO_NECESSARIA — devolvida para o operador corrigir","x":-960,"y":-2180,"width":360,"height":120,"color":"1"},
+		{"id":"3b861c3e227fa54e","type":"text","text":"\tEM REVISÃO ATRIBUIDA : revisão em andamento com revisor específico","x":-645,"y":-2360,"width":280,"height":120,"color":"4"},
+		{"id":"6963e7baa7a76b96","x":-520,"y":-2160,"width":375,"height":100,"color":"4","type":"text","text":"\t AGUARDANDO_ASSINATURA — aprovada, aguardando assinatura do responsável"},
+		{"id":"647bb2fc53cba5e2","type":"text","text":"\tPORTARIA","x":-645,"y":-3030,"width":250,"height":70,"color":"6"},
+		{"id":"33fd86e539e4ea00","x":-100,"y":-1840,"width":340,"height":140,"color":"3","type":"text","text":"\tDispensada:\nProcedimento excepcional. Publicar sem assinatura requer embasamento legal. Esta decisão ficará marcada permanentemente nos relatórios de auditoria."},
+		{"id":"b7a53073900df633","x":-451,"y":-1980,"width":237,"height":50,"color":"6","type":"text","text":"METODO DE ASSINATURA"},
+		{"id":"98055cb205f5da47","x":-420,"y":-1800,"width":275,"height":100,"color":"3","type":"text","text":"\tManual: Justificativa da Assinatura Manual"},
+		{"id":"c47afa0b45281548","x":-721,"y":-1840,"width":243,"height":100,"color":"3","type":"text","text":"\tDigital (PDF)\n\tBaixa o pdf, assine digitalmente com seu certificado."},
+		{"id":"fe9c4badb9ff2377","x":-456,"y":-1540,"width":348,"height":100,"color":"4","type":"text","text":"\t· • PRONTO_PUBLICACAO — assinada, pronta para publicação"},
+		{"id":"e99c310f3d629b6b","x":-395,"y":-1240,"width":250,"height":60,"type":"text","text":""}
+	],
+	"edges":[
+		{"id":"a1ddcc4d2db35603","fromNode":"647bb2fc53cba5e2","fromSide":"bottom","toNode":"9411c9effcbc54eb","toSide":"top"},
+		{"id":"fc3cce4a6a1c0662","fromNode":"9411c9effcbc54eb","fromSide":"bottom","toNode":"f9c84f42081fbb4f","toSide":"left"},
+		{"id":"bbd3458a27e4a6c2","fromNode":"f9c84f42081fbb4f","fromSide":"bottom","toNode":"3b861c3e227fa54e","toSide":"right"},
+		{"id":"304a48ee0cb44b5b","fromNode":"1f3c376cbe079388","fromSide":"top","toNode":"9411c9effcbc54eb","toSide":"left"},
+		{"id":"3a42ba63a70b998e","fromNode":"3b861c3e227fa54e","fromSide":"left","toNode":"1f3c376cbe079388","toSide":"top"},
+		{"id":"eb4ea615c128ea44","fromNode":"3b861c3e227fa54e","fromSide":"bottom","toNode":"6963e7baa7a76b96","toSide":"top"},
+		{"id":"7f314ca864a510c1","fromNode":"6963e7baa7a76b96","fromSide":"bottom","toNode":"b7a53073900df633","toSide":"top"},
+		{"id":"21a29235a357b1ef","fromNode":"b7a53073900df633","fromSide":"bottom","toNode":"98055cb205f5da47","toSide":"top"},
+		{"id":"21a16a17d598437b","fromNode":"b7a53073900df633","fromSide":"bottom","toNode":"c47afa0b45281548","toSide":"top"},
+		{"id":"0efe097124be62a4","fromNode":"b7a53073900df633","fromSide":"bottom","toNode":"33fd86e539e4ea00","toSide":"top"},
+		{"id":"f77582009044ddbf","fromNode":"c47afa0b45281548","fromSide":"bottom","toNode":"fe9c4badb9ff2377","toSide":"top"},
+		{"id":"770cf10f6dde0b5d","fromNode":"98055cb205f5da47","fromSide":"bottom","toNode":"fe9c4badb9ff2377","toSide":"top"},
+		{"id":"f07081cf7501f6a2","fromNode":"33fd86e539e4ea00","fromSide":"bottom","toNode":"fe9c4badb9ff2377","toSide":"top"}
+	]
+}

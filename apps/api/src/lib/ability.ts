@@ -40,25 +40,33 @@ export function buildAbility(user: User): AppAbility {
         return build()
     }
 
-    // 2. PREFEITO: Assinatura e visualização global
+    // 2. PREFEITO: Assinatura, visualização global e criação de portarias
     if (user.role === 'PREFEITO') {
         can('ler', 'all')
+        can('criar', 'Portaria')
         can('assinar', 'Portaria')
         can('publicar', 'Portaria')
         return build()
     }
 
-    // 3. SECRETARIO: Gestão da própria secretaria
+    // 3. SECRETARIO: Gestão da própria secretaria + criação de portarias
     if (user.role === 'SECRETARIO' && user.secretariaId) {
+        can('criar', 'Portaria')
         can('ler', 'Portaria', { secretariaId: user.secretariaId } as any)
+        can('editar', 'Portaria', { secretariaId: user.secretariaId } as any)
+        can('submeter', 'Portaria', { secretariaId: user.secretariaId } as any)
         can('aprovar', 'Portaria', { secretariaId: user.secretariaId } as any)
         can('rejeitar', 'Portaria', { secretariaId: user.secretariaId } as any)
         can('ler', 'FeedAtividade', { secretariaId: user.secretariaId } as any)
+        can('ler', 'Analytics')
     }
 
-    // 4. REVISOR: Revisão claim-based de portarias da secretaria
+    // 4. REVISOR: Revisão claim-based de portarias da secretaria + criação
     if (user.role === 'REVISOR' && user.secretariaId) {
+        can('criar', 'Portaria')
         can('ler', 'Portaria', { secretariaId: user.secretariaId } as any)
+        can('editar', 'Portaria', { secretariaId: user.secretariaId, status: 'RASCUNHO' } as any)
+        can('submeter', 'Portaria', { secretariaId: user.secretariaId } as any)
         can('aprovar', 'Portaria', { secretariaId: user.secretariaId } as any)
         can('rejeitar', 'Portaria', { secretariaId: user.secretariaId } as any)
         can('ler', 'FeedAtividade', { secretariaId: user.secretariaId } as any)

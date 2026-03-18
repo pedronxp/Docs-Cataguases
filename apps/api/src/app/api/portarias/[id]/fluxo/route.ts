@@ -43,6 +43,11 @@ export async function PATCH(
         if (!_portaria) return NextResponse.json({ success: false, error: 'Portaria não encontrada' }, { status: 404 })
         const portaria = _portaria as typeof _portaria & PortariaComRevisao
 
+        // Label legível para usar nas mensagens de notificação
+        const portariaLabel = portaria.numeroOficial
+            ? `"${portaria.titulo}" (Nº ${portaria.numeroOficial})`
+            : `"${portaria.titulo}"`
+
         let novoStatus = portaria.status
         let mensagemLog = ''
         let revisorAtualId = portaria.revisorAtualId
@@ -119,9 +124,17 @@ export async function PATCH(
                 if (!justificativa) {
                     return NextResponse.json({ success: false, error: 'Justificativa obrigatória para transferência' }, { status: 400 })
                 }
-                // Verifica se o revisor de destino existe e é REVISOR ativo da mesma secretaria
+                // Verifica se o revisor de destino existe e tem permissão (Admin/Prefeito ignoram secretaria)
                 const revisorDestino = await prisma.user.findFirst({
-                    where: { id: revisorId, role: 'REVISOR', ativo: true, secretariaId: portaria.secretariaId }
+                    where: { 
+                        id: revisorId, 
+                        role: { in: ['REVISOR', 'SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'] }, 
+                        ativo: true,
+                        OR: [
+                            { secretariaId: portaria.secretariaId },
+                            { role: { in: ['ADMIN_GERAL', 'PREFEITO'] } }
+                        ]
+                    }
                 })
                 if (!revisorDestino) {
                     return NextResponse.json({ success: false, error: 'Revisor de destino inválido ou não pertence à mesma secretaria' }, { status: 400 })
@@ -221,8 +234,6 @@ export async function PATCH(
         // ── Notificações direcionadas por userId ──────────────────────────────
         // Executado fora da transação (falha não bloqueia o fluxo principal)
         try {
-            const portariaLabel = `portaria ${portaria.id.slice(0, 8)}`
-
             if (action === 'ENVIAR_REVISAO') {
                 // Notifica todos os revisores/secretários da secretaria
                 const revisores = await buscarRevisoresDaSecretaria(portaria.secretariaId)
@@ -230,7 +241,7 @@ export async function PATCH(
                     revisores.map((r) => ({
                         userId: r.id,
                         tipo: 'PORTARIA_SUBMETIDA',
-                        mensagem: `Nova portaria enviada para revisão por ${nomeAutor}`,
+                        mensagem: `${nomeAutor} enviou ${portariaLabel} para revisão. Acesse para revisar.`,
                         portariaId: id,
                         metadata: { action },
                     }))
@@ -247,7 +258,7 @@ export async function PATCH(
                     await criarNotificacao({
                         userId: portariaComAutor.criadoPorId,
                         tipo: 'REVISAO_ATRIBUIDA',
-                        mensagem: `${nomeAutor} assumiu a revisão da sua portaria`,
+                        mensagem: `${nomeAutor} assumiu a revisão de ${portariaLabel}.`,
                         portariaId: id,
                         metadata: { action },
                     })
@@ -264,7 +275,7 @@ export async function PATCH(
                     await criarNotificacao({
                         userId: portariaComAutor.criadoPorId,
                         tipo: 'DOCUMENTO_DEVOLVIDO_AUTOR',
-                        mensagem: `Seu documento foi devolvido para correção por ${nomeAutor}: "${observacao}"`,
+                        mensagem: `${portariaLabel} foi devolvida para correção por ${nomeAutor}${observacao ? ` — Motivo: "${observacao}"` : ''}. Acesse para corrigir e reenviar.`,
                         portariaId: id,
                         metadata: { action, observacao },
                     })
@@ -281,7 +292,7 @@ export async function PATCH(
                     await criarNotificacao({
                         userId: portariaComAutor.criadoPorId,
                         tipo: 'PORTARIA_APROVADA',
-                        mensagem: `Sua portaria foi aprovada na revisão por ${nomeAutor} e aguarda assinatura`,
+                        mensagem: `${portariaLabel} foi aprovada na revisão por ${nomeAutor} e agora aguarda assinatura.`,
                         portariaId: id,
                         metadata: { action },
                     })
@@ -293,7 +304,7 @@ export async function PATCH(
                 await criarNotificacao({
                     userId: revisorId,
                     tipo: 'REVISAO_ATRIBUIDA',
-                    mensagem: `${nomeAutor} transferiu a revisão de ${portariaLabel} para você`,
+                    mensagem: `${nomeAutor} transferiu a revisão de ${portariaLabel} para você${justificativa ? ` — Justificativa: "${justificativa}"` : ''}.`,
                     portariaId: id,
                     metadata: { action, justificativa },
                 })

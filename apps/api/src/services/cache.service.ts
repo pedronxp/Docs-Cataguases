@@ -171,8 +171,10 @@ class RedisCacheProvider implements CacheProvider {
         if (this.connected && this.redis) return this.redis
 
         try {
-            // Dynamic import para não quebrar quando redis não está instalado
-            const { createClient } = await import('redis')
+            // @ts-ignore - módulo opcional não instalado (fallback em memória)
+            // Usa eval para o Webpack não tentar resolver estaticamente se não estiver instalado
+            const redisModule = eval('require("redis")')
+            const { createClient } = redisModule
             this.redis = createClient({ url: this.redisUrl })
             this.redis.on('error', (err: any) => {
                 console.warn('[Cache] Redis error, falling back to memory:', err.message)

@@ -6,7 +6,7 @@
  * Permite criar, editar, reordenar e ativar/desativar prompts de treinamento
  * que são injetados dinamicamente no system prompt de TODAS as LLMs.
  */
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,9 +22,9 @@ import {
     BookOpen, MessageSquare, FileText, Settings2, Sparkles, GripVertical,
     Info, Copy, ToggleLeft, ToggleRight,
 } from 'lucide-react'
+import { Can } from '@/lib/ability'
 
-const API_BASE = (import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:3000'
-const apiUrl = (p: string) => `${API_BASE}${p}`
+import api from '@/lib/api'
 
 export const Route = createFileRoute('/_sistema/admin/ia')({
     component: TreinamentoIAPage,
@@ -222,18 +222,20 @@ function PromptCard({
 // ── Modal de criação/edição ────────────────────────────────────────────────────
 function PromptModal({
     prompt,
+    initialValues,
     onSave,
     onClose,
     loading,
 }: {
     prompt: LlmPrompt | null
+    initialValues?: { nome?: string; categoria?: Categoria; conteudo?: string }
     onSave: (data: Partial<LlmPrompt>) => void
     onClose: () => void
     loading: boolean
 }) {
-    const [nome, setNome] = useState(prompt?.nome ?? '')
-    const [categoria, setCategoria] = useState<Categoria>(prompt?.categoria ?? 'CUSTOM')
-    const [conteudo, setConteudo] = useState(prompt?.conteudo ?? '')
+    const [nome, setNome] = useState(prompt?.nome ?? initialValues?.nome ?? '')
+    const [categoria, setCategoria] = useState<Categoria>(prompt?.categoria ?? initialValues?.categoria ?? 'CUSTOM')
+    const [conteudo, setConteudo] = useState(prompt?.conteudo ?? initialValues?.conteudo ?? '')
     const [ordem, setOrdem] = useState(prompt?.ordem ?? 0)
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -340,14 +342,15 @@ function TreinamentoIAPage() {
     const [refreshing, setRefreshing] = useState(false)
     const [modalOpen, setModalOpen] = useState(false)
     const [editingPrompt, setEditingPrompt] = useState<LlmPrompt | null>(null)
+    const [modalInitialValues, setModalInitialValues] = useState<{ nome?: string; categoria?: Categoria; conteudo?: string } | undefined>(undefined)
     const [filtroCategoria, setFiltroCategoria] = useState<string>('TODOS')
     const [showPreview, setShowPreview] = useState(false)
 
     const fetchPrompts = useCallback(async () => {
         setRefreshing(true)
         try {
-            const res = await fetch(apiUrl('/api/admin/ia/prompts'), { credentials: 'include' })
-            const data = await res.json()
+            const res = await api.get('/api/admin/ia/prompts')
+            const data = res.data
             if (data.success) setPrompts(data.data)
         } catch (e) {
             toast({ variant: 'destructive', title: 'Erro ao carregar prompts' })
@@ -361,18 +364,16 @@ function TreinamentoIAPage() {
     const handleSave = async (formData: Partial<LlmPrompt>) => {
         setLoading(true)
         try {
-            const url = editingPrompt
-                ? apiUrl(`/api/admin/ia/prompts/${editingPrompt.id}`)
-                : apiUrl('/api/admin/ia/prompts')
-            const method = editingPrompt ? 'PATCH' : 'POST'
+            const endpoint = editingPrompt
+                ? `/api/admin/ia/prompts/${editingPrompt.id}`
+                : '/api/admin/ia/prompts'
 
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(formData),
-            })
-            const data = await res.json()
+            const req = editingPrompt
+                ? api.patch(endpoint, formData)
+                : api.post(endpoint, formData)
+
+            const res = await req
+            const data = res.data
             if (!data.success) throw new Error(data.error)
 
             toast({
@@ -391,13 +392,8 @@ function TreinamentoIAPage() {
 
     const handleToggle = async (id: string, ativo: boolean) => {
         try {
-            const res = await fetch(apiUrl(`/api/admin/ia/prompts/${id}`), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ ativo }),
-            })
-            const data = await res.json()
+            const res = await api.patch(`/api/admin/ia/prompts/${id}`, { ativo })
+            const data = res.data
             if (!data.success) throw new Error(data.error)
             setPrompts(prev => prev.map(p => p.id === id ? { ...p, ativo } : p))
             toast({ title: ativo ? 'Prompt ativado' : 'Prompt desativado' })
@@ -409,11 +405,8 @@ function TreinamentoIAPage() {
     const handleDelete = async (id: string, nome: string) => {
         if (!confirm(`Excluir o prompt "${nome}"? Esta ação não pode ser desfeita.`)) return
         try {
-            const res = await fetch(apiUrl(`/api/admin/ia/prompts/${id}`), {
-                method: 'DELETE',
-                credentials: 'include',
-            })
-            const data = await res.json()
+            const res = await api.delete(`/api/admin/ia/prompts/${id}`)
+            const data = res.data
             if (!data.success) throw new Error(data.error)
             setPrompts(prev => prev.filter(p => p.id !== id))
             toast({ title: 'Prompt excluído', description: `"${nome}" foi removido.` })
@@ -429,14 +422,8 @@ function TreinamentoIAPage() {
         const curr = prompts[idx]
         // Troca as ordens
         await Promise.all([
-            fetch(apiUrl(`/api/admin/ia/prompts/${curr.id}`), {
-                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                credentials: 'include', body: JSON.stringify({ ordem: prev.ordem }),
-            }),
-            fetch(apiUrl(`/api/admin/ia/prompts/${prev.id}`), {
-                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                credentials: 'include', body: JSON.stringify({ ordem: curr.ordem }),
-            }),
+            api.patch(`/api/admin/ia/prompts/${curr.id}`, { ordem: prev.ordem }),
+            api.patch(`/api/admin/ia/prompts/${prev.id}`, { ordem: curr.ordem })
         ])
         await fetchPrompts()
     }
@@ -447,14 +434,8 @@ function TreinamentoIAPage() {
         const next = prompts[idx + 1]
         const curr = prompts[idx]
         await Promise.all([
-            fetch(apiUrl(`/api/admin/ia/prompts/${curr.id}`), {
-                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                credentials: 'include', body: JSON.stringify({ ordem: next.ordem }),
-            }),
-            fetch(apiUrl(`/api/admin/ia/prompts/${next.id}`), {
-                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                credentials: 'include', body: JSON.stringify({ ordem: curr.ordem }),
-            }),
+            api.patch(`/api/admin/ia/prompts/${curr.id}`, { ordem: next.ordem }),
+            api.patch(`/api/admin/ia/prompts/${next.id}`, { ordem: curr.ordem })
         ])
         await fetchPrompts()
     }
@@ -472,8 +453,15 @@ function TreinamentoIAPage() {
         .join('')
 
     return (
-        <div className="flex flex-col gap-6 p-6 max-w-5xl mx-auto">
-            {/* Header */}
+        <Can I="manage" a="all" passThrough>
+            {(allowed) => {
+                if (!allowed) {
+                    return <Navigate to="/dashboard" replace />
+                }
+
+                return (
+                    <div className="flex flex-col gap-6 p-6 max-w-5xl mx-auto">
+                        {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <div className="flex items-center gap-2.5 mb-1">
@@ -491,7 +479,7 @@ function TreinamentoIAPage() {
                         <RefreshCw className={`h-4 w-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
                         Atualizar
                     </Button>
-                    <Button onClick={() => { setEditingPrompt(null); setModalOpen(true) }}>
+                    <Button onClick={() => { setEditingPrompt(null); setModalInitialValues(undefined); setModalOpen(true) }}>
                         <Plus className="h-4 w-4 mr-1.5" />
                         Novo Prompt
                     </Button>
@@ -556,18 +544,24 @@ function TreinamentoIAPage() {
                             categoria: 'MODELO' as Categoria,
                             conteudo: 'Ao auxiliar na criação de modelos de documento, sugira variáveis padronizadas: {{NOME_SERVIDOR}} para nome completo, {{CPF}} para CPF, {{CARGO}} para cargo, {{SECRETARIA}} para secretaria. Sempre recomende incluir as tags de sistema {{SYS_NUMERO}}, {{SYS_DATA}} e {{SYS_PREFEITO}}.',
                         },
+                        {
+                            nome: 'Avisos e Anúncios do Sistema',
+                            categoria: 'CHAT_GERAL' as Categoria,
+                            conteudo: `O dashboard possui um quadro de "Avisos do Sistema". ADMIN_GERAL pode postar avisos para todos os usuários do dashboard clicando no botão "Postar aviso para todos os usuários". Tipos disponíveis: NOVIDADE (✨ novas funções), INFO (ℹ️ informações), AVISO (⚠️ manutenção/atenção). Cada aviso pode ter data de expiração opcional. Os usuários podem dispensar individualmente. API: GET/POST /api/avisos, PATCH/DELETE /api/avisos/:id.`,
+                        },
+                        {
+                            nome: 'Decretos vs Portarias — Listas Separadas',
+                            categoria: 'SISTEMA' as Categoria,
+                            conteudo: `Decretos e Portarias são tipos diferentes de documentos com listas independentes no sistema. Portarias: /administrativo/portarias. Decretos: /administrativo/decretos. NÃO misture as listas — são gerenciadas separadamente. O fluxo de criação e revisão de ambos segue o mesmo padrão wizard. Quando o usuário perguntar sobre decretos, direcione para /administrativo/decretos e não para portarias.`,
+                        },
                     ].map((exemplo, i) => (
                         <button
                             key={i}
                             type="button"
                             onClick={() => {
                                 setEditingPrompt(null)
+                                setModalInitialValues({ nome: exemplo.nome, categoria: exemplo.categoria, conteudo: exemplo.conteudo })
                                 setModalOpen(true)
-                                // Timeout para modal abrir antes de preencher (React state batching)
-                                setTimeout(() => {
-                                    const modal = document.querySelector('#nome') as HTMLInputElement
-                                    if (modal) modal.value = exemplo.nome
-                                }, 100)
                             }}
                             className="text-left p-3 rounded-lg border border-slate-200 hover:border-primary/40 hover:bg-primary/5 transition-all group"
                         >
@@ -611,7 +605,7 @@ function TreinamentoIAPage() {
                         <Brain className="h-10 w-10 mx-auto mb-3 opacity-30" />
                         <p className="font-semibold">Nenhum prompt encontrado</p>
                         <p className="text-sm mt-1">Crie um novo prompt para treinar o assistente</p>
-                        <Button className="mt-4" onClick={() => { setEditingPrompt(null); setModalOpen(true) }}>
+                        <Button className="mt-4" onClick={() => { setEditingPrompt(null); setModalInitialValues(undefined); setModalOpen(true) }}>
                             <Plus className="h-4 w-4 mr-1.5" />
                             Criar primeiro prompt
                         </Button>
@@ -623,7 +617,7 @@ function TreinamentoIAPage() {
                             prompt={prompt}
                             onToggle={handleToggle}
                             onDelete={handleDelete}
-                            onEdit={(p) => { setEditingPrompt(p); setModalOpen(true) }}
+                            onEdit={(p) => { setEditingPrompt(p); setModalInitialValues(undefined); setModalOpen(true) }}
                             onMoveUp={handleMoveUp}
                             onMoveDown={handleMoveDown}
                             isFirst={idx === 0}
@@ -675,11 +669,15 @@ function TreinamentoIAPage() {
             {modalOpen && (
                 <PromptModal
                     prompt={editingPrompt}
+                    initialValues={modalInitialValues}
                     onSave={handleSave}
-                    onClose={() => { setModalOpen(false); setEditingPrompt(null) }}
+                    onClose={() => { setModalOpen(false); setEditingPrompt(null); setModalInitialValues(undefined) }}
                     loading={loading}
                 />
             )}
         </div>
+                )
+            }}
+        </Can>
     )
 }

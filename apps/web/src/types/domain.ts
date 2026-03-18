@@ -138,6 +138,8 @@ export interface LivrosNumeracao {
     numero_inicial: number
     logs: LivroLog[]
     ativo: boolean
+    reinicia_por_ano: boolean
+    ano_atual: number | null
     criado_em: string
     atualizado_em: string
 }

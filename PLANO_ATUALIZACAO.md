@@ -18,11 +18,11 @@
 ## Fase 2 — Robustez (Semana 3-4)
 
 ### Testes automatizados
-- [ ] Criar suite de testes para NumeracaoService (atomicidade, formato)
-- [ ] Testes para DocxHeaderService (EMF, PNG, sem imagem, sem cabecalho)
-- [ ] Testes para llm-sanitizer (CPF, CNPJ, dados bancarios)
-- [ ] Testes para fluxo de portaria (transicoes de estado validas e invalidas)
-- [ ] Testes E2E basicos com Playwright (login, criar portaria, submeter)
+- [x] Criar suite de testes para NumeracaoService (atomicidade, formato)
+- [x] Testes para DocxHeaderService (EMF, PNG, sem imagem, sem cabecalho)
+- [x] Testes para llm-sanitizer (CPF, CNPJ, dados bancarios)
+- [x] Testes para fluxo de portaria (transicoes de estado validas e invalidas)
+- [x] Testes E2E basicos com Playwright (login, criar portaria, submeter)
 
 ### Seguranca
 - [ ] Rate limiting por usuario na API /api/llm/chat (max 50 req/hora)

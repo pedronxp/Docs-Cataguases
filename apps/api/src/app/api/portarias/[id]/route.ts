@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { getSession, getAuthUser } from '@/lib/auth'
 import { buildAbility } from '@/lib/ability'
 import { subject } from '@casl/ability'
+import { StorageService } from '@/services/storage.service'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,9 +67,50 @@ export async function GET(
             )
         }
 
+        // ── Resolve variáveis de sistema para o preview no frontend ──────────
+        const sysVarsPreview: Record<string, string> = {}
+        try {
+            // 1. SYS_GESTAO_DADOS → prefeito, vice, gabinete
+            const gestaoRow = await prisma.variavelSistema.findUnique({ where: { chave: 'SYS_GESTAO_DADOS' } })
+            if (gestaoRow?.valor) {
+                const dados = JSON.parse(gestaoRow.valor)
+                const gestao = Array.isArray(dados) ? dados[0] : dados
+                if (gestao?.prefeito)      sysVarsPreview['SYS_PREFEITO']      = gestao.prefeito
+                if (gestao?.vicePrefeito)  sysVarsPreview['SYS_VICE_NOME']     = gestao.vicePrefeito
+                if (gestao?.chefeGabinete) sysVarsPreview['SYS_GABINETE_NOME'] = gestao.chefeGabinete
+                // secretarios: { ADM: 'João', SMS: 'Maria', ... }
+                if (gestao?.secretarios && typeof gestao.secretarios === 'object') {
+                    for (const [sigla, nome] of Object.entries(gestao.secretarios)) {
+                        sysVarsPreview[`SYS_SEC_${sigla}_NOME`] = String(nome)
+                    }
+                }
+            }
+
+            // 2. Variáveis avulsas na tabela (SYS_SEC_*_NOME e outras)
+            const varsAvulsas = await prisma.variavelSistema.findMany({
+                where: { chave: { not: 'SYS_GESTAO_DADOS' } },
+                select: { chave: true, valor: true },
+            })
+            for (const v of varsAvulsas) {
+                if (!sysVarsPreview[v.chave]) sysVarsPreview[v.chave] = v.valor
+            }
+        } catch { /* variáveis de sistema não críticas para o GET */ }
+
+        // ── Gera URLs assinadas para que o frontend exiba/baixe sem proxy ──────
+        let pdfSignedUrl: string | null = null
+        let docxSignedUrl: string | null = null
+        try {
+            if (portaria.pdfUrl) {
+                pdfSignedUrl = await StorageService.getSignedUrl(portaria.pdfUrl, 3600)
+            }
+            if ((portaria as any).docxRascunhoUrl) {
+                docxSignedUrl = await StorageService.getSignedUrl((portaria as any).docxRascunhoUrl, 3600)
+            }
+        } catch { /* URLs assinadas não críticas */ }
+
         return NextResponse.json({
             success: true,
-            data: portaria,
+            data: { ...portaria, sysVarsPreview, pdfSignedUrl, docxSignedUrl },
         })
     } catch (error) {
         return NextResponse.json(
@@ -124,9 +166,15 @@ export async function PATCH(
             return NextResponse.json({ success: false, error: 'Nenhum campo válido para atualizar' }, { status: 400 })
         }
 
+        // Se formData foi alterado, invalida o DOCX em cache para forçar regeneração
+        const dadosParaSalvar = { ...dadosFiltrados }
+        if (dadosFiltrados.formData !== undefined) {
+            dadosParaSalvar.docxRascunhoUrl = null
+        }
+
         const atualizada = await prisma.portaria.update({
             where: { id },
-            data: dadosFiltrados,
+            data: dadosParaSalvar,
         })
 
         // Registra log de edição se formData foi alterado

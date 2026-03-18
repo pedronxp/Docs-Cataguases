@@ -6,6 +6,9 @@ import { TrendingUp, FileText, CheckCircle2, Building2 } from 'lucide-react'
 import { CartesianGrid, XAxis, Tooltip, ResponsiveContainer, Area, AreaChart, Pie, PieChart, Cell } from "recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { listarSecretarias, type Secretaria } from '@/services/secretaria.service'
+import { Can } from '@/lib/ability'
+import { useAuthStore } from '@/store/auth.store'
+import { Navigate } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_sistema/admin/analytics')({
   component: AnalyticsPage,
@@ -15,9 +18,16 @@ function AnalyticsPage() {
   const [data, setData] = useState<ChartData | null>(null)
   const [loading, setLoading] = useState(true)
   const [secretarias, setSecretarias] = useState<Secretaria[]>([])
+  const { usuario } = useAuthStore()
 
   // UI Filters State
-  const [filtroSecretaria, setFiltroSecretaria] = useState<string>('all')
+  const [filtroSecretaria, setFiltroSecretaria] = useState<string>(() => {
+    // SECRETARIO sees only their secretaria by default
+    if (usuario?.role === 'SECRETARIO' && usuario?.secretariaId) {
+      return usuario.secretariaId
+    }
+    return 'all'
+  })
   const [filtroSetor, setFiltroSetor] = useState<string>('all')
 
   useEffect(() => {
@@ -48,16 +58,30 @@ function AnalyticsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-800">Painel de Desempenho</h2>
-          <p className="text-sm text-slate-500">Métricas e acompanhamento do volume de documentos institucionais gerados.</p>
-        </div>
+    <Can I="ler" a="Analytics" passThrough>
+      {(allowed) => {
+        if (!allowed) {
+          return <Navigate to="/dashboard" replace />
+        }
+        
+        const isSecretario = usuario?.role === 'SECRETARIO'
+        const currentFilteredSecretaria = isSecretario && usuario?.secretariaId ? usuario.secretariaId : filtroSecretaria
 
-        <div className="flex items-center gap-3">
-          <Select value={filtroSecretaria} onValueChange={(val) => { setFiltroSecretaria(val); setFiltroSetor('all') }}>
-            <SelectTrigger className="w-[200px] h-9 text-sm bg-white">
+        return (
+          <div className="space-y-6 max-w-6xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-800">Painel de Desempenho</h2>
+                <p className="text-sm text-slate-500">Métricas e acompanhamento do volume de documentos institucionais gerados.</p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Select 
+                  value={currentFilteredSecretaria} 
+                  onValueChange={(val) => { setFiltroSecretaria(val); setFiltroSetor('all') }}
+                  disabled={isSecretario}
+                >
+                  <SelectTrigger className="w-[200px] h-9 text-sm bg-white">
               <SelectValue placeholder="Todas as Secretarias" />
             </SelectTrigger>
             <SelectContent>
@@ -206,7 +230,10 @@ function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-    </div>
+            </div>
+          </div>
+        )
+      }}
+    </Can>
   )
 }

@@ -59,7 +59,8 @@ export async function POST(request: Request) {
                 formato_base: data.formato_base || "PORT-{N}/CATAGUASES",
                 proximo_numero: Number(data.proximo_numero) || 1,
                 numero_inicial: Number(data.numero_inicial) || 1,
-                ativo: data.ativo ?? true
+                ativo: data.ativo ?? true,
+                reinicia_por_ano: data.reinicia_por_ano ?? true
             },
         })
 
@@ -147,7 +148,8 @@ export async function PATCH(request: Request) {
                 formato_base: data.formato_base,
                 proximo_numero: data.proximo_numero !== undefined ? Number(data.proximo_numero) : undefined,
                 ativo: data.ativo,
-                tipoDocumento: data.tipoDocumento
+                tipoDocumento: data.tipoDocumento,
+                reinicia_por_ano: data.reinicia_por_ano
             }
         })
 

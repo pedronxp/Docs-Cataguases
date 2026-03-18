@@ -29,7 +29,7 @@ export class NumeracaoService {
 
             return await prisma.$transaction(async (tx) => {
                 const livros = await tx.$queryRaw<any[]>`
-                    SELECT id, nome, "formato_base", "proximo_numero", logs
+                    SELECT id, nome, "formato_base", "proximo_numero", "numero_inicial", "reinicia_por_ano", "ano_atual", logs
                     FROM "LivrosNumeracao"
                     WHERE ativo = true
                     AND "tipoDocumento" = ${tipoDocumento}::"TipoDocumento"
@@ -42,8 +42,18 @@ export class NumeracaoService {
                 }
 
                 let livro = livros[0]
-                const numeroAlocado = livro.proximo_numero
                 const anoAtual = new Date().getFullYear()
+
+                // Lógica de reset anual
+                let numeroAlocado = livro.proximo_numero
+                let atualizarAnoAtual = false
+                
+                if (livro.reinicia_por_ano) {
+                    if (livro.ano_atual !== anoAtual) {
+                        numeroAlocado = livro.numero_inicial // Reseta para o numero inicial
+                        atualizarAnoAtual = true
+                    }
+                }
 
                 const logEntry = {
                     portariaId,
@@ -68,6 +78,7 @@ export class NumeracaoService {
                 await tx.$executeRaw`
                     UPDATE "LivrosNumeracao"
                     SET "proximo_numero" = ${numeroAlocado + 1},
+                        "ano_atual" = ${atualizarAnoAtual ? anoAtual : livro.ano_atual},
                         logs = ${JSON.stringify(novoLogs)}::jsonb,
                         "atualizado_em" = NOW()
                     WHERE id = ${livro.id}

@@ -53,17 +53,29 @@ function NotificacaoRow({
             className={`w-full text-left px-4 py-3 flex gap-3 items-start hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 ${!notif.lida ? 'bg-blue-50/40' : ''}`}
         >
             <div className="mt-0.5">
-                <EventoIcon tipo={notif.tipoEvento} />
+                <EventoIcon tipo={notif.tipoEvento ?? notif.tipo ?? ''} />
             </div>
             <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-slate-800 leading-snug line-clamp-2">
+                {/* Título e número da portaria se disponível */}
+                {(notif.portariaTitulo || notif.portariaNumero) && (
+                    <p className="text-[10px] font-semibold text-slate-500 mb-0.5 truncate">
+                        {notif.portariaNumero && (
+                            <span className="font-mono bg-slate-100 rounded px-1 py-0.5 mr-1">{notif.portariaNumero}</span>
+                        )}
+                        {notif.portariaTitulo}
+                    </p>
+                )}
+                <p className="text-xs font-medium text-slate-800 leading-snug">
                     {notif.mensagem}
                 </p>
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                    {notif.portariaNumero && (
-                        <span className="text-[10px] font-mono text-slate-500 bg-slate-100 rounded px-1 py-0.5">
-                            {notif.portariaNumero}
+                    {notif.direcionada && (
+                        <span className="text-[9px] font-bold uppercase text-violet-600 bg-violet-50 border border-violet-200 rounded px-1 py-0.5">
+                            Direta
                         </span>
+                    )}
+                    {!notif.lida && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500 inline-block" />
                     )}
                     <span className="text-[10px] text-slate-400">
                         {tempoRelativo(notif.createdAt)}
@@ -75,7 +87,7 @@ function NotificacaoRow({
 }
 
 export function NotificationBell() {
-    const { notificacoes, naoLidas, marcarTodasLidas } = useNotificationsStore()
+    const { notificacoes, naoLidas, marcarTodasLidas, clearNotificacoes } = useNotificationsStore()
     const navigate = useNavigate()
 
     const handleClick = (n: NotificacaoItem) => {
@@ -86,7 +98,7 @@ export function NotificationBell() {
         if (n.portariaId) {
             navigate({
                 to: '/administrativo/portarias/$id',
-                params: { id: n.portariaId },
+                params: { id: n.portariaId! },
             }).catch(() => {
                 navigate({ to: '/administrativo/portarias' })
             })
@@ -118,29 +130,55 @@ export function NotificationBell() {
             <DropdownMenuContent className="w-80 p-0" align="end" sideOffset={8}>
                 {/* Cabeçalho */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                    <h3 className="text-sm font-semibold text-slate-800">Notificações</h3>
-                    {naoLidas > 0 && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs text-slate-500 hover:text-slate-800 px-2"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                marcarTodasLidas()
-                            }}
-                        >
-                            <CheckCheck className="h-3 w-3 mr-1" />
-                            Marcar como lidas
-                        </Button>
-                    )}
+                    <div>
+                        <h3 className="text-sm font-semibold text-slate-800">Notificações</h3>
+                        {notificacoes.length > 0 && (
+                            <p className="text-[10px] text-slate-400">
+                                {notificacoes.length} no total · {naoLidas} não {naoLidas === 1 ? 'lida' : 'lidas'}
+                            </p>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                        {naoLidas > 0 && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-slate-500 hover:text-slate-800 px-2"
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    marcarTodasLidas()
+                                }}
+                                title="Marcar todas como lidas"
+                            >
+                                <CheckCheck className="h-3 w-3 mr-1" />
+                                Lidas
+                            </Button>
+                        )}
+                        {notificacoes.length > 0 && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2"
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    clearNotificacoes()
+                                }}
+                                title="Limpar todas as notificações"
+                            >
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Limpar
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Lista */}
-                <ScrollArea className="h-72">
+                <ScrollArea className="h-80">
                     {notificacoes.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full py-10 gap-2 text-slate-400">
+                        <div className="flex flex-col items-center justify-center h-full py-12 gap-2 text-slate-400">
                             <Bell className="h-8 w-8 opacity-25" />
-                            <p className="text-sm">Nenhuma notificação ainda</p>
+                            <p className="text-sm font-medium">Você está em dia!</p>
+                            <p className="text-xs">Nenhuma notificação no momento</p>
                         </div>
                     ) : (
                         <div>
