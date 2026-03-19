@@ -1,8 +1,6 @@
 console.log('DEBUG.TSX START')
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import { useAuthStore } from './store/auth.store'
-import { AppHeader } from './components/shared/AppHeader'
 
 const root = document.getElementById('root')
 if (root) {
