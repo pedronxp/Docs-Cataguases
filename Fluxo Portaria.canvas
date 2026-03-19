@@ -4,14 +4,14 @@
 		{"id":"f9c84f42081fbb4f","type":"text","text":"\tEM REVISÃO: submetida, aguardando um revisor para assumir documento.","x":-395,"y":-2610,"width":350,"height":140,"color":"5"},
 		{"id":"1f3c376cbe079388","type":"text","text":"\t CORRECAO_NECESSARIA — devolvida para o operador corrigir","x":-960,"y":-2180,"width":360,"height":120,"color":"1"},
 		{"id":"3b861c3e227fa54e","type":"text","text":"\tEM REVISÃO ATRIBUIDA : revisão em andamento com revisor específico","x":-645,"y":-2360,"width":280,"height":120,"color":"4"},
-		{"id":"6963e7baa7a76b96","x":-520,"y":-2160,"width":375,"height":100,"color":"4","type":"text","text":"\t AGUARDANDO_ASSINATURA — aprovada, aguardando assinatura do responsável"},
+		{"id":"6963e7baa7a76b96","type":"text","text":"\t AGUARDANDO_ASSINATURA — aprovada, aguardando assinatura do responsável","x":-520,"y":-2160,"width":375,"height":100,"color":"4"},
 		{"id":"647bb2fc53cba5e2","type":"text","text":"\tPORTARIA","x":-645,"y":-3030,"width":250,"height":70,"color":"6"},
-		{"id":"33fd86e539e4ea00","x":-100,"y":-1840,"width":340,"height":140,"color":"3","type":"text","text":"\tDispensada:\nProcedimento excepcional. Publicar sem assinatura requer embasamento legal. Esta decisão ficará marcada permanentemente nos relatórios de auditoria."},
-		{"id":"b7a53073900df633","x":-451,"y":-1980,"width":237,"height":50,"color":"6","type":"text","text":"METODO DE ASSINATURA"},
-		{"id":"98055cb205f5da47","x":-420,"y":-1800,"width":275,"height":100,"color":"3","type":"text","text":"\tManual: Justificativa da Assinatura Manual"},
-		{"id":"c47afa0b45281548","x":-721,"y":-1840,"width":243,"height":100,"color":"3","type":"text","text":"\tDigital (PDF)\n\tBaixa o pdf, assine digitalmente com seu certificado."},
-		{"id":"fe9c4badb9ff2377","x":-456,"y":-1540,"width":348,"height":100,"color":"4","type":"text","text":"\t· • PRONTO_PUBLICACAO — assinada, pronta para publicação"},
-		{"id":"e99c310f3d629b6b","x":-395,"y":-1240,"width":250,"height":60,"type":"text","text":""}
+		{"id":"33fd86e539e4ea00","type":"text","text":"\tDispensada:\nProcedimento excepcional. Publicar sem assinatura requer embasamento legal. Esta decisão ficará marcada permanentemente nos relatórios de auditoria.","x":-100,"y":-1840,"width":340,"height":140,"color":"3"},
+		{"id":"b7a53073900df633","type":"text","text":"METODO DE ASSINATURA","x":-451,"y":-1980,"width":237,"height":50,"color":"6"},
+		{"id":"98055cb205f5da47","type":"text","text":"\tManual: Justificativa da Assinatura Manual","x":-420,"y":-1800,"width":275,"height":100,"color":"3"},
+		{"id":"c47afa0b45281548","type":"text","text":"\tDigital (PDF)\n\tBaixa o pdf, assine digitalmente com seu certificado.","x":-721,"y":-1840,"width":243,"height":140,"color":"3"},
+		{"id":"fe9c4badb9ff2377","type":"text","text":"\t· • PRONTO_PUBLICACAO — assinada, pronta para publicação","x":-456,"y":-1540,"width":348,"height":100,"color":"4"},
+		{"id":"e99c310f3d629b6b","type":"text","text":"","x":-395,"y":-1240,"width":250,"height":60}
 	],
 	"edges":[
 		{"id":"a1ddcc4d2db35603","fromNode":"647bb2fc53cba5e2","fromSide":"bottom","toNode":"9411c9effcbc54eb","toSide":"top"},

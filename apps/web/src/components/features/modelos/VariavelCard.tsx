@@ -9,7 +9,7 @@ import { GripVertical, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useState } from 'react'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 
 export type VariavelExtraida = {
   tag: string
