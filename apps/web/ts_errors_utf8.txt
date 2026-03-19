@@ -1,0 +1,5 @@
+﻿src/routes/_sistema.admin.usuarios.index.tsx(22,1): error TS6133: 'useToast' is declared but its value is never read.
+src/routes/_sistema.diario-oficial.tsx(101,9): error TS6133: 'iconBg' is declared but its value is never read.
+src/routes/_sistema.revisao.fila.tsx(9,47): error TS6133: 'ArrowRight' is declared but its value is never read.
+src/routes/_sistema.revisao.fila.tsx(22,11): error TS6133: 'usuario' is declared but its value is never read.
+src/routes/_sistema.tutorial.tsx(10,28): error TS6133: 'Unlock' is declared but its value is never read.

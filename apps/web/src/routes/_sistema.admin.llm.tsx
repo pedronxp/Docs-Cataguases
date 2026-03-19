@@ -46,7 +46,7 @@ const PROVIDERS: { name: LLMProvider; label: string; desc: string; icon: React.E
     { name: 'mistral', label: 'Mistral', desc: 'Modelos de ponta', icon: Sparkles, accent: 'text-[#6730a3]', accentBg: 'bg-[#f3f0ff]', accentBorder: 'border-[#6730a3]' },
     { name: 'groq', label: 'Groq', desc: 'Ultra-rápido', icon: Cpu, accent: 'text-[#6730a3]', accentBg: 'bg-[#f3f0ff]', accentBorder: 'border-[#6730a3]' },
     { name: 'openrouter', label: 'OpenRouter', desc: '400+ modelos', icon: Globe, accent: 'text-[#1351b4]', accentBg: 'bg-[#edf5ff]', accentBorder: 'border-[#1351b4]' },
-    { name: 'kimi', label: 'Kimi', desc: 'Moonshot AI', icon: Sparkles, accent: 'text-[#1d9e74]', accentBg: 'bg-[#e6f4f1]', accentBorder: 'border-[#1d9e74]' },
+    { name: 'kimi' as LLMProvider, label: 'Kimi', desc: 'Moonshot AI', icon: Sparkles, accent: 'text-[#1d9e74]', accentBg: 'bg-[#e6f4f1]', accentBorder: 'border-[#1d9e74]' },
 ]
 
 // ── Provider card ─────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ function LogRow({ entry }: { entry: LLMRequestLog }) {
     const providerColor = entry.provider === 'cerebras' ? 'text-[#c55a00] border-[#c55a00] bg-[#fff5eb]'
         : entry.provider === 'mistral' ? 'text-[#6730a3] border-[#6730a3] bg-[#f3f0ff]'
         : entry.provider === 'groq' ? 'text-[#6730a3] border-[#6730a3] bg-[#f3f0ff]'
-        : entry.provider === 'kimi' ? 'text-[#1d9e74] border-[#1d9e74] bg-[#e6f4f1]'
+        : (entry.provider as string) === 'kimi' ? 'text-[#1d9e74] border-[#1d9e74] bg-[#e6f4f1]'
         : 'text-[#1351b4] border-[#1351b4] bg-[#edf5ff]'
     return (
         <TableRow className={`text-xs ${entry.success ? '' : 'bg-[#ffefec]'} border-b border-[#e6e6e6]`}>

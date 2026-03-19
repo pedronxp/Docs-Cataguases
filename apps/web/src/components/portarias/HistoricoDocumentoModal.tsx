@@ -10,7 +10,7 @@ import type { FeedAtividade } from '@/types/domain'
 import {
     FileText, CheckCircle2, AlertCircle, Send, PenTool,
     Eye, Download, Save, Clock, Trash2, UserCheck,
-    RefreshCw, Bot, FileSignature, XCircle, Loader2,
+    RefreshCw, Bot, FileSignature, XCircle,
     ArrowRightLeft, ScrollText,
 } from 'lucide-react'
 

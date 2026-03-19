@@ -130,7 +130,7 @@ function ValidarPage() {
                             <CertRow label="Título" value={portaria.titulo} />
                             <CertRow label="Número Oficial" value={portaria.numeroOficial ?? '—'} />
                             <CertRow label="Data de Publicação" value={new Date(portaria.updatedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })} />
-                            <CertRow label="Hash de Autenticidade" value={(portaria as any).hashIntegridade ?? portaria.hashAssinatura ?? '—'} mono />
+                            <CertRow label="Hash de Autenticidade" value={portaria.hashIntegridade ?? portaria.hashAssinatura ?? '—'} mono />
                             <CertRow label="Secretaria Emissora" value={portaria.secretaria?.nome || portaria.secretariaId} />
                         </div>
 

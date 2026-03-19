@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/auth.store'
 import {
     Eye, EyeOff, Building2, AlertCircle, User, Mail,
-    Lock, ChevronRight, ChevronLeft, CheckCircle2, FileText
+    Lock, ChevronRight, ChevronLeft, CheckCircle2
 } from 'lucide-react'
 import api from '@/lib/api'
 

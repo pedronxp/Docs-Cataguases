@@ -8,8 +8,12 @@ export const STATUS_PORTARIA = {
     PUBLICADA: 'PUBLICADA',
     FALHA_PROCESSAMENTO: 'FALHA_PROCESSAMENTO',
     ERRO_GERACAO: 'ERRO_GERACAO',
+    PROCESSANDO: 'PROCESSANDO',
+    // Aliases para compatibilidade legada
+    PENDENTE: 'EM_REVISAO_ABERTA',
+    APROVADA: 'PRONTO_PUBLICACAO',
 } as const
-export type StatusPortaria = (typeof STATUS_PORTARIA)[keyof typeof STATUS_PORTARIA]
+export type StatusPortaria = keyof typeof STATUS_PORTARIA
 
 export const ROLES = {
     ADMIN_GERAL: 'ADMIN_GERAL',
@@ -67,12 +71,13 @@ export type TipoEventoFeed = (typeof TIPO_EVENTO_FEED)[keyof typeof TIPO_EVENTO_
 export interface Secretaria {
     id: string; nome: string; sigla: string; cor: string;
     titularId?: string | null;
-    titular?: Pick<Usuario, 'id' | 'name' | 'email' | 'image'> | null;
+    titular?: Pick<Usuario, 'id' | 'name' | 'email'> | null;
 }
 export interface Setor { id: string; nome: string; secretariaId: string }
 
 export interface Usuario {
-    id: string; name: string; email: string; role: RoleUsuario; ativo: boolean
+    id: string; name: string; email: string; role: RoleUsuario; ativo: boolean;
+    image?: string | null;
     permissoesExtra: string[]; secretariaId: string | null; setorId: string | null
     secretaria?: Secretaria; setor?: Setor; createdAt: string
 }
@@ -92,6 +97,8 @@ export interface Portaria {
     assinadoPor?: { name: string } | null
     modelo?: { nome: string }
     secretaria?: Secretaria & { cor?: string }
+    hashAssinatura: string | null
+    numeroSistematico?: string
     createdAt: string; updatedAt: string
     feedAtividades?: FeedAtividade[]
 }

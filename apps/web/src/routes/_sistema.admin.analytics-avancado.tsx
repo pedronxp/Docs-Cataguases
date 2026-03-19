@@ -2,14 +2,14 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { useState, useEffect, useMemo } from 'react'
 import {
-    BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
+    BarChart, Bar, AreaChart, Area, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Navigate } from '@tanstack/react-router'
 import {
     Clock, TrendingDown, Users, Calendar, BarChart3, Activity,
-    Building2, Zap, Target, ArrowUpRight, ArrowDownRight, Timer
+    Building2, Target, ArrowUpRight, ArrowDownRight, Timer
 } from 'lucide-react'
 import api from '@/lib/api'
 import { Can } from '@/lib/ability'
@@ -240,7 +240,7 @@ function AnalyticsAvancadoPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
-                            {data.pipeline.map((item, i) => {
+                            {data.pipeline.map((item) => {
                                 const maxQtd = Math.max(...data.pipeline.map(p => p.quantidade), 1)
                                 const pct = Math.round((item.quantidade / maxQtd) * 100)
                                 return (

@@ -78,7 +78,7 @@ function NotificacaoRow({
                         <span className="h-1.5 w-1.5 rounded-full bg-blue-500 inline-block" />
                     )}
                     <span className="text-[10px] text-slate-400">
-                        {tempoRelativo(notif.createdAt)}
+                        {tempoRelativo(notif.createdAt || new Date().toISOString())}
                     </span>
                 </div>
             </div>

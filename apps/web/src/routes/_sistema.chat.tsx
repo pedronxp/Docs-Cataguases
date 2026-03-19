@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import api from '@/lib/api'
 import {
-    Plus, Trash2, Bot, User as UserIcon, Send, Sparkles, Loader2, Cpu, Globe, Settings, Info, Paperclip, X, FileText
+    Plus, Trash2, Bot, User as UserIcon, Send, Sparkles, Loader2, Settings, Info, Paperclip, X, FileText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

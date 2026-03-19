@@ -40,7 +40,7 @@ function PortariaWizardPage() {
     const [secretariasLista, setSecretariasLista] = useState<Secretaria[]>([])
     const [formValues, setFormValues] = useState<Record<string, string>>({})
     const [submitting, setSubmitting] = useState(false)
-    const [direction, setDirection] = useState<'forward' | 'back'>('forward')
+
     const [touched, setTouched] = useState(false)
 
     useEffect(() => {
@@ -65,13 +65,11 @@ function PortariaWizardPage() {
     }, [])
 
     const handleNextStep = () => {
-        setDirection('forward')
         setTouched(true)
         nextStep()
     }
 
     const handlePrevStep = () => {
-        setDirection('back')
         prevStep()
     }
 

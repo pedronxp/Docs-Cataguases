@@ -2,12 +2,12 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
-    Search, ShieldAlert, PowerOff, Power, Loader2, X,
-    Users, UserCheck, UserX, Building2, ChevronDown, Shield,
-    Settings, Filter
+    Search, ShieldAlert, PowerOff, Power, X,
+    Users, UserCheck, UserX, Building2, Shield,
+    Settings
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -26,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useState, useEffect, useMemo } from 'react'
 import type { Usuario, RoleUsuario, Secretaria } from '@/types/domain'
 import { listarSetores, type Setor, listarSecretarias } from '@/services/secretaria.service'
-import api from '@/lib/api'
+
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/_sistema/admin/usuarios/')({
@@ -120,8 +120,7 @@ function OrgUsuarioRow({ usuario, secretaria, showSecretaria }: {
 // ─── Página Principal ───────────────────────────────────────────────────────
 
 function UsuariosPage() {
-    const { toast } = useToast()
-    const { usuarios, loading, toggleStatus, refetch } = useUsuarios()
+    const { usuarios, loading, toggleStatus } = useUsuarios()
     const [busca, setBusca] = useState('')
     const [filtroRole, setFiltroRole] = useState<RoleUsuario | ''>('')
     const [filtroSecretaria, setFiltroSecretaria] = useState('')

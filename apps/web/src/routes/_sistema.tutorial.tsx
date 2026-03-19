@@ -19,7 +19,7 @@ export const Route = createFileRoute('/_sistema/tutorial')({
 // ══════════════════════════════════════════════════════════════════════════════
 
 const ALL_ROLES = ['OPERADOR', 'REVISOR', 'SECRETARIO', 'PREFEITO', 'ADMIN_GERAL'] as const
-type Role = typeof ALL_ROLES[number]
+
 
 const ROLE_LABELS: Record<string, string> = {
     OPERADOR: 'Operador', REVISOR: 'Revisor', SECRETARIO: 'Secretário',

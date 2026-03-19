@@ -2,9 +2,9 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useDashboard } from '@/hooks/use-dashboard'
 import { useState, useEffect } from 'react'
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import {
@@ -27,7 +27,7 @@ import {
     FileSignature, ScrollText, Loader2, ChevronRight,
     Bell, Megaphone, Trash2,
 } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useNotificationsStore } from '@/store/notifications.store'
 import {

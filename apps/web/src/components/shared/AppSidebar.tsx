@@ -3,7 +3,7 @@ import { AbilityContext } from '@/lib/ability'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
     LayoutDashboard, FileText, Users, Settings, BookOpen,
-    Braces, Archive, Building2, BarChart2, Network,
+    Braces, Building2, BarChart2,
     Newspaper, Activity, ChevronLeft, ChevronRight,
     ClipboardList, ClipboardCheck, GraduationCap, ScrollText,
     PlusCircle, List, Puzzle, ChevronDown, ChevronUp, Bot, Brain,

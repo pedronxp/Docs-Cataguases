@@ -95,7 +95,7 @@ export function AssinaturaModal({ isOpen, onOpenChange, portariaId, onSigned }: 
             
             // Força a geração do PDF caso ainda não exista
             const res = await portariaService.gerarPdf(portariaId)
-            if (res.error) {
+            if (!res.success) {
                 toast({ title: 'Erro ao gerar', description: res.error, variant: 'destructive' })
                 return
             }

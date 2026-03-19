@@ -492,13 +492,13 @@ function PortariaDetalhesPage() {
                                             className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50 font-semibold"
                                             onClick={async () => {
                                                 const res = await portariaService.gerarPdf(id)
-                                                if (res.success && res.data?.url) {
+                                                if (!res.success) {
+                                                    toast({ title: 'Falha na regeneração', description: res.error || 'O modelo pode não ter template configurado.', variant: 'destructive' })
+                                                } else if (res.data?.url) {
                                                     setPdfViewerUrl(`/api/portarias/${id}/stream?type=pdf`)
                                                     setViewerMode('pdf')
                                                     toast({ title: 'Documento regenerado', description: 'O arquivo foi gerado com sucesso.' })
                                                     loadPortaria()
-                                                } else {
-                                                    toast({ title: 'Falha na regeneração', description: res.error || 'O modelo pode não ter template configurado.', variant: 'destructive' })
                                                 }
                                             }}
                                         >
