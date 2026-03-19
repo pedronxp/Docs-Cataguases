@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params
     const session = await getSession()
     if (!session) {
         return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         if (!dbUser) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
 
         const chatSession = await (prisma as any).chatSession.findFirst({
-            where: { id: params.id, userId: dbUser.id },
+            where: { id, userId: dbUser.id },
             include: {
                 mensagens: {
                     orderBy: { createdAt: 'asc' },
@@ -30,12 +31,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
         return NextResponse.json({ session: chatSession })
     } catch (err: any) {
-        console.error(`[GET /api/llm/sessions/${params.id}]`, err)
+        console.error(`[GET /api/llm/sessions/${id}]`, err)
         return NextResponse.json({ error: 'Erro interno ao buscar mensagens da sessão' }, { status: 500 })
     }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
@@ -49,7 +51,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
         return NextResponse.json({ success: true })
     } catch (err: any) {
-        console.error(`[DELETE /api/llm/sessions/${params.id}]`, err)
+        console.error(`[DELETE /api/llm/sessions/${id}]`, err)
         return NextResponse.json({ error: 'Erro interno ao deletar sessão' }, { status: 500 })
     }
 }

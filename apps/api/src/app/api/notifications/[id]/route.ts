@@ -10,8 +10,9 @@ export const dynamic = 'force-dynamic'
 
 export async function PATCH(
     _req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
@@ -19,28 +20,27 @@ export async function PATCH(
 
     // Garante que a notificação pertence ao usuário
     const [existente]: any[] = await prisma.$queryRaw`
-        SELECT id FROM "Notificacao" WHERE id = ${params.id} AND "userId" = ${userId}
-    `
-    if (!existente) return NextResponse.json({ error: 'Notificação não encontrada' }, { status: 404 })
+        SELECT id FROM "Notificacao" WHERE id = ${id} AND "userId" = ${userId}
+    `    if (!existente) return NextResponse.json({ error: 'Notificação não encontrada' }, { status: 404 })
 
     await prisma.$executeRaw`
-        UPDATE "Notificacao" SET lida = true WHERE id = ${params.id}
+        UPDATE "Notificacao" SET lida = true WHERE id = ${id}
     `
-
     return NextResponse.json({ success: true })
 }
 
 export async function DELETE(
     _req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
     const userId = session.id as string
 
     await prisma.$executeRaw`
-        DELETE FROM "Notificacao" WHERE id = ${params.id} AND "userId" = ${userId}
+        DELETE FROM "Notificacao" WHERE id = ${id} AND "userId" = ${userId}
     `
 
     return NextResponse.json({ success: true })

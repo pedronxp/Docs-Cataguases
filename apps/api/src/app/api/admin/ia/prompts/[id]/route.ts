@@ -20,8 +20,9 @@ const atualizarPromptSchema = z.object({
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params
     const usuario = await getAuthUser()
     if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     if (usuario.role !== 'ADMIN_GERAL') {
@@ -32,7 +33,7 @@ export async function GET(
         SELECT p.*, u.name as "criadoPorNome"
         FROM "LlmPrompt" p
         LEFT JOIN "User" u ON u.id = p."criadoPorId"
-        WHERE p.id = ${params.id}
+        WHERE p.id = ${id}
     `
     if (!prompt) return NextResponse.json({ error: 'Prompt não encontrado' }, { status: 404 })
 
@@ -44,8 +45,9 @@ export async function GET(
 
 export async function PATCH(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params
     const usuario = await getAuthUser()
     if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     if (usuario.role !== 'ADMIN_GERAL') {
@@ -63,7 +65,7 @@ export async function PATCH(
     }
 
     // Verifica se existe
-    const [existente]: any[] = await prisma.$queryRaw`SELECT id FROM "LlmPrompt" WHERE id = ${params.id}`
+    const [existente]: any[] = await prisma.$queryRaw`SELECT id FROM "LlmPrompt" WHERE id = ${id}`
     if (!existente) return NextResponse.json({ error: 'Prompt não encontrado' }, { status: 404 })
 
     const { nome, categoria, conteudo, ativo, ordem } = parsed.data
@@ -78,7 +80,7 @@ export async function PATCH(
     if (ativo     !== undefined) { sets.push(`\"ativo\" = $${values.length + 1}`);     values.push(ativo) }
     if (ordem     !== undefined) { sets.push(`\"ordem\" = $${values.length + 1}`);     values.push(ordem) }
 
-    values.push(params.id) // para o WHERE
+    values.push(id) // para o WHERE
 
     // Usa queryRawUnsafe para SET dinâmico (seguro pois os valores são parametrizados)
     await prisma.$executeRawUnsafe(
@@ -86,24 +88,25 @@ export async function PATCH(
         ...values
     )
 
-    const [updated]: any[] = await prisma.$queryRaw`SELECT * FROM "LlmPrompt" WHERE id = ${params.id}`
+    const [updated]: any[] = await prisma.$queryRaw`SELECT * FROM "LlmPrompt" WHERE id = ${id}`
     return NextResponse.json({ success: true, data: updated })
 }
 
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params
     const usuario = await getAuthUser()
     if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     if (usuario.role !== 'ADMIN_GERAL') {
         return NextResponse.json({ error: 'Acesso restrito a administradores' }, { status: 403 })
     }
 
-    const [existente]: any[] = await prisma.$queryRaw`SELECT id, nome FROM "LlmPrompt" WHERE id = ${params.id}`
+    const [existente]: any[] = await prisma.$queryRaw`SELECT id, nome FROM "LlmPrompt" WHERE id = ${id}`
     if (!existente) return NextResponse.json({ error: 'Prompt não encontrado' }, { status: 404 })
 
-    await prisma.$executeRaw`DELETE FROM "LlmPrompt" WHERE id = ${params.id}`
+    await prisma.$executeRaw`DELETE FROM "LlmPrompt" WHERE id = ${id}`
 
     return NextResponse.json({ success: true, message: 'Prompt excluído com sucesso' })
 }
