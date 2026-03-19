@@ -10,17 +10,17 @@ import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+// Badge import removed
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import {
-    Brain, Plus, Trash2, Power, PowerOff, Save, Eye, EyeOff,
-    ChevronUp, ChevronDown, AlertTriangle, CheckCircle2, RefreshCw,
-    BookOpen, MessageSquare, FileText, Settings2, Sparkles, GripVertical,
-    Info, Copy, ToggleLeft, ToggleRight,
+    Brain, Plus, Trash2, PowerOff, Save, Eye, EyeOff,
+    ChevronUp, ChevronDown, CheckCircle2, RefreshCw,
+    BookOpen, MessageSquare, FileText, Settings2, Sparkles,
+    Info, ToggleLeft, ToggleRight,
 } from 'lucide-react'
 import { Can } from '@/lib/ability'
 

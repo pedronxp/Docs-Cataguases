@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
+// Switch import removed
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
@@ -789,7 +789,7 @@ function NovoModeloWizard() {
                   <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
                     <strong className="font-bold flex items-center gap-2 text-yellow-900">
                       Variáveis orfãs
-                      <Badge variant="warning" className="bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100 h-5 px-1.5">{variaveisSemTag.length}</Badge>
+                      <Badge variant="outline" className="bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100 h-5 px-1.5">{variaveisSemTag.length}</Badge>
                     </strong>
                     <Button
                       size="sm"

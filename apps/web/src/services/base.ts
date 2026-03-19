@@ -4,8 +4,8 @@ import type { AxiosInstance } from 'axios'
 export const httpClient: AxiosInstance = api
 
 export class BaseApiService {
-    protected http: AxiosInstance
-    protected basePath: string
+    public http: AxiosInstance
+    public basePath: string
 
     constructor(http: AxiosInstance = httpClient, basePath: string = '') {
         this.http = http

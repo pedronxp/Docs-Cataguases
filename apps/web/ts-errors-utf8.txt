@@ -1,4 +1,11 @@
-﻿src/components/shared/NotificationBell.tsx(81,40): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+﻿src/components/portarias/AssinaturaModal.tsx(98,21): error TS2339: Property 'error' does not exist on type 'Result<{ url: string; }>'.
+  Property 'error' does not exist on type 'Ok<{ url: string; }>'.
+src/components/portarias/AssinaturaModal.tsx(99,66): error TS2339: Property 'error' does not exist on type 'Result<{ url: string; }>'.
+  Property 'error' does not exist on type 'Ok<{ url: string; }>'.
+src/components/portarias/HistoricoDocumentoModal.tsx(13,45): error TS6133: 'Loader2' is declared but its value is never read.
+src/components/shared/AppSidebar.tsx(6,13): error TS6133: 'Archive' is declared but its value is never read.
+src/components/shared/AppSidebar.tsx(6,44): error TS6133: 'Network' is declared but its value is never read.
+src/components/shared/NotificationBell.tsx(81,40): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
   Type 'undefined' is not assignable to type 'string'.
 src/routes/_auth.registro.tsx(12,52): error TS6133: 'FileText' is declared but its value is never read.
 src/routes/_sistema.acervo.tsx(6,110): error TS6133: 'X' is declared but its value is never read.
@@ -32,6 +39,8 @@ src/routes/_sistema.admin.usuarios.index.tsx(10,1): error TS6133: 'Label' is dec
 src/routes/_sistema.admin.usuarios.index.tsx(29,1): error TS6133: 'api' is declared but its value is never read.
 src/routes/_sistema.admin.usuarios.index.tsx(123,11): error TS6133: 'toast' is declared but its value is never read.
 src/routes/_sistema.admin.usuarios.index.tsx(124,46): error TS6133: 'refetch' is declared but its value is never read.
+src/routes/_sistema.administrativo.portarias.$id.tsx(501,109): error TS2339: Property 'error' does not exist on type 'Result<{ url: string; }>'.
+  Property 'error' does not exist on type 'Ok<{ url: string; }>'.
 src/routes/_sistema.administrativo.portarias.index.tsx(12,35): error TS6133: 'ChevronDown' is declared but its value is never read.
 src/routes/_sistema.administrativo.portarias.index.tsx(83,7): error TS6133: 'ABA_TABS' is declared but its value is never read.
 src/routes/_sistema.administrativo.portarias.novo.tsx(43,12): error TS6133: 'direction' is declared but its value is never read.
@@ -41,7 +50,9 @@ src/routes/_sistema.dashboard.tsx(5,1): error TS6192: All imports in import decl
 src/routes/_sistema.dashboard.tsx(7,1): error TS6133: 'Badge' is declared but its value is never read.
 src/routes/_sistema.dashboard.tsx(30,1): error TS6192: All imports in import declaration are unused.
 src/routes/_sistema.diario-oficial.tsx(101,9): error TS6133: 'iconBg' is declared but its value is never read.
+src/routes/_sistema.perfil.tsx(111,37): error TS2339: Property 'clearAuth' does not exist on type 'AuthState'.
 src/routes/_sistema.revisao.fila.tsx(9,47): error TS6133: 'ArrowRight' is declared but its value is never read.
 src/routes/_sistema.revisao.fila.tsx(22,11): error TS6133: 'usuario' is declared but its value is never read.
 src/routes/_sistema.tutorial.tsx(10,28): error TS6133: 'Unlock' is declared but its value is never read.
 src/routes/_sistema.tutorial.tsx(22,6): error TS6196: 'Role' is declared but never used.
+src/routes/validar.tsx(133,121): error TS2339: Property 'hashAssinatura' does not exist on type 'Portaria'.

@@ -1,5 +1,5 @@
 import { ok, err, type Result } from '../lib/result'
-import { BaseApiService, httpClient } from './base'
+import { BaseApiService, httpClient } from '@/services/base'
 
 export type LLMProvider = 'cerebras' | 'mistral' | 'groq' | 'openrouter'
 

@@ -4,7 +4,7 @@ import type {
     PaginatedResponse, ListQueryParams,
 } from '../types/api'
 import { ok, err, type Result } from '../lib/result'
-import { BaseApiService, httpClient } from './base'
+import { BaseApiService, httpClient } from '@/services/base'
 
 /**
  * Desencapsula respostas que podem vir de duas formas:

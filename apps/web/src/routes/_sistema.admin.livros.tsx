@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
-    Plus, Book, Edit, History, RefreshCcw, RefreshCw,
+    Plus, Book, Edit, History, RefreshCw,
     User as UserIcon, Calendar, Network, Loader2, Trash2, Search,
     ShieldAlert
 } from 'lucide-react'
@@ -43,7 +43,6 @@ function LivrosNumeracaoPage() {
     
     // Auth & PIN
     const [pinSeguranca, setPinSeguranca] = useState('')
-    const [resetTarget, setResetTarget] = useState<LivrosNumeracao | null>(null)
 
     useEffect(() => {
         loadLivros()
@@ -65,7 +64,6 @@ function LivrosNumeracaoPage() {
         if (res.success) {
             toast({ title: 'Sucesso', description: 'Livro atualizado com sucesso.' })
             setIsEditOpen(false)
-            setResetTarget(null)
             setPinSeguranca('')
             loadLivros()
         } else {
@@ -73,14 +71,7 @@ function LivrosNumeracaoPage() {
         }
     }
 
-    const handleResetConfirm = () => {
-        if (!resetTarget) return
-        if (!pinSeguranca) {
-            toast({ title: 'PIN Obrigatório', description: 'Informe seu PIN de Segurança para confirmar.', variant: 'destructive' })
-            return
-        }
-        handleUpdate({ id: resetTarget.id, proximo_numero: resetTarget.numero_inicial })
-    }
+
 
     const handleDelete = async () => {
         if (!deleteTarget) return
@@ -249,14 +240,7 @@ function LivrosNumeracaoPage() {
                                         >
                                             <Edit className="h-4 w-4" />
                                         </Button>
-                                        <Button
-                                            variant="ghost" size="icon"
-                                            className="h-8 w-8 text-slate-400 hover:text-amber-600 hover:bg-amber-50 shrink-0"
-                                            onClick={() => setResetTarget(livro)}
-                                            title="Resetar Contador"
-                                        >
-                                            <RefreshCcw className="h-4 w-4" />
-                                        </Button>
+
                                         <Button
                                             variant="ghost" size="icon"
                                             className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0"

@@ -108,7 +108,7 @@ function QuickPerfilLink({ to, label, icon }: { to: string; label: string; icon:
 }
 
 function PerfilPage() {
-    const { usuario, updateUsuario, clearAuth } = useAuthStore()
+    const { usuario, updateUsuario, clearSession } = useAuthStore()
     const navigate = useNavigate()
     const { toast } = useToast()
     const [showPin, setShowPin] = useState(false)
@@ -157,7 +157,7 @@ function PerfilPage() {
         } finally { setSalvandoSenha(false) }
     }
 
-    function handleLogout() { clearAuth(); navigate({ to: '/login' }) }
+    function handleLogout() { clearSession(); navigate({ to: '/login' }) }
 
     return (
         <div className="max-w-3xl mx-auto space-y-5 animate-in fade-in duration-500">

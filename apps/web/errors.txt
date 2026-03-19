@@ -1,0 +1,18 @@
+﻿src/routes/_sistema.admin.usuarios.index.tsx(6,41): error TS6133: 'ChevronDown' is declared but its value is never read.
+src/routes/_sistema.admin.usuarios.index.tsx(7,15): error TS6133: 'Filter' is declared but its value is never read.
+src/routes/_sistema.admin.usuarios.index.tsx(10,1): error TS6133: 'Label' is declared but its value is never read.
+src/routes/_sistema.admin.usuarios.index.tsx(29,1): error TS6133: 'api' is declared but its value is never read.
+src/routes/_sistema.admin.usuarios.index.tsx(123,11): error TS6133: 'toast' is declared but its value is never read.
+src/routes/_sistema.admin.usuarios.index.tsx(124,46): error TS6133: 'refetch' is declared but its value is never read.
+src/routes/_sistema.administrativo.portarias.index.tsx(12,35): error TS6133: 'ChevronDown' is declared but its value is never read.
+src/routes/_sistema.administrativo.portarias.index.tsx(83,7): error TS6133: 'ABA_TABS' is declared but its value is never read.
+src/routes/_sistema.administrativo.portarias.novo.tsx(43,12): error TS6133: 'direction' is declared but its value is never read.
+src/routes/_sistema.chat.tsx(6,67): error TS6133: 'Cpu' is declared but its value is never read.
+src/routes/_sistema.chat.tsx(6,72): error TS6133: 'Globe' is declared but its value is never read.
+src/routes/_sistema.dashboard.tsx(5,1): error TS6192: All imports in import declaration are unused.
+src/routes/_sistema.dashboard.tsx(7,1): error TS6133: 'Badge' is declared but its value is never read.
+src/routes/_sistema.dashboard.tsx(30,1): error TS6192: All imports in import declaration are unused.
+src/routes/_sistema.diario-oficial.tsx(101,9): error TS6133: 'iconBg' is declared but its value is never read.
+src/routes/_sistema.revisao.fila.tsx(9,47): error TS6133: 'ArrowRight' is declared but its value is never read.
+src/routes/_sistema.revisao.fila.tsx(22,11): error TS6133: 'usuario' is declared but its value is never read.
+src/routes/_sistema.tutorial.tsx(10,28): error TS6133: 'Unlock' is declared but its value is never read.

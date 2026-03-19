@@ -9,7 +9,7 @@ import {
 import {
     Search, Plus, FileText, AlertCircle, CheckCircle2,
     Clock, Eye, FileDown, MoreVertical, Filter, PenTool, HelpCircle, Trash2,
-    User, UserCheck, ShieldAlert, ChevronDown,
+    User, UserCheck, ShieldAlert
 } from 'lucide-react'
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -80,16 +80,7 @@ function getResponsavel(doc: Portaria): { tipo: string; nome: string } | null {
 
 // ─── Abas de status ──────────────────────────────────────────────────────────
 
-const ABA_TABS = [
-    { key: 'all',                   label: 'Todos' },
-    { key: 'RASCUNHO',              label: 'Rascunho' },
-    { key: 'EM_REVISAO_ABERTA',     label: 'Em Revisão' },
-    { key: 'EM_REVISAO_ATRIBUIDA',  label: 'Em Revisão' },
-    { key: 'CORRECAO_NECESSARIA',   label: 'Correção' },
-    { key: 'AGUARDANDO_ASSINATURA', label: 'Assinatura' },
-    { key: 'PRONTO_PUBLICACAO',     label: 'Diário Oficial' },
-    { key: 'PUBLICADA',             label: 'Publicadas' },
-] as const
+
 
 function PortariasListPage() {
     const { portarias, loading, filters, updateFilters, refresh } = usePortarias()

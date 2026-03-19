@@ -18,9 +18,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { useUsuarios } from '@/hooks/use-usuarios'
 import {
-    ClipboardCheck, ArrowLeft, Clock, UserCheck, UserX,
-    Loader2, Shield, Building2, Search, X, AlertTriangle,
-    CheckCircle2, XCircle, Calendar
+    ClipboardCheck, ArrowLeft, Clock, UserCheck,
+    Loader2, Building2, Search, X, AlertTriangle,
+    CheckCircle2, XCircle
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import type { Usuario, RoleUsuario, Secretaria } from '@/types/domain'

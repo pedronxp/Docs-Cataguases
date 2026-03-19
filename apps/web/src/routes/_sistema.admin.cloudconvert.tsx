@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -69,7 +69,7 @@ function CloudConvertMonitor() {
     toast({ title: 'Exportado', description: 'Download iniciado.' })
   }
 
-  const totalCredits = keys.reduce((acc, k) => acc + (k.credits || 0), 0)
+  const totalCredits = keys.reduce((acc, k) => acc + (typeof k.credits === 'number' ? k.credits : Number(k.credits || 0)), 0)
   const activeKey = keys.find(k => k.isActive)
 
   return (
