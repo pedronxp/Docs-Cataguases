@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { encrypt } from '@/lib/encryption'
 
 const ADMIN_ROLES = ['ADMIN_GERAL', 'ADMIN']
 
@@ -32,18 +33,23 @@ export async function GET(_req: NextRequest) {
         orderBy: { criadoEm: 'desc' },
     })
 
-    // Auto-reativar chaves cujo cooldown já expirou
+    // Auto-reativar chaves cujo cooldown já expirou — uma única query em vez de loop de UPDATEs.
+    // Executa em background (não bloqueia a resposta e falhas não impactam a listagem).
     const now = new Date()
-    for (const key of keys) {
-        if (key.esgotada && key.esgotadaAte && key.esgotadaAte < now) {
-            key.esgotada = false
-            key.esgotadaAte = null
-            await prisma.llmApiKey.update({
-                where: { id: key.id },
-                data: { esgotada: false, esgotadaAte: null },
-            })
+    prisma.llmApiKey.updateMany({
+        where: { esgotada: true, esgotadaAte: { lt: now } },
+        data: { esgotada: false, esgotadaAte: null },
+    }).then(() => {
+        // Atualiza o estado local para refletir as reativações na resposta atual
+        for (const key of keys) {
+            if (key.esgotada && key.esgotadaAte && key.esgotadaAte < now) {
+                key.esgotada = false
+                key.esgotadaAte = null
+            }
         }
-    }
+    }).catch((err: any) => {
+        console.warn('[GET /admin/llm/keys] Falha ao reativar chaves expiradas:', err?.message)
+    })
 
     const groq = keys.filter(k => k.provider === 'groq')
     const openrouter = keys.filter(k => k.provider === 'openrouter')
@@ -109,12 +115,22 @@ export async function POST(req: NextRequest) {
     const trimmedKey = key.trim()
     const mask = maskKey(trimmedKey)
 
+    // SEGURANÇA: criptografa a chave com AES-256-GCM antes de persistir.
+    // A chave em texto plano nunca é salva no banco.
+    let encryptedKey: string
+    try {
+        encryptedKey = encrypt(trimmedKey)
+    } catch (encErr: any) {
+        console.error('[LLM Keys] Falha ao criptografar chave:', encErr?.message)
+        return NextResponse.json({ error: 'Erro de configuração do servidor (ENCRYPTION_KEY). Contate o administrador.' }, { status: 500 })
+    }
+
     try {
         const created = await prisma.llmApiKey.create({
             data: {
                 provider,
                 label: label.trim(),
-                keyEncrypted: trimmedKey,
+                keyEncrypted: encryptedKey,
                 mask,
             },
             select: { id: true, provider: true, label: true, mask: true, ativo: true, criadoEm: true },

@@ -37,12 +37,13 @@ export async function GET() {
             })
         }
 
-        // Remove a senha do objeto de retorno
-        const { password: _, ...userWithoutPassword } = user
+        // SEGURANÇA: remove campos sensíveis antes de retornar ao frontend.
+        // pinSeguranca é um código de acesso de ADMIN_GERAL — nunca deve trafegar pelo frontend.
+        const { password: _, pinSeguranca: __, ...userWithoutSensitiveData } = user as any
 
         return NextResponse.json({
             success: true,
-            data: userWithoutPassword,
+            data: userWithoutSensitiveData,
         })
     } catch (error) {
         console.error('Erro no endpoint /me:', error)

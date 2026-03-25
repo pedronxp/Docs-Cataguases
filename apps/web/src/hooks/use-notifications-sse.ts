@@ -132,6 +132,7 @@ export function useNotificationsSSE() {
                     title: LABELS[data.tipoEvento] ?? 'Notificação',
                     description: data.mensagem,
                 })
+                window.dispatchEvent(new Event('portaria-changed'))
                 // Reset do contador de retentativas após sucesso
                 retryCountRef.current = 0
             } catch {
@@ -171,6 +172,7 @@ export function useNotificationsSSE() {
                     title: LABELS[data.tipo] ?? 'Notificação',
                     description: data.mensagem,
                 })
+                window.dispatchEvent(new Event('portaria-changed'))
                 retryCountRef.current = 0
             } catch {
                 // JSON malformado — ignora silenciosamente

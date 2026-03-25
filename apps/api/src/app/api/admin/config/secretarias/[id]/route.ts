@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
 import { z } from 'zod'
+import { CacheService, CACHE_TAGS } from '@/services/cache.service'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,6 +72,7 @@ export async function PATCH(
             }
         }
 
+        CacheService.invalidateByTag(CACHE_TAGS.SECRETARIAS).catch(() => {})
         return NextResponse.json({ success: true, data: updated })
     } catch (error) {
         console.error('Erro ao atualizar secretaria:', error)
@@ -93,6 +95,7 @@ export async function DELETE(
             data: { ativo: false },
         })
 
+        CacheService.invalidateByTag(CACHE_TAGS.SECRETARIAS).catch(() => {})
         return NextResponse.json({ success: true })
     } catch (error: any) {
         console.error('Erro ao remover secretaria:', error)

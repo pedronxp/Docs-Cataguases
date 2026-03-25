@@ -8,7 +8,7 @@ import {
     ClipboardList, ClipboardCheck, GraduationCap, ScrollText,
     PlusCircle, List, Puzzle, ChevronDown, ChevronUp, Bot, Brain,
     Library, RefreshCcw, MessageSquarePlus, Stamp, MessageSquareWarning,
-    Construction,
+    Construction, GitBranch,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useUIStore } from '@/hooks/use-ui'
@@ -86,6 +86,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
             { to: '/admin/analytics', label: 'Painel Analytics', icon: BarChart2, action: 'ler', subject: 'Analytics' },
             { to: '/admin/analytics-avancado', label: 'Analytics Avançado', icon: Activity, action: 'manage', subject: 'all' },
             { to: '/admin/integracoes', label: 'Integrações', icon: Puzzle, action: 'gerenciar', subject: 'Configuracoes' },
+            { to: '/admin/workflow', label: 'Workflows', icon: GitBranch, action: 'gerenciar', subject: 'Configuracoes' },
             { to: '/admin/livros', label: 'Numeração/Livros', icon: Settings, action: 'gerenciar', subject: 'LivrosNumeracao' },
             { to: '/admin/llm', label: 'Painel de IA', icon: Bot, action: 'gerenciar', subject: 'Configuracoes' },
             { to: '/admin/ia', label: 'Treinamento da IA', icon: Brain, action: 'manage', subject: 'all' },

@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
             LEFT JOIN "User" u ON u.id = p."criadoPorId"
             WHERE p.categoria = ${categoria} AND p.ativo = true
             ORDER BY p.ordem ASC, p."criadoEm" ASC
-        `
+        `;
     } else if (categoria) {
         prompts = await prisma.$queryRaw`
             SELECT p.*, u.name as "criadoPorNome"
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
             LEFT JOIN "User" u ON u.id = p."criadoPorId"
             WHERE p.categoria = ${categoria}
             ORDER BY p.ordem ASC, p."criadoEm" ASC
-        `
+        `;
     } else if (apenasAtivos) {
         prompts = await prisma.$queryRaw`
             SELECT p.*, u.name as "criadoPorNome"
@@ -58,14 +58,14 @@ export async function GET(req: NextRequest) {
             LEFT JOIN "User" u ON u.id = p."criadoPorId"
             WHERE p.ativo = true
             ORDER BY p.ordem ASC, p."criadoEm" ASC
-        `
+        `;
     } else {
         prompts = await prisma.$queryRaw`
             SELECT p.*, u.name as "criadoPorNome"
             FROM "LlmPrompt" p
             LEFT JOIN "User" u ON u.id = p."criadoPorId"
             ORDER BY p.ordem ASC, p."criadoEm" ASC
-        `
+        `;
     }
 
     // Formata para o frontend
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     const parsed = criarPromptSchema.safeParse(body)
     if (!parsed.success) {
-        return NextResponse.json({ error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }, { status: 400 })
+        return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }, { status: 400 })
     }
 
     const id = randomUUID()
@@ -101,11 +101,11 @@ export async function POST(req: NextRequest) {
     await prisma.$executeRaw`
         INSERT INTO "LlmPrompt" ("id", "nome", "categoria", "conteudo", "ativo", "ordem", "criadoPorId", "criadoEm", "atualizadoEm")
         VALUES (${id}, ${nome}, ${categoria}, ${conteudo}, ${ativo}, ${ordem}, ${criadoPorId}, NOW(), NOW())
-    `
+    `;
 
     const [prompt]: any[] = await prisma.$queryRaw`
         SELECT * FROM "LlmPrompt" WHERE id = ${id}
-    `
+    `;
 
     return NextResponse.json({ success: true, data: prompt }, { status: 201 })
 }

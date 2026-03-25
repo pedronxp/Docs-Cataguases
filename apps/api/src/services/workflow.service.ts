@@ -119,6 +119,153 @@ const WORKFLOW_PADRAO: Omit<WorkflowConfig, 'id' | 'criadoEm' | 'atualizadoEm'> 
     transicoes: TRANSICOES_PADRAO,
 }
 
+// ── Presets ─────────────────────────────────────────────────────────────────
+
+const ESTADOS_SIMPLES: WorkflowEstado[] = [
+    { id: 'RASCUNHO', nome: 'RASCUNHO', label: 'Rascunho', cor: '#94a3b8', icone: 'FileEdit', ordem: 0, tipo: 'INICIO' },
+    { id: 'PRONTO_PUBLICACAO', nome: 'PRONTO_PUBLICACAO', label: 'Pronto para Publicação', cor: '#06b6d4', icone: 'CheckCircle', ordem: 1, tipo: 'INTERMEDIARIO' },
+    { id: 'PUBLICADA', nome: 'PUBLICADA', label: 'Publicada', cor: '#10b981', icone: 'Globe', ordem: 2, tipo: 'FIM' },
+]
+
+const TRANSICOES_SIMPLES: WorkflowTransicao[] = [
+    {
+        de: 'RASCUNHO', para: 'PRONTO_PUBLICACAO', acao: 'submeter',
+        label: 'Submeter para Publicação', rolesPermitidos: ['OPERADOR', 'SECRETARIO', 'ADMIN_GERAL'],
+        requerObservacao: false,
+    },
+    {
+        de: 'PRONTO_PUBLICACAO', para: 'PUBLICADA', acao: 'publicar',
+        label: 'Publicar', rolesPermitidos: ['SECRETARIO', 'ADMIN_GERAL'],
+        requerObservacao: false, acaoAutomatica: 'numerar_e_publicar',
+    },
+    {
+        de: 'PRONTO_PUBLICACAO', para: 'RASCUNHO', acao: 'rejeitar',
+        label: 'Rejeitar', rolesPermitidos: ['SECRETARIO', 'ADMIN_GERAL'],
+        requerObservacao: true,
+    },
+]
+
+const ESTADOS_RIGOROSO: WorkflowEstado[] = [
+    { id: 'RASCUNHO', nome: 'RASCUNHO', label: 'Rascunho', cor: '#94a3b8', icone: 'FileEdit', ordem: 0, tipo: 'INICIO' },
+    { id: 'EM_REVISAO_ABERTA', nome: 'EM_REVISAO_ABERTA', label: 'Aguardando Revisor', cor: '#60a5fa', icone: 'Eye', ordem: 1, tipo: 'INTERMEDIARIO' },
+    { id: 'EM_REVISAO_ATRIBUIDA', nome: 'EM_REVISAO_ATRIBUIDA', label: 'Em Revisão Técnica', cor: '#3b82f6', icone: 'UserCheck', ordem: 2, tipo: 'INTERMEDIARIO' },
+    { id: 'CORRECAO_NECESSARIA', nome: 'CORRECAO_NECESSARIA', label: 'Correção Necessária', cor: '#f59e0b', icone: 'AlertTriangle', ordem: 3, tipo: 'INTERMEDIARIO' },
+    { id: 'REVISAO_CHEFIA', nome: 'REVISAO_CHEFIA', label: 'Revisão da Chefia', cor: '#a78bfa', icone: 'Shield', ordem: 4, tipo: 'INTERMEDIARIO' },
+    { id: 'AGUARDANDO_ASSINATURA', nome: 'AGUARDANDO_ASSINATURA', label: 'Aguardando Assinatura', cor: '#8b5cf6', icone: 'PenTool', ordem: 5, tipo: 'INTERMEDIARIO' },
+    { id: 'PRONTO_PUBLICACAO', nome: 'PRONTO_PUBLICACAO', label: 'Pronto para Publicação', cor: '#06b6d4', icone: 'CheckCircle', ordem: 6, tipo: 'INTERMEDIARIO' },
+    { id: 'PUBLICADA', nome: 'PUBLICADA', label: 'Publicada', cor: '#10b981', icone: 'Globe', ordem: 7, tipo: 'FIM' },
+    { id: 'FALHA_PROCESSAMENTO', nome: 'FALHA_PROCESSAMENTO', label: 'Falha no Processamento', cor: '#f87171', icone: 'XCircle', ordem: 99, tipo: 'ERRO' },
+]
+
+const TRANSICOES_RIGOROSO: WorkflowTransicao[] = [
+    {
+        de: 'RASCUNHO', para: 'EM_REVISAO_ABERTA', acao: 'submeter',
+        label: 'Submeter para Revisão Técnica', rolesPermitidos: ['OPERADOR', 'SECRETARIO', 'ADMIN_GERAL'],
+        requerObservacao: false, acaoAutomatica: 'notificar_revisores',
+    },
+    {
+        de: 'EM_REVISAO_ABERTA', para: 'EM_REVISAO_ATRIBUIDA', acao: 'atribuir',
+        label: 'Assumir Revisão Técnica', rolesPermitidos: ['REVISOR', 'SECRETARIO', 'ADMIN_GERAL'],
+        requerObservacao: false,
+    },
+    {
+        de: 'EM_REVISAO_ATRIBUIDA', para: 'CORRECAO_NECESSARIA', acao: 'solicitar_correcao',
+        label: 'Solicitar Correção', rolesPermitidos: ['REVISOR', 'SECRETARIO', 'ADMIN_GERAL'],
+        requerObservacao: true,
+    },
+    {
+        de: 'CORRECAO_NECESSARIA', para: 'EM_REVISAO_ABERTA', acao: 'resubmeter',
+        label: 'Resubmeter após Correção', rolesPermitidos: ['OPERADOR', 'SECRETARIO', 'ADMIN_GERAL'],
+        requerObservacao: false,
+    },
+    {
+        de: 'EM_REVISAO_ATRIBUIDA', para: 'REVISAO_CHEFIA', acao: 'aprovar_tecnico',
+        label: 'Aprovar (Técnico) → Chefia', rolesPermitidos: ['REVISOR', 'ADMIN_GERAL'],
+        requerObservacao: false,
+    },
+    {
+        de: 'REVISAO_CHEFIA', para: 'AGUARDANDO_ASSINATURA', acao: 'aprovar_chefia',
+        label: 'Aprovar (Chefia) → Assinatura', rolesPermitidos: ['SECRETARIO', 'ADMIN_GERAL'],
+        requerObservacao: false, acaoAutomatica: 'gerar_pdf',
+    },
+    {
+        de: 'REVISAO_CHEFIA', para: 'CORRECAO_NECESSARIA', acao: 'rejeitar_chefia',
+        label: 'Devolver para Correção', rolesPermitidos: ['SECRETARIO', 'ADMIN_GERAL'],
+        requerObservacao: true,
+    },
+    {
+        de: 'AGUARDANDO_ASSINATURA', para: 'PRONTO_PUBLICACAO', acao: 'assinar',
+        label: 'Assinar Documento', rolesPermitidos: ['PREFEITO', 'ADMIN_GERAL'],
+        requerObservacao: false, acaoAutomatica: 'registrar_assinatura',
+    },
+    {
+        de: 'AGUARDANDO_ASSINATURA', para: 'RASCUNHO', acao: 'rejeitar',
+        label: 'Rejeitar (Retornar ao Início)', rolesPermitidos: ['PREFEITO', 'ADMIN_GERAL'],
+        requerObservacao: true,
+    },
+    {
+        de: 'PRONTO_PUBLICACAO', para: 'PUBLICADA', acao: 'publicar',
+        label: 'Publicar no Diário Oficial', rolesPermitidos: ['ADMIN_GERAL', 'PREFEITO'],
+        requerObservacao: false, acaoAutomatica: 'numerar_e_publicar',
+    },
+]
+
+export interface WorkflowPreset {
+    id: 'SIMPLES' | 'PADRAO' | 'RIGOROSO'
+    nome: string
+    descricao: string
+    casoDeUso: string
+    cor: string
+    tiposRecomendados: string[]
+    config: Omit<WorkflowConfig, 'id' | 'criadoEm' | 'atualizadoEm'>
+}
+
+export const WORKFLOW_PRESETS: WorkflowPreset[] = [
+    {
+        id: 'SIMPLES',
+        nome: 'Simples',
+        descricao: 'Fluxo direto sem revisão nem assinatura. Ideal para documentos internos de baixa complexidade.',
+        casoDeUso: 'Memorandos, Ofícios internos, Comunicados',
+        cor: '#10b981',
+        tiposRecomendados: ['MEMORANDO', 'OFICIO'],
+        config: {
+            nome: 'Workflow Simples',
+            descricao: 'Rascunho → Pronto para Publicação → Publicada',
+            tipoDocumento: 'MEMORANDO',
+            ativo: true,
+            estados: ESTADOS_SIMPLES,
+            transicoes: TRANSICOES_SIMPLES,
+        },
+    },
+    {
+        id: 'PADRAO',
+        nome: 'Padrão',
+        descricao: 'Fluxo com revisão técnica e assinatura. Equilíbrio entre controle e agilidade.',
+        casoDeUso: 'Portarias, Resoluções, Atos Administrativos',
+        cor: '#3b82f6',
+        tiposRecomendados: ['PORTARIA', 'RESOLUCAO'],
+        config: {
+            ...WORKFLOW_PADRAO,
+        },
+    },
+    {
+        id: 'RIGOROSO',
+        nome: 'Rigoroso',
+        descricao: 'Fluxo com revisão dupla (técnica + chefia) e assinatura obrigatória do Prefeito.',
+        casoDeUso: 'Leis, Decretos, Atos de maior impacto jurídico',
+        cor: '#8b5cf6',
+        tiposRecomendados: ['LEI', 'DECRETO'],
+        config: {
+            nome: 'Workflow Rigoroso',
+            descricao: 'Rascunho → Revisão Técnica → Revisão Chefia → Assinatura → Publicação',
+            tipoDocumento: 'LEI',
+            ativo: true,
+            estados: ESTADOS_RIGOROSO,
+            transicoes: TRANSICOES_RIGOROSO,
+        },
+    },
+]
+
 // ── Service ─────────────────────────────────────────────────────────────────
 
 export class WorkflowService {
@@ -363,6 +510,34 @@ export class WorkflowService {
      */
     static getWorkflowPadrao(): Omit<WorkflowConfig, 'id' | 'criadoEm' | 'atualizadoEm'> {
         return WORKFLOW_PADRAO
+    }
+
+    /**
+     * Retorna os presets disponíveis (SIMPLES, PADRÃO, RIGOROSO).
+     * Presets são configurações pré-definidas para acelerar a configuração de workflows.
+     */
+    static listarPresets(): WorkflowPreset[] {
+        return WORKFLOW_PRESETS
+    }
+
+    /**
+     * Aplica um preset como workflow global para um tipo de documento.
+     * Sobrescreve qualquer workflow GLOBAL previamente configurado para aquele tipo.
+     */
+    static async aplicarPreset(params: {
+        presetId: 'SIMPLES' | 'PADRAO' | 'RIGOROSO'
+        tipoDocumento: string
+        secretariaId?: string
+    }): Promise<Result<WorkflowConfig>> {
+        const preset = WORKFLOW_PRESETS.find(p => p.id === params.presetId)
+        if (!preset) return err(`Preset "${params.presetId}" não encontrado.`)
+
+        return this.salvarWorkflow({
+            ...preset.config,
+            tipoDocumento: params.tipoDocumento,
+            secretariaId: params.secretariaId,
+            nome: `${preset.nome} — ${params.tipoDocumento}${params.secretariaId ? ' (Secretaria)' : ' (Global)'}`,
+        })
     }
 
     /**

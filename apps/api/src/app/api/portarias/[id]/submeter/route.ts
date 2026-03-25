@@ -1,54 +1,13 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
-import { PdfService } from '@/services/pdf.service'
 import { StorageService } from '@/services/storage.service'
 import { DocxGeneratorService } from '@/services/docx-generator.service'
+import { VariableService } from '@/services/variable.service'
 import crypto from 'crypto'
+import { Client } from '@upstash/qstash'
 
-const MESES_SUBMETER = [
-    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
-]
-
-async function resolverVariaveisParaSubmeter(portaria: any): Promise<Record<string, string>> {
-    const agora = new Date()
-    const dataBR = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    const dataExtenso = `${agora.getDate()}º de ${MESES_SUBMETER[agora.getMonth()]} de ${agora.getFullYear()}`
-
-    const varsBD = await prisma.variavelSistema.findMany()
-    const varsMap: Record<string, string> = {}
-    for (const v of varsBD) {
-        varsMap[v.chave] = v.valor
-    }
-
-    varsMap['SYS_DATA'] = dataBR
-    varsMap['SYS_DATA_EXTENSO'] = dataExtenso
-    varsMap['SYS_NUMERO'] = portaria.numeroOficial || '______'
-
-    try {
-        const gestao = await prisma.variavelSistema.findUnique({ where: { chave: 'SYS_GESTAO_DADOS' } })
-        if (gestao?.valor) {
-            const dados = JSON.parse(gestao.valor)
-            const gestaoAtual = Array.isArray(dados) ? dados[0] : dados
-            varsMap['SYS_PREFEITO'] = gestaoAtual?.prefeito || varsMap['SYS_PREFEITO'] || 'PREFEITO NÃO CONFIGURADO'
-        }
-    } catch { /* mantém valor padrão */ }
-
-    if (portaria.secretaria) {
-        varsMap['SYS_SECRETARIA'] = portaria.secretaria.nome || ''
-        varsMap['SYS_SECRETARIA_SIGLA'] = portaria.secretaria.sigla || ''
-    }
-    if (portaria.setor) {
-        varsMap['SYS_SETOR'] = portaria.setor.nome || ''
-        varsMap['SYS_SETOR_SIGLA'] = portaria.setor.sigla || ''
-    }
-    if (portaria.criadoPor) {
-        varsMap['SYS_AUTOR'] = portaria.criadoPor.name || portaria.criadoPor.username || ''
-    }
-
-    return varsMap
-}
+const qstash = process.env.QSTASH_TOKEN ? new Client({ token: process.env.QSTASH_TOKEN }) : null;
 
 export const dynamic = 'force-dynamic'
 
@@ -113,18 +72,21 @@ export async function POST(
         }
 
         const updateData: Record<string, any> = {
-            status: 'EM_REVISAO_ABERTA'
+            status: 'PROCESSANDO'
         }
 
-        // ── Gera DOCX preenchido + PDF a partir do template Word ─────────────────
+        // ── Gera DOCX preenchido localmente ─────────────────
         const modelo = portaria.modelo
         const templatePath = modelo?.docxTemplateUrl
+
+        let varsSistema: Record<string, any> = {}
+        let allVariables: Record<string, any> = {}
 
         if (templatePath) {
             try {
                 const formData = (portaria.formData ?? {}) as Record<string, any>
-                const varsSistema = await resolverVariaveisParaSubmeter(portaria)
-                const allVariables: Record<string, any> = { ...varsSistema, ...formData }
+                varsSistema = await VariableService.resolverVariaveis(id, { context: 'DOCX' })
+                allVariables = { ...varsSistema, ...formData }
 
                 // 1. Preenche o template DOCX com as variáveis
                 let docxBuffer: Buffer
@@ -156,66 +118,21 @@ export async function POST(
                 const hash = crypto.createHash('sha256').update(docxBuffer).digest('hex')
                 updateData.hashIntegridade = hash
 
-                // 4. Converte DOCX → PDF via CloudConvert (idêntico ao template Word)
-                const pdfResult = await PdfService.docxToPdf(docxBuffer)
-                if (pdfResult.ok) {
-                    const pdfPath = `portarias/${id}/documento-${Date.now()}.pdf`
-                    await StorageService.uploadBuffer(pdfPath, pdfResult.value, 'application/pdf')
-                    updateData.pdfUrl = pdfPath
-                } else {
-                    console.warn('[/submeter] Falha ao converter DOCX→PDF:', pdfResult.error)
-                    // Não bloqueia — PDF pode ser regenerado
-                }
             } catch (docxErr: any) {
                 console.warn('[/submeter] Falha ao gerar DOCX preenchido:', docxErr?.message)
-                // Fallback: tenta gerar PDF pelo HTML se o DOCX falhar
                 if (modelo?.conteudoHtml) {
-                    console.warn('[/submeter] Usando fallback HTML→PDF')
-                    let html = modelo.conteudoHtml
-                    // Usa todas as variáveis de sistema (já resolvidas) + formData
-                    const formData = (portaria.formData as Record<string, string>) || {}
-                    const allFallbackVars: Record<string, string> = {
-                        ...await resolverVariaveisParaSubmeter(portaria),
-                        ...formData
-                    }
-                    for (const [key, value] of Object.entries(allFallbackVars)) {
-                        html = html.split(`{{${key}}}`).join(String(value))
-                    }
-                    // Limpa tags não substituídas
-                    html = html.replace(/\{\{[^}]+\}\}/g, '')
-                    const pdfResult = await PdfService.htmlToPdf(html)
-                    if (pdfResult.ok) {
-                        const pdfPath = `portarias/${id}/documento-${Date.now()}.pdf`
-                        await StorageService.uploadBuffer(pdfPath, pdfResult.value, 'application/pdf')
-                        updateData.pdfUrl = pdfPath
-                    }
+                    varsSistema = await VariableService.resolverVariaveis(id, { context: 'HTML' })
+                    allVariables = { ...varsSistema, ...((portaria.formData as Record<string, string>) || {}) }
                 }
             }
         } else if (modelo?.conteudoHtml) {
-            // Modelo sem template DOCX — gera pelo HTML (legado)
-            console.warn('[/submeter] Modelo sem docxTemplateUrl, usando HTML→PDF')
-            let html = modelo.conteudoHtml
-            const formData = (portaria.formData as Record<string, string>) || {}
-            const allLegacyVars: Record<string, string> = {
-                ...await resolverVariaveisParaSubmeter(portaria),
-                ...formData
-            }
-            for (const [key, value] of Object.entries(allLegacyVars)) {
-                html = html.split(`{{${key}}}`).join(String(value))
-            }
-            // Limpa tags não substituídas
-            html = html.replace(/\{\{[^}]+\}\}/g, '')
-            const pdfResult = await PdfService.htmlToPdf(html)
-            if (pdfResult.ok) {
-                const pdfPath = `portarias/${id}/documento-${Date.now()}.pdf`
-                await StorageService.uploadBuffer(pdfPath, pdfResult.value, 'application/pdf')
-                updateData.pdfUrl = pdfPath
-            }
+            varsSistema = await VariableService.resolverVariaveis(id, { context: 'HTML' })
+            allVariables = { ...varsSistema, ...((portaria.formData as Record<string, string>) || {}) }
         }
 
         const nomeAutor = session.name || session.username || 'Sistema'
 
-        // Transação: atualiza portaria + registra evento no feed
+        // Transação: atualiza portaria (status: PROCESSANDO) + registra evento
         const atualizada = await prisma.$transaction(async (tx) => {
             const p = await tx.portaria.update({
                 where: { id },
@@ -225,13 +142,13 @@ export async function POST(
             await tx.feedAtividade.create({
                 data: {
                     tipoEvento: 'PORTARIA_SUBMETIDA',
-                    mensagem: `Documento submetido para revisão por ${nomeAutor}`,
+                    mensagem: `Documento em processamento para revisão por ${nomeAutor}`,
                     portariaId: id,
                     autorId: (session.id as string),
                     secretariaId: portaria.secretariaId,
                     metadata: {
                         temDocx: !!docxEditadoBase64,
-                        temPdf: !!updateData.pdfUrl
+                        assincrono: true
                     }
                 }
             })
@@ -239,13 +156,37 @@ export async function POST(
             return p
         })
 
-        const semDocumento = !updateData.pdfUrl && !updateData.docxRascunhoUrl
+        // Dispara Webhook via QStash ou fetch local
+        const webhookPayload = {
+            portariaId: id,
+            docxRascunhoUrl: updateData.docxRascunhoUrl,
+            htmlFallback: modelo?.conteudoHtml,
+            fallbackVars: allVariables,
+            sessionUserId: session.id,
+            nomeAutor: nomeAutor
+        }
+
+        if (qstash && process.env.VERCEL_URL) {
+            const baseUrl = `https://${process.env.VERCEL_URL}`
+            await qstash.publishJSON({
+                url: `${baseUrl}/api/webhooks/qstash/pdf-generator`,
+                body: webhookPayload,
+                retries: 3
+            })
+        } else {
+            // Fallback para desenvolvimento local ou falta de token
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+            fetch(`${baseUrl}/api/webhooks/qstash/pdf-generator`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(webhookPayload)
+            }).catch(e => console.error('Erro ao chamar webhook local', e))
+        }
+
         return NextResponse.json({
             success: true,
             data: atualizada,
-            warning: semDocumento
-                ? 'Portaria submetida, mas o documento não pôde ser gerado. O modelo pode não possuir template configurado.'
-                : undefined
+            message: 'Documento enviado para processamento. Aguarde alguns instantes.'
         })
     } catch (error: any) {
         console.error('[/submeter]', error)

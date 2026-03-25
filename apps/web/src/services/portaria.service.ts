@@ -27,7 +27,7 @@ export class PortariaService extends BaseApiService {
         try {
             const raw: any = await this.http.get(this.url('/portarias'), { params })
             const data = raw.data || raw
-            const items = Array.isArray(data) ? data : (data.items || [])
+            const items = Array.isArray(data) ? data : (data.data || data.items || [])
             return ok({
                 data: items,
                 total: items.length,

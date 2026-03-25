@@ -16,17 +16,21 @@ export async function GET(request: Request) {
         if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
         const role = (usuario as any).role || 'OPERADOR'
-        const secretariaId = (usuario as any).secretariaId || undefined
 
         const url = new URL(request.url)
         const periodo = parseInt(url.searchParams.get('periodo') || '90')
+        const uiSecretariaId = url.searchParams.get('secretariaId') === 'all' ? undefined : url.searchParams.get('secretariaId') || undefined
+        const uiSetorId = url.searchParams.get('setorId') === 'all' ? undefined : url.searchParams.get('setorId') || undefined
+
+        const secretariaId = (usuario as any).secretariaId || uiSecretariaId
+        const setorId = uiSetorId
 
         // Cache-Aside
-        const cacheKey = CacheService.key('analytics', 'avancado', role, secretariaId, String(periodo))
+        const cacheKey = CacheService.key('analytics', 'avancado', role, secretariaId || 'all', setorId || 'all', String(periodo))
         const data = await CacheService.getOrSet(
             cacheKey,
             async () => {
-                const result = await AnalyticsService.obterDashboardAvancado({ secretariaId, role, periodo })
+                const result = await AnalyticsService.obterDashboardAvancado({ secretariaId, setorId, role, periodo })
                 if (!result.ok) throw new Error(result.error)
                 return result.value
             },

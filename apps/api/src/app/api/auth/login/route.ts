@@ -2,12 +2,30 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { comparePassword, createToken } from '@/lib/auth'
 import { cookies } from 'next/headers'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
     try {
+        // Rate limiting: máx. 5 tentativas por IP a cada 60s; bloqueio de 5 min após exceder
+        const ip = getClientIp(request)
+        const rl = checkRateLimit(`login:${ip}`, 5, 60_000, 5 * 60_000)
+        if (!rl.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Muitas tentativas. Tente novamente em ${rl.retryAfterSeconds}s.` },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(rl.retryAfterSeconds),
+                        'X-RateLimit-Limit': '5',
+                        'X-RateLimit-Remaining': '0',
+                    },
+                }
+            )
+        }
+
         // Pega os campos. Vamos assumir que o FE pode mandar "email" como identifier (email ou username).
         const identifier = await request.json()
         const loginIdentifier = identifier.email || identifier.username
@@ -58,13 +76,15 @@ export async function POST(request: Request) {
             path: '/',
         })
 
-        // Remove a senha do objeto de retorno
-        const { password: _, ...userWithoutPassword } = user
+        // Remove campos sensíveis do objeto de retorno
+        const { password: _, pinSeguranca: __, ...userWithoutSensitiveData } = user as any
 
+        // Token retornado no body para o frontend armazenar no store (Bearer token via Axios)
+        // e também gravado em cookie HttpOnly como camada de fallback.
         return NextResponse.json({
             success: true,
             data: {
-                user: userWithoutPassword,
+                user: userWithoutSensitiveData,
                 token,
             },
         })

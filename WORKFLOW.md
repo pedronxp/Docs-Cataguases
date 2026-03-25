@@ -86,8 +86,10 @@ PUBLICADA
 | `EM_REVISAO_ATRIBUIDA` | Revisor assumiu, em análise | Revisor atual |
 | `CORRECAO_NECESSARIA` | Devolvida ao autor com observação | OPERADOR (autor) |
 | `AGUARDANDO_ASSINATURA` | Aprovada na revisão, aguarda assinatura | PREFEITO, ADMIN |
-| `PRONTO_PUBLICACAO` | Assinada, aguarda publicação oficial | PREFEITO, SECRETARIO, ADMIN |
+| `PRONTO_PUBLICACAO` | Assinada, aguarda publicação oficial | PREFEITO, SECRETARIO, ADMIN, JORNALISTA |
 | `PUBLICADA` | Número oficial alocado, publicada | (imutável) |
+| `CANCELADA` | Fluxo interrompido (antes da publicação) | OPERADOR (autor), ADMIN |
+| `ARQUIVADA` | Portaria inativada ou deprecada | ADMIN |
 
 ---
 

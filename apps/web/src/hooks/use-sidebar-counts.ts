@@ -52,7 +52,15 @@ export function useSidebarCounts() {
 
         fetchCounts()
         const interval = setInterval(fetchCounts, POLL_INTERVAL_MS)
-        return () => clearInterval(interval)
+
+        // Escuta eventos globais para atualizar instantaneamente
+        const handleForceRefresh = () => fetchCounts()
+        window.addEventListener('portaria-changed', handleForceRefresh)
+
+        return () => {
+            clearInterval(interval)
+            window.removeEventListener('portaria-changed', handleForceRefresh)
+        }
     }, [isAuthenticated, fetchCounts])
 
     return { counts, refresh: fetchCounts }

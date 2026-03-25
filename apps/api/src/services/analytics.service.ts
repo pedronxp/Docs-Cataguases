@@ -9,13 +9,20 @@ export class AnalyticsService {
      */
     static async obterDashboardCompleto(params: {
         secretariaId?: string;
+        setorId?: string;
         role: string;
     }) {
-        const { secretariaId, role } = params
+        const { secretariaId, setorId, role } = params
         const where: any = {}
 
         if (role !== 'ADMIN_GERAL' && role !== 'PREFEITO' && secretariaId) {
             where.secretariaId = secretariaId
+        } else if (secretariaId) {
+            where.secretariaId = secretariaId
+        }
+
+        if (setorId) {
+            where.setorId = setorId
         }
 
         try {
@@ -199,15 +206,22 @@ export class AnalyticsService {
      */
     static async obterDashboardAvancado(params: {
         secretariaId?: string;
+        setorId?: string;
         role: string;
         periodo?: number;
     }) {
-        const { secretariaId, role, periodo = 90 } = params
+        const { secretariaId, setorId, role, periodo = 90 } = params
         const where: any = {}
         const isAdmin = role === 'ADMIN_GERAL' || role === 'PREFEITO'
 
         if (!isAdmin && secretariaId) {
             where.secretariaId = secretariaId
+        } else if (secretariaId) {
+            where.secretariaId = secretariaId
+        }
+
+        if (setorId) {
+            where.setorId = setorId
         }
 
         const dataCorte = new Date()

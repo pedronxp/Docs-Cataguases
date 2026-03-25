@@ -15,6 +15,7 @@
  */
 
 import prisma from '@/lib/prisma'
+import { decrypt, isEncrypted } from '@/lib/encryption'
 
 export type LLMProvider = 'cerebras' | 'mistral' | 'groq' | 'openrouter' | 'kimi'
 
@@ -347,7 +348,17 @@ async function callWithCircuitBreaker(
         }
 
         try {
-            const result = await callProviderRaw(provider, key.keyEncrypted, key.id, model, options)
+            // Descriptografa a chave em memória — nunca persiste o valor plano
+            let plainKey: string
+            try {
+                plainKey = isEncrypted(key.keyEncrypted)
+                    ? decrypt(key.keyEncrypted)
+                    : key.keyEncrypted // fallback para chaves legacy ainda não migradas
+            } catch (decErr: any) {
+                console.error(`[LLM Pool] Falha ao descriptografar chave ${key.mask}:`, decErr?.message)
+                return { tried: false, skipReason: 'no_key' } as any
+            }
+            const result = await callProviderRaw(provider, plainKey, key.id, model, options)
             await incrementKeyUsage(key.id, result.usage.totalTokens).catch(() => {})
             return { ...result, tried: true }
         } catch (err: any) {
@@ -383,9 +394,10 @@ async function callWithCircuitBreaker(
  * Usado para otimizar a ordem de tentativas — providers sem chave vão para o final.
  */
 function hasEnvKey(p: LLMProvider): boolean {
-    const k = p === 'cerebras' ? process.env.CEREBRAS_API_KEY
-        : p === 'mistral'    ? process.env.MISTRAL_API_KEY
-        : p === 'groq'       ? process.env.GROQ_API_KEY
+    const k = p === 'cerebras'   ? process.env.CEREBRAS_API_KEY
+        : p === 'mistral'        ? process.env.MISTRAL_API_KEY
+        : p === 'groq'           ? process.env.GROQ_API_KEY
+        : p === 'kimi'           ? process.env.KIMI_API_KEY
         : process.env.OPENROUTER_API_KEY
     return !!k
 }
@@ -427,9 +439,11 @@ export async function llmChat(options: LLMChatOptions): Promise<LLMChatResult> {
     const failReasons: Record<string, SkipReason | 'error'> = {}
 
     for (const provider of providerOrder) {
-        // Seleciona modelo padrão do provider se houve failover
+        // Seleciona modelo padrão do provider apenas quando houve failover real
+        // (provider diferente do escolhido) — NÃO substituir por causa do '/' no nome,
+        // pois modelos OpenRouter legitimamente têm '/' (ex: meta-llama/llama-3.3-70b-instruct:free)
         let modelToUse = choice.model
-        if (provider !== choice.provider || modelToUse.includes('/')) {
+        if (provider !== choice.provider) {
             if (provider === 'cerebras') modelToUse = 'llama3.1-8b'
             else if (provider === 'mistral') modelToUse = 'mistral-large-latest'
             else if (provider === 'groq') modelToUse = 'llama-3.3-70b-versatile'
@@ -485,50 +499,40 @@ export async function llmChat(options: LLMChatOptions): Promise<LLMChatResult> {
     // ── Mensagens de erro com branding "Doc's Cataguases" ────────────────────
     if (options.skipSmartRouter && apiError.includes(choice.provider)) {
         throw new Error(
-            `Doc's Cataguases — A API retornou um erro para o modelo selecionado (${choice.provider}). ` +
-            `Verifique se o modelo está indisponível ou tente outra opção.`
+            `Doc's Cataguases — O serviço de inteligência artificial selecionado encontra-se temporariamente indisponível. Por gentileza, aguarde alguns instantes ou opte pelo modo automático.`
         )
     }
 
     if (options.skipSmartRouter && rateLimited.includes(choice.provider)) {
         // Modo manual: provider escolhido está com rate limit
         throw new Error(
-            `Doc's Cataguases — O modelo selecionado (${choice.provider}) está temporariamente sobrecarregado. ` +
-            `Aguarde 1–2 minutos ou selecione outro modelo.`
+            `Doc's Cataguases — O modelo selecionado está operando em sua capacidade máxima no momento. Por favor, aguarde alguns minutos e tente novamente, ou selecione outra opção.`
         )
     }
 
     if (options.skipSmartRouter && noKey.includes(choice.provider)) {
         // Modo manual: provider escolhido não tem chave configurada
         throw new Error(
-            `Doc's Cataguases — O provedor selecionado (${choice.provider}) não tem chave de API configurada. ` +
-            `Contate o administrador ou selecione outro modelo.`
+            `Doc's Cataguases — O provedor selecionado encontra-se inativo no sistema. Recomendamos utilizar o modo automático ou contatar o suporte técnico.`
         )
     }
 
     if (rateLimited.length > 0 && noKey.length + rateLimited.length === providerOrder.length) {
         // Todos falharam — compõe mensagem detalhada
-        const partes: string[] = []
-        if (rateLimited.length > 0) partes.push(`limite atingido: ${rateLimited.join(', ')}`)
-        if (noKey.length > 0) partes.push(`sem chave configurada: ${noKey.join(', ')}`)
         throw new Error(
-            `Doc's Cataguases — O assistente está temporariamente indisponível (${partes.join(' | ')}). ` +
-            `Aguarde 1–2 minutos e tente novamente.`
+            `Doc's Cataguases — Nossos serviços de assistência encontram-se com alta demanda no momento. Por gentileza, aguarde alguns minutos antes de realizar uma nova solicitação.`
         )
     }
 
     if (noKey.length === providerOrder.length) {
         // Nenhum provider tem chave configurada
         throw new Error(
-            `Doc's Cataguases — Nenhuma chave de IA está configurada no servidor. ` +
-            `Peça ao administrador para adicionar uma chave Cerebras, Groq ou OpenRouter nas configurações.`
+            `Doc's Cataguases — O serviço de assistência encontra-se inativo no momento. Por favor, reporte esta situação à equipe de suporte técnico.`
         )
     }
 
     throw new Error(
-        `Doc's Cataguases — Assistente indisponível no momento. ` +
-        `Provedores sem chave: [${noKey.join(', ')}]. Com limite atingido: [${rateLimited.join(', ')}]. ` +
-        `Tente novamente em alguns minutos.`
+        `Doc's Cataguases — Constatamos uma instabilidade temporária na comunicação com o assistente. Por favor, tente novamente em alguns instantes.`
     )
 }
 
@@ -601,8 +605,14 @@ async function callProviderRaw(
 
     if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: res.statusText }))
-        require('fs').writeFileSync(`${provider}_err.json`, JSON.stringify({status: res.status, url: `${baseUrl}/chat/completions`, errBody, reqBody: body}, null, 2))
-        console.error(`[LLM Provider ${provider}] Status ${res.status}:`, JSON.stringify(errBody))
+        // Log estruturado sem expor chaves ou dados sensíveis — sem escrita em disco
+        console.error(`[LLM Provider ${provider}] Status ${res.status}:`, JSON.stringify({
+            status: res.status,
+            model,
+            errorCode: errBody?.error?.code,
+            errorType: errBody?.error?.type,
+            errorMsg: (errBody?.error?.message || errBody?.error || res.statusText)?.slice(0, 200),
+        }))
         const err = new Error(errBody?.error?.message || errBody?.error || res.statusText) as any
         err.status = res.status
         err.resetAt = groqHeaders?.resetAt
@@ -626,28 +636,65 @@ async function callProviderRaw(
         })
     }
 
-    // Fallback: Modelos (ex: Cerebras llama3.1-8b) às vezes retornam a chamada da tool como string JSON pura no content
-    if (!tool_calls && content && content.includes('"type":') && content.includes('"name":')) {
+    // ── Fallback: Modelos pequenos (ex: Cerebras llama3.1-8b) às vezes retornam
+    //    chamadas de tool como JSON puro no content em vez de usar tool_calls.
+    //    Formatos conhecidos:
+    //      1) {"name": "func", "arguments": "{...}"}           (uma tool)
+    //      2) {"name": "func", "arguments": "{...}"}\n{...}    (múltiplas, uma por linha)
+    //      3) [{"name": "func", ...}, ...]                      (array)
+    //      4) {"type": "function", "name": "func", "parameters": {...}}
+    //      5) Qualquer dos acima envoltos em ```json ... ```
+    if (!tool_calls && content && content.includes('"name"')) {
         try {
             let cleanJson = content.trim()
+            // Remove blocos de code fence
             cleanJson = cleanJson.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/, '').trim()
             if (cleanJson.startsWith('`') && cleanJson.endsWith('`')) {
                 cleanJson = cleanJson.slice(1, -1).trim()
             }
-            
-            if (cleanJson.startsWith('{') && cleanJson.endsWith('}')) {
+
+            // Tenta parsear como JSON
+            let candidates: any[] = []
+
+            if (cleanJson.startsWith('[')) {
+                // Formato array: [{"name":...}, {"name":...}]
                 const parsed = JSON.parse(cleanJson)
-                if ((parsed.type === 'function' || parsed.function) && parsed.name) {
-                    tool_calls = [{
+                if (Array.isArray(parsed)) candidates = parsed
+            } else if (cleanJson.startsWith('{')) {
+                // Pode ser um único objeto ou múltiplos objetos separados por newline
+                // Tenta primeiro como objeto único
+                try {
+                    candidates = [JSON.parse(cleanJson)]
+                } catch {
+                    // Múltiplos objetos JSON separados por newline (JSONL / ndjson)
+                    const lines = cleanJson.split(/\n/).map((l: string) => l.trim()).filter((l: string) => l.startsWith('{'))
+                    for (const line of lines) {
+                        try { candidates.push(JSON.parse(line)) } catch { /* pula linhas inválidas */ }
+                    }
+                }
+            }
+
+            // Filtra apenas objetos que parecem tool calls válidas
+            const validCalls = candidates.filter(c =>
+                c && typeof c === 'object' && typeof c.name === 'string' && c.name.length > 0
+            )
+
+            if (validCalls.length > 0) {
+                tool_calls = validCalls.map(c => {
+                    // Normaliza arguments: pode vir como string JSON ou como objeto
+                    let args = c.arguments ?? c.parameters ?? '{}'
+                    if (typeof args === 'object') args = JSON.stringify(args)
+
+                    return {
                         id: 'call_' + Math.random().toString(36).slice(2, 9),
                         type: 'function',
                         function: {
-                            name: parsed.name,
-                            arguments: typeof parsed.parameters === 'object' ? JSON.stringify(parsed.parameters) : (parsed.parameters || parsed.arguments || '{}')
+                            name: c.name,
+                            arguments: args,
                         }
-                    }]
-                    content = '' // Zera o content já que era um tool call
-                }
+                    }
+                })
+                content = '' // Zera o content pois era tool call(s)
             }
         } catch (e) {
             // Se não for JSON válido, ignora e mantém o content como texto
@@ -729,16 +776,18 @@ export function setActiveProvider(provider: LLMProvider): void { activeProvider 
 export function getLLMStats() {
     return {
         activeProvider,
-        cerebras: stats.cerebras,
-        mistral: stats.mistral,
-        groq: stats.groq,
+        cerebras:   stats.cerebras,
+        mistral:    stats.mistral,
+        groq:       stats.groq,
         openrouter: stats.openrouter,
+        kimi:       stats.kimi,
         recentRequests: requestLog.slice(0, 20),
         models: {
-            cerebras: CEREBRAS_MODELS,
-            mistral: MISTRAL_MODELS,
-            groq: GROQ_MODELS,
+            cerebras:   CEREBRAS_MODELS,
+            mistral:    MISTRAL_MODELS,
+            groq:       GROQ_MODELS,
             openrouter: OPENROUTER_FREE_MODELS,
+            kimi:       KIMI_MODELS,
         },
     }
 }

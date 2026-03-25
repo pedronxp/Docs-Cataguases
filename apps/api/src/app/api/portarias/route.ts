@@ -105,37 +105,71 @@ export async function GET(req: NextRequest) {
         const ability = buildAbility(usuario as any)
 
         const { searchParams } = new URL(req.url)
-        const status = searchParams.get('status')
+        const status   = searchParams.get('status')
+        const busca    = searchParams.get('busca')?.trim() || undefined
 
-        // Busca básica
+        // ── Paginação cursor-based ────────────────────────────────────────────
+        // Parâmetros: limit (máx 200, padrão 20) + cursor (updatedAt do último item recebido)
+        // Uso: GET /portarias?limit=20&cursor=2024-06-01T12:00:00.000Z
+        const limit  = Math.min(Math.max(parseInt(searchParams.get('limit') || searchParams.get('pageSize') || '20'), 1), 200)
+        const cursor = searchParams.get('cursor') || undefined
+
+        // ── Filtro CASL no banco (evita carregar tudo em memória) ─────────────
+        // Aplica a restrição de secretaria diretamente na query quando possível
+        const user = usuario as any
+        const secretariaFilter =
+            user.role === 'ADMIN_GERAL' || user.role === 'PREFEITO'
+                ? {}                                               // vê tudo
+                : user.role === 'OPERADOR'
+                ? { criadoPorId: user.id }                        // só as próprias portarias
+                : user.secretariaId
+                ? { secretariaId: user.secretariaId }             // filtrado por secretaria
+                : {}
+
         const portarias = await prisma.portaria.findMany({
             where: {
+                ...secretariaFilter,
                 ...(status && { status: status as any }),
+                ...(busca && {
+                    OR: [
+                        { titulo: { contains: busca, mode: 'insensitive' } },
+                        { numeroOficial: { contains: busca, mode: 'insensitive' } },
+                    ]
+                }),
+                // Cursor: busca portarias atualizadas antes do cursor (próxima página)
+                ...(cursor && { updatedAt: { lt: new Date(cursor) } }),
             },
             orderBy: { updatedAt: 'desc' },
+            // Busca limit+1 para saber se há próxima página sem query extra
+            take: limit + 1,
             include: {
-                criadoPor: {
-                    select: { id: true, name: true, email: true },
-                },
-                revisorAtual: {
-                    select: { id: true, name: true, email: true },
-                },
-                secretaria: {
-                    select: { id: true, nome: true, sigla: true },
-                },
-                setor: {
-                    select: { id: true, nome: true, sigla: true },
-                },
-                modelo: {
-                    select: { id: true, nome: true },
-                },
+                criadoPor:    { select: { id: true, name: true, email: true } },
+                revisorAtual: { select: { id: true, name: true, email: true } },
+                secretaria:   { select: { id: true, nome: true, sigla: true } },
+                setor:        { select: { id: true, nome: true, sigla: true } },
+                modelo:       { select: { id: true, nome: true } },
             },
         })
 
-        // Filtra pela habilidade CASL no backend
+        // Filtragem CASL residual (permissões granulares além do filtro de banco)
         const filtradas = portarias.filter(p => ability.can('ler', subject('Portaria', p as any)))
 
-        return NextResponse.json(filtradas)
+        // Determina se há próxima página
+        const hasNextPage = filtradas.length > limit
+        const items = hasNextPage ? filtradas.slice(0, limit) : filtradas
+        const nextCursor = hasNextPage
+            ? items[items.length - 1]?.updatedAt?.toISOString()
+            : null
+
+        return NextResponse.json({
+            data: items,
+            pagination: {
+                limit,
+                hasNextPage,
+                nextCursor,
+                count: items.length,
+            },
+        })
     } catch (error) {
         console.error('Erro ao listar portarias:', error)
         return NextResponse.json(

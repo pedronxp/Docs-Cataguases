@@ -4,6 +4,9 @@ import prisma from '@/lib/prisma'
 import { PdfService } from '@/services/pdf.service'
 import { StorageService } from '@/services/storage.service'
 import { DocxGeneratorService } from '@/services/docx-generator.service'
+import { VariableService } from '@/services/variable.service'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET(
     req: NextRequest,
@@ -17,11 +20,11 @@ export async function GET(
         const portaria = await prisma.portaria.findUnique({
             where: { id },
             include: {
-                modelo: { select: { docxTemplateUrl: true, conteudoHtml: true, nome: true } },
-                secretaria: { select: { nome: true, sigla: true } },
-                setor:      { select: { nome: true, sigla: true } },
-                criadoPor:  { select: { name: true, username: true } },
-                assinadoPor: { select: { name: true } }
+                modelo: true,
+                secretaria: true,
+                setor:      true,
+                criadoPor:  true,
+                assinadoPor: true
             }
         })
 
@@ -31,18 +34,6 @@ export async function GET(
         if (portaria.pdfUrl) {
             try {
                 const signedUrl = await StorageService.getSignedUrl(portaria.pdfUrl)
-                // Registra log de visualização do PDF
-                await prisma.feedAtividade.create({
-                    data: {
-                        tipoEvento: 'PDF_VISUALIZADO',
-                        mensagem: `PDF visualizado por ${usuario.name || usuario.username || 'usuário'}`,
-                        portariaId: id,
-                        autorId: usuario.id,
-                        secretariaId: portaria.secretariaId,
-                        setorId: portaria.setorId ?? null,
-                        metadata: { acao: 'visualizar_pdf' },
-                    }
-                }).catch(() => {/* log não crítico */})
                 return NextResponse.json({ url: signedUrl })
             } catch {
                 console.warn('[PDF Route] URL assinada falhou — regenerando PDF...')
@@ -54,47 +45,8 @@ export async function GET(
 
         if (templatePath) {
             try {
-                // Resolve variáveis de sistema
-                const agora = new Date()
-                const MESES = ['janeiro','fevereiro','março','abril','maio','junho',
-                               'julho','agosto','setembro','outubro','novembro','dezembro']
-                const varsBD = await prisma.variavelSistema.findMany()
-                const varsMap: Record<string, string> = {}
-                for (const v of varsBD) varsMap[v.chave] = v.valor
-                varsMap['SYS_DATA'] = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                varsMap['SYS_DATA_EXTENSO'] = `${agora.getDate()}º de ${MESES[agora.getMonth()]} de ${agora.getFullYear()}`
-                varsMap['SYS_NUMERO'] = portaria.numeroOficial || '______'
-
-                try {
-                    const gestao = await prisma.variavelSistema.findUnique({ where: { chave: 'SYS_GESTAO_DADOS' } })
-                    if (gestao?.valor) {
-                        const dados = JSON.parse(gestao.valor)
-                        const g = Array.isArray(dados) ? dados[0] : dados
-                        varsMap['SYS_PREFEITO'] = g?.prefeito || varsMap['SYS_PREFEITO'] || 'PREFEITO NÃO CONFIGURADO'
-                    }
-                } catch { /* mantém padrão */ }
-
-                if (portaria.secretaria) {
-                    varsMap['SYS_SECRETARIA'] = portaria.secretaria.nome || ''
-                    varsMap['SYS_SECRETARIA_SIGLA'] = portaria.secretaria.sigla || ''
-                }
-                if ((portaria as any).setor) {
-                    varsMap['SYS_SETOR'] = (portaria as any).setor.nome || ''
-                }
-                if (portaria.criadoPor) {
-                    varsMap['SYS_AUTOR'] = portaria.criadoPor.name || portaria.criadoPor.username || ''
-                }
-
-                // Texto simples de assinatura para DOCX
-                if (portaria.assinaturaStatus === 'ASSINADA_DIGITAL' || portaria.assinaturaStatus === 'ASSINADA_MANUAL') {
-                    const strTipo = portaria.assinaturaStatus === 'ASSINADA_DIGITAL' ? 'DIGITALMENTE' : 'MANUALMENTE'
-                    const nomeStr = (portaria as any).assinadoPor?.name || 'Autoridade'
-                    const dataStr = portaria.assinadoEm ? new Date(portaria.assinadoEm).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR')
-                    varsMap['SYS_ASSINATURA'] = `DOCUMENTO ASSINADO ${strTipo} POR ${nomeStr} EM ${dataStr}`
-                } else {
-                    varsMap['SYS_ASSINATURA'] = ''
-                }
-
+                // Resolve variáveis de sistema usando o novo VariableService
+                const varsMap = await VariableService.resolverVariaveis(id, { context: 'DOCX' })
                 const formData = (portaria.formData ?? {}) as Record<string, any>
                 const allVariables = { ...varsMap, ...formData }
 
@@ -106,6 +58,18 @@ export async function GET(
                     await StorageService.uploadBuffer(filePath, pdfResult.value, 'application/pdf')
                     await prisma.portaria.update({ where: { id: portaria.id }, data: { pdfUrl: filePath } })
                     const signedUrl = await StorageService.getSignedUrl(filePath)
+                    
+                    // Log silencioso
+                    await prisma.feedAtividade.create({
+                        data: {
+                            tipoEvento: 'PDF_GERADO',
+                            mensagem: `PDF (DOCX) gerado para visualização`,
+                            portariaId: id,
+                            autorId: usuario.id,
+                            secretariaId: portaria.secretariaId,
+                        }
+                    }).catch(() => {})
+
                     return NextResponse.json({ url: signedUrl })
                 }
 
@@ -121,70 +85,27 @@ export async function GET(
             return NextResponse.json({ error: 'Modelo sem conteúdo configurado' }, { status: 404 })
         }
 
-        // Resolve variáveis de sistema para o fallback HTML
-        const agora2 = new Date()
-        const MESES2 = ['janeiro','fevereiro','março','abril','maio','junho',
-                       'julho','agosto','setembro','outubro','novembro','dezembro']
-        const varsBD2 = await prisma.variavelSistema.findMany()
-        const fallbackVarsMap: Record<string, string> = {}
-        for (const v of varsBD2) fallbackVarsMap[v.chave] = v.valor
-        fallbackVarsMap['SYS_DATA'] = agora2.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-        fallbackVarsMap['SYS_DATA_EXTENSO'] = `${agora2.getDate()}º de ${MESES2[agora2.getMonth()]} de ${agora2.getFullYear()}`
-        fallbackVarsMap['SYS_NUMERO'] = portaria.numeroOficial || '______'
-
-        try {
-            const gestao2 = await prisma.variavelSistema.findUnique({ where: { chave: 'SYS_GESTAO_DADOS' } })
-            if (gestao2?.valor) {
-                const dados2 = JSON.parse(gestao2.valor)
-                const g2 = Array.isArray(dados2) ? dados2[0] : dados2
-                fallbackVarsMap['SYS_PREFEITO'] = g2?.prefeito || fallbackVarsMap['SYS_PREFEITO'] || 'PREFEITO NÃO CONFIGURADO'
-            }
-        } catch { /* mantém padrão */ }
-
-        if (portaria.secretaria) {
-            fallbackVarsMap['SYS_SECRETARIA'] = portaria.secretaria.nome || ''
-            fallbackVarsMap['SYS_SECRETARIA_SIGLA'] = portaria.secretaria.sigla || ''
-        }
-        if ((portaria as any).setor) {
-            fallbackVarsMap['SYS_SETOR'] = (portaria as any).setor.nome || ''
-        }
-        if (portaria.criadoPor) {
-            fallbackVarsMap['SYS_AUTOR'] = portaria.criadoPor.name || portaria.criadoPor.username || ''
-        }
-
+        // Resolve variáveis de sistema para o fallback HTML usando o VariableService
+        const fallbackVarsMap = await VariableService.resolverVariaveis(id, { context: 'HTML' })
+        
         let html = htmlBase
-        const formData2 = portaria.formData as Record<string, any>
+        const formData2 = (portaria.formData ?? {}) as Record<string, any>
         const allFallbackVars = { ...fallbackVarsMap, ...formData2 }
+        
         Object.entries(allFallbackVars).forEach(([key, value]) => {
             html = html.split(`{{${key}}}`).join(String(value))
         })
 
-        // INJEÇÃO DA ASSINATURA NO HTML PARA PREVIEW
-        if (portaria.assinaturaStatus === 'ASSINADA_DIGITAL' || portaria.assinaturaStatus === 'ASSINADA_MANUAL') {
-            const assinadoEmFormatado = portaria.assinadoEm 
-                ? new Date(portaria.assinadoEm).toLocaleString('pt-BR') 
-                : agora2.toLocaleString('pt-BR');
-            
-            const strTipo = portaria.assinaturaStatus === 'ASSINADA_DIGITAL' ? 'DIGITALMENTE' : 'MANUALMENTE';
-            const blocoAssinatura = `
-<div style="margin-top: 40px; padding: 15px; border: 1px solid #ddd; border-radius: 4px; font-family: sans-serif; font-size: 10pt; max-width: 450px; text-align: left; background-color: #fcfcfc;">
-    <div style="font-weight: bold; margin-bottom: 5px; color: #333;">DOCUMENTO ASSINADO ${strTipo}</div>
-    <div style="color: #444; margin-bottom: 3px;"><strong>Assinado por:</strong> ${(portaria as any).assinadoPor?.name || 'Autoridade'}</div>
-    <div style="color: #444; margin-bottom: 3px;"><strong>Data e Hora:</strong> ${assinadoEmFormatado}</div>
-    ${portaria.hashIntegridade ? `<div style="color: #666; font-size: 8pt; margin-top: 5px; word-break: break-all;"><strong>Hash de Autenticidade:</strong> ${portaria.hashIntegridade}</div>` : ''}
-</div>`;
-            
-            if (html.includes('{{SYS_ASSINATURA}}')) {
-                html = html.split('{{SYS_ASSINATURA}}').join(blocoAssinatura);
+        // Se o template HTML não tinha a tag {{SYS_ASSINATURA}} ou {{LINHA_ASSINATURA}}, 
+        // o VariableService já resolveu mas precisamos garantir que o bloco de assinatura 
+        // apareça se não estiver presente no template.
+        if (!html.includes(fallbackVarsMap['SYS_ASSINATURA']) && !html.includes(fallbackVarsMap['LINHA_ASSINATURA'])) {
+            const blocoAssinatura = fallbackVarsMap['SYS_ASSINATURA'] || fallbackVarsMap['LINHA_ASSINATURA'] || ''
+            if (html.includes('</body>')) {
+                html = html.replace('</body>', blocoAssinatura + '</body>')
             } else {
-                if (html.includes('</body>')) {
-                    html = html.replace('</body>', blocoAssinatura + '</body>');
-                } else {
-                    html += '<br/><br/>' + blocoAssinatura;
-                }
+                html += '<br/><br/>' + blocoAssinatura
             }
-        } else {
-            html = html.split('{{SYS_ASSINATURA}}').join('');
         }
 
         const pdfResult = await PdfService.htmlToPdf(html)

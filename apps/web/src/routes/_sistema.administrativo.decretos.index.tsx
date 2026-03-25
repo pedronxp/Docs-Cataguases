@@ -53,6 +53,8 @@ const STATUS_LABELS: Partial<Record<StatusPortaria, string>> = {
     AGUARDANDO_ASSINATURA: 'Aguardando Assinatura',
     PRONTO_PUBLICACAO: 'Fila do Diário',
     PUBLICADA: 'Publicado',
+    CANCELADA: 'Cancelado',
+    ARQUIVADA: 'Arquivado',
     FALHA_PROCESSAMENTO: 'Falha no PDF',
     ERRO_GERACAO: 'Erro de Geração',
 }

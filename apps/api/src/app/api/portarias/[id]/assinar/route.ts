@@ -57,6 +57,29 @@ export async function POST(
             }, { status: 400 })
         }
 
+        // Validação de tamanho do comprovante base64 (máx. 10MB decodificados ≈ ~13.6MB em base64)
+        // SEGURANÇA: sem essa validação, um payload malicioso pode causar OOM antes do Buffer.from().
+        if (comprovanteBase64) {
+            const COMPROVANTE_MAX_B64_CHARS = 14 * 1024 * 1024 // ~10MB decodificados
+            if (typeof comprovanteBase64 !== 'string' || comprovanteBase64.length > COMPROVANTE_MAX_B64_CHARS) {
+                return NextResponse.json({
+                    success: false,
+                    error: 'O comprovante excede o tamanho máximo de 10MB'
+                }, { status: 400 })
+            }
+            // Validação de extensão permitida
+            if (comprovanteNome) {
+                const ext = String(comprovanteNome).split('.').pop()?.toLowerCase()
+                const ALLOWED_EXTS = ['pdf', 'png', 'jpg', 'jpeg']
+                if (!ext || !ALLOWED_EXTS.includes(ext)) {
+                    return NextResponse.json({
+                        success: false,
+                        error: 'Tipo de arquivo inválido. Use PDF, PNG ou JPG.'
+                    }, { status: 400 })
+                }
+            }
+        }
+
         // Comprovante obrigatório para assinatura manual
         if (tipoAssinatura === 'MANUAL' && !comprovanteBase64) {
             return NextResponse.json({

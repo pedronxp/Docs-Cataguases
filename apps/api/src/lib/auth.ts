@@ -1,6 +1,7 @@
 import { cookies, headers } from 'next/headers'
 import { verifyToken, signToken } from './jwt'
 import bcrypt from 'bcryptjs'
+import prisma from './prisma'
 
 /**
  * Compara uma senha em texto puro com um hash.
@@ -53,8 +54,6 @@ export async function getSession() {
         return null
     }
 }
-
-import prisma from './prisma'
 
 /**
  * Retorna o usuário completo do banco de dados a partir da sessão.

@@ -3,63 +3,9 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { StorageService } from '@/services/storage.service'
 import { DocxGeneratorService } from '@/services/docx-generator.service'
+import { VariableService } from '@/services/variable.service'
 
 export const dynamic = 'force-dynamic'
-
-const MESES = [
-    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
-]
-
-/**
- * Resolve as variáveis de sistema (SYS_*) para injetar no template DOCX.
- * Usa os mesmos dados que a rota /submeter usa para o HTML/PDF.
- */
-async function resolverVariaveisSistema(portaria: any): Promise<Record<string, string>> {
-    const agora = new Date()
-    const dataBR = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    const dataExtenso = `${agora.getDate()}º de ${MESES[agora.getMonth()]} de ${agora.getFullYear()}`
-
-    // Carrega todas as variáveis fixas da tabela VariavelSistema
-    const varsBD = await prisma.variavelSistema.findMany()
-    const varsMap: Record<string, string> = {}
-    for (const v of varsBD) {
-        varsMap[v.chave] = v.valor
-    }
-
-    // Sobrescreve / adiciona variáveis dinâmicas
-    varsMap['SYS_DATA'] = dataBR
-    varsMap['SYS_DATA_EXTENSO'] = dataExtenso
-    // Número ainda não alocado no rascunho
-    varsMap['SYS_NUMERO'] = portaria.numeroOficial || '______'
-
-    // Resolve SYS_PREFEITO a partir dos dados de gestão
-    try {
-        const gestao = await prisma.variavelSistema.findUnique({ where: { chave: 'SYS_GESTAO_DADOS' } })
-        if (gestao?.valor) {
-            const dados = JSON.parse(gestao.valor)
-            const gestaoAtual = Array.isArray(dados) ? dados[0] : dados
-            varsMap['SYS_PREFEITO'] = gestaoAtual?.prefeito || varsMap['SYS_PREFEITO'] || 'PREFEITO NÃO CONFIGURADO'
-        }
-    } catch {
-        // mantém valor padrão já carregado
-    }
-
-    // Variáveis contextuais da portaria
-    if (portaria.secretaria) {
-        varsMap['SYS_SECRETARIA'] = portaria.secretaria.nome || ''
-        varsMap['SYS_SECRETARIA_SIGLA'] = portaria.secretaria.sigla || ''
-    }
-    if (portaria.setor) {
-        varsMap['SYS_SETOR'] = portaria.setor.nome || ''
-        varsMap['SYS_SETOR_SIGLA'] = portaria.setor.sigla || ''
-    }
-    if (portaria.criadoPor) {
-        varsMap['SYS_AUTOR'] = portaria.criadoPor.name || portaria.criadoPor.username || ''
-    }
-
-    return varsMap
-}
 
 export async function GET(
     request: Request,
@@ -126,7 +72,7 @@ export async function GET(
 
         // Monta o mapa completo de variáveis: sistema + formData do usuário
         // formData tem prioridade para sobrescrever eventuais colisões
-        const varsistema = await resolverVariaveisSistema(portaria)
+        const varsistema = await VariableService.resolverVariaveis(id, { context: 'DOCX' })
         const allVariables: Record<string, any> = { ...varsistema, ...formData }
 
         console.log('[/docx] Template path:', templatePath)

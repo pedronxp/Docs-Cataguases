@@ -10,20 +10,26 @@ export const dynamic = 'force-dynamic'
  * Retorna métricas agregadas para o dashboard administrativo.
  * Cache-Aside com TTL de 60s por role+secretaria.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
         const usuario = await getAuthUser()
         if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
         const role = (usuario as any).role || 'OPERADOR'
-        const secretariaId = (usuario as any).secretariaId || undefined
+        
+        const { searchParams } = new URL(req.url)
+        const uiSecretariaId = searchParams.get('secretariaId') === 'all' ? undefined : searchParams.get('secretariaId') || undefined
+        const uiSetorId = searchParams.get('setorId') === 'all' ? undefined : searchParams.get('setorId') || undefined
 
-        // Cache-Aside: chave única por role+secretaria
-        const cacheKey = CacheService.key('analytics', 'dashboard', role, secretariaId)
+        const secretariaId = (usuario as any).secretariaId || uiSecretariaId
+        const setorId = uiSetorId
+
+        // Cache-Aside: chave única por role+secretaria+setor
+        const cacheKey = CacheService.key('analytics', 'dashboard', role, secretariaId || 'all', setorId || 'all')
         const data = await CacheService.getOrSet(
             cacheKey,
             async () => {
-                const result = await AnalyticsService.obterDashboardCompleto({ secretariaId, role })
+                const result = await AnalyticsService.obterDashboardCompleto({ secretariaId, setorId, role })
                 if (!result.ok) throw new Error(result.error)
                 return result.value
             },

@@ -60,7 +60,7 @@ export const LLM_TOOLS = [
         type: 'function',
         function: {
             name: 'criar_secretaria',
-            description: 'Cria uma nova secretaria no banco de dados. Requer permissão ADMIN_GERAL.',
+            description: 'Cria uma nova secretaria no banco de dados. Requer permissão ADMIN_GERAL. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -76,7 +76,7 @@ export const LLM_TOOLS = [
         type: 'function',
         function: {
             name: 'criar_setor',
-            description: 'Cria um novo setor (departamento) vinculado a uma secretaria. Exige o ID da secretaria (use listar_secretarias antes se não souber).',
+            description: 'Cria um novo setor (departamento) vinculado a uma secretaria. Exige o ID da secretaria (use listar_secretarias antes se não souber). ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -93,7 +93,7 @@ export const LLM_TOOLS = [
         type: 'function',
         function: {
             name: 'deletar_secretaria',
-            description: 'Deleta (desativa) uma secretaria pelo ID ou sigla. Use listar_secretarias primeiro para obter o ID correto. Requer permissão ADMIN_GERAL. ATENÇÃO: confirme com o usuário antes de deletar.',
+            description: 'Deleta (desativa) uma secretaria pelo ID ou sigla. Use listar_secretarias primeiro para obter o ID correto. Requer permissão ADMIN_GERAL. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -110,7 +110,7 @@ export const LLM_TOOLS = [
         type: 'function',
         function: {
             name: 'deletar_setor',
-            description: 'Deleta (desativa) um setor pelo ID. Use listar_setores_secretaria para descobrir o ID. Requer permissão ADMIN_GERAL ou SECRETARIO.',
+            description: 'Deleta (desativa) um setor pelo ID. Use listar_setores_secretaria para descobrir o ID. Requer permissão ADMIN_GERAL ou SECRETARIO. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -128,7 +128,7 @@ export const LLM_TOOLS = [
         type: 'function',
         function: {
             name: 'editar_secretaria',
-            description: 'Edita o nome, sigla ou cor de uma secretaria existente. Use listar_secretarias para obter o ID antes.',
+            description: 'Edita o nome, sigla ou cor de uma secretaria existente. Use listar_secretarias para obter o ID antes. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -200,7 +200,7 @@ export const LLM_TOOLS = [
         type: 'function',
         function: {
             name: 'criar_portaria',
-            description: 'Cria uma nova portaria (rascunho) no sistema. Precisa do modeloId (use listar_modelos) e secretariaId (use listar_secretarias). Permitido para OPERADOR, SECRETARIO, REVISOR, PREFEITO e ADMIN_GERAL.',
+            description: 'Cria uma nova portaria (rascunho) no sistema. Precisa do modeloId (use listar_modelos) e secretariaId (use listar_secretarias). Permitido para OPERADOR, SECRETARIO, REVISOR, PREFEITO e ADMIN_GERAL. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -249,6 +249,101 @@ export const LLM_TOOLS = [
                     portariaId: { type: 'string', description: 'O ID da portaria (obtido via buscar_documentos).' },
                 },
                 required: ['portariaId'],
+            },
+        },
+    },
+    // ── FLUXO DE PORTARIA ─────────────────────────────────────────────────────
+    {
+        type: 'function',
+        function: {
+            name: 'submeter_portaria',
+            description: 'Submete uma portaria em RASCUNHO (ou CORRECAO_NECESSARIA) para a fila de revisão, mudando o status para EM_REVISAO_ABERTA. Permitido apenas para o autor da portaria ou ADMIN_GERAL. Use listar_portarias para obter o portariaId. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    portariaId: { type: 'string', description: 'O ID da portaria a submeter.' },
+                    observacao: { type: 'string', description: 'Observação opcional para o revisor.' },
+                },
+                required: ['portariaId'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'aprovar_revisao',
+            description: 'Aprova a revisão de uma portaria em EM_REVISAO_ATRIBUIDA, enviando-a para AGUARDANDO_ASSINATURA. Permitido para REVISOR (se for o revisor atual), SECRETARIO e ADMIN_GERAL. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    portariaId: { type: 'string', description: 'O ID da portaria a aprovar.' },
+                    observacao: { type: 'string', description: 'Observação ou parecer opcional da revisão.' },
+                },
+                required: ['portariaId'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'verificar_prontidao_publicacao',
+            description: 'Verifica se uma portaria está pronta para publicação: checa status, assinatura, PDF gerado e permissão do usuário. Use antes de pedir ao usuário para publicar.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    portariaId: { type: 'string', description: 'O ID da portaria a verificar.' },
+                },
+                required: ['portariaId'],
+            },
+        },
+    },
+    // ── GESTÃO DE USUÁRIOS ────────────────────────────────────────────────────
+    {
+        type: 'function',
+        function: {
+            name: 'listar_usuarios',
+            description: 'Lista usuários do sistema com filtros opcionais. Requer ADMIN_GERAL. Use para verificar quem tem determinado papel, quem está em uma secretaria ou buscar um servidor pelo nome.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    role: { type: 'string', description: 'Filtrar por papel: ADMIN_GERAL, PREFEITO, SECRETARIO, REVISOR, OPERADOR, PENDENTE.' },
+                    secretariaId: { type: 'string', description: 'Filtrar por secretaria (ID obtido via listar_secretarias).' },
+                    busca: { type: 'string', description: 'Busca por nome ou e-mail (busca parcial).' },
+                    ativo: { type: 'boolean', description: 'Filtrar por status: true = ativos, false = inativos. Padrão: todos.' },
+                },
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'alterar_papel',
+            description: 'Altera o papel (role) de um usuário e opcionalmente sua secretaria de lotação. Requer ADMIN_GERAL. Para REVISOR, OPERADOR e SECRETARIO é obrigatório informar secretariaId. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    userId: { type: 'string', description: 'ID do usuário a alterar (obtido via listar_usuarios).' },
+                    role: { type: 'string', description: 'Novo papel: ADMIN_GERAL, PREFEITO, SECRETARIO, REVISOR, OPERADOR.' },
+                    secretariaId: { type: 'string', description: 'ID da secretaria de lotação (obrigatório para REVISOR, OPERADOR e SECRETARIO).' },
+                    ativo: { type: 'boolean', description: 'Ativar (true) ou desativar (false) o usuário.' },
+                },
+                required: ['userId', 'role'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'alterar_lotacao',
+            description: 'Altera a secretaria e/ou setor de lotação de um usuário sem mudar seu papel. Requer ADMIN_GERAL. Use quando o servidor foi transferido de secretaria. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    userId: { type: 'string', description: 'ID do usuário (obtido via listar_usuarios).' },
+                    secretariaId: { type: 'string', description: 'ID da nova secretaria (obtido via listar_secretarias).' },
+                    setorId: { type: 'string', description: 'ID do novo setor (opcional, obtido via listar_setores_secretaria).' },
+                },
+                required: ['userId', 'secretariaId'],
             },
         },
     },
@@ -689,6 +784,293 @@ export async function executeToolCall(
                 conteudoTexto: JSON.stringify(doc.formData),
                 urlDownload,
                 instrucaoParaIA: `Gere um resumo (ementa) deste documento e inclua "[Baixar Documento](${urlDownload})" ao final.`,
+            }
+        }
+
+        // ── FLUXO DE PORTARIA ──────────────────────────────────────────────────
+        case 'submeter_portaria': {
+            if (!context?.userAuth?.email) return { erro: 'Usuário não identificado.' }
+            const dbUser = await prisma.user.findFirst({ where: { email: context.userAuth.email, ativo: true } })
+            if (!dbUser) return { erro: 'Usuário não encontrado.' }
+
+            const { portariaId, observacao } = args
+            const portaria = await prisma.portaria.findUnique({
+                where: { id: portariaId },
+                include: { secretaria: { select: { sigla: true, nome: true } } }
+            }) as any
+            if (!portaria) return { erro: `Portaria com ID "${portariaId}" não encontrada. Use listar_portarias para verificar.` }
+
+            // Apenas o autor ou ADMIN_GERAL pode submeter
+            if (portaria.criadoPorId !== dbUser.id && dbUser.role !== 'ADMIN_GERAL') {
+                return { erro: 'Apenas o autor da portaria ou um ADMIN_GERAL pode submetê-la para revisão.' }
+            }
+
+            if (!['RASCUNHO', 'CORRECAO_NECESSARIA'].includes(portaria.status)) {
+                return {
+                    erro: `Portaria não pode ser submetida no status "${portaria.status}".`,
+                    statusAtual: portaria.status,
+                    statusPermitidos: ['RASCUNHO', 'CORRECAO_NECESSARIA'],
+                }
+            }
+
+            await prisma.$transaction(async (tx) => {
+                await (tx.portaria as any).update({
+                    where: { id: portariaId },
+                    data: { status: 'EM_REVISAO_ABERTA' },
+                })
+                await tx.feedAtividade.create({
+                    data: {
+                        tipoEvento: 'PORTARIA_SUBMETIDA',
+                        mensagem: `Documento submetido para revisão por ${dbUser.name} (via assistente IA)${observacao ? `. Obs: "${observacao}"` : ''}`,
+                        portariaId,
+                        autorId: dbUser.id,
+                        secretariaId: portaria.secretariaId,
+                        metadata: { via: 'assistente_ia', observacao } as any,
+                    },
+                })
+            })
+
+            await logAcaoIA(dbUser.id, `Assistente IA submeteu portaria "${portaria.titulo}" para revisão`, portaria.secretariaId, { acao: 'submeter_portaria', portariaId })
+            return {
+                mensagem: `Portaria "${portaria.titulo}" submetida para revisão com sucesso!`,
+                portaria: { id: portariaId, titulo: portaria.titulo, novoStatus: 'EM_REVISAO_ABERTA', secretaria: portaria.secretaria?.sigla },
+                proximoPasso: 'A portaria agora está na fila de revisão. Um revisor irá assumí-la e analisar o documento.',
+                aviso: portaria.docxRascunhoUrl ? undefined : 'O documento PDF não foi gerado automaticamente via IA. Para gerar, acesse a portaria na interface e use o botão "Reprocessar PDF".',
+            }
+        }
+
+        case 'aprovar_revisao': {
+            if (!context?.userAuth?.email) return { erro: 'Usuário não identificado.' }
+            const dbUser = await prisma.user.findFirst({ where: { email: context.userAuth.email, ativo: true } })
+            if (!dbUser) return { erro: 'Usuário não encontrado.' }
+
+            if (!['REVISOR', 'SECRETARIO', 'ADMIN_GERAL'].includes(dbUser.role)) {
+                return { erro: `Ação negada. Seu cargo "${dbUser.role}" não tem permissão para aprovar revisões. Necessário: REVISOR, SECRETARIO ou ADMIN_GERAL.` }
+            }
+
+            const { portariaId, observacao } = args
+            const portaria = await prisma.portaria.findUnique({ where: { id: portariaId } }) as any
+            if (!portaria) return { erro: `Portaria com ID "${portariaId}" não encontrada.` }
+
+            if (portaria.status !== 'EM_REVISAO_ATRIBUIDA') {
+                return {
+                    erro: `Portaria não está em revisão atribuída. Status atual: "${portaria.status}".`,
+                    statusAtual: portaria.status,
+                    dica: portaria.status === 'EM_REVISAO_ABERTA'
+                        ? 'A portaria ainda não foi atribuída a um revisor. Um revisor precisa assumir a revisão primeiro.'
+                        : `Para aprovar, o status deve ser EM_REVISAO_ATRIBUIDA.`,
+                }
+            }
+
+            // Verifica se é o revisor atual (ou ADMIN_GERAL/SECRETARIO)
+            if (portaria.revisorAtualId && portaria.revisorAtualId !== dbUser.id && !['ADMIN_GERAL', 'SECRETARIO'].includes(dbUser.role)) {
+                return { erro: 'Esta portaria está atribuída a outro revisor. Apenas o revisor designado, um SECRETARIO ou ADMIN_GERAL pode aprová-la.' }
+            }
+
+            await prisma.$transaction(async (tx) => {
+                await (tx.portaria as any).update({
+                    where: { id: portariaId },
+                    data: { status: 'AGUARDANDO_ASSINATURA', revisorAtualId: null },
+                })
+                await tx.feedAtividade.create({
+                    data: {
+                        tipoEvento: 'MUDANCA_STATUS_APROVAR_REVISAO',
+                        mensagem: `Revisão aprovada por ${dbUser.name} (via assistente IA). Aguardando assinatura.${observacao ? ` Parecer: "${observacao}"` : ''}`,
+                        portariaId,
+                        autorId: dbUser.id,
+                        secretariaId: portaria.secretariaId,
+                        metadata: { via: 'assistente_ia', action: 'APROVAR_REVISAO', observacao } as any,
+                    },
+                })
+            })
+
+            // Notificar o autor (melhor esforço — falha não bloqueia)
+            try {
+                if (portaria.criadoPorId) {
+                    await prisma.feedAtividade.create({
+                        data: {
+                            tipoEvento: 'PORTARIA_APROVADA',
+                            mensagem: `Sua portaria foi aprovada na revisão por ${dbUser.name} e agora aguarda assinatura.`,
+                            portariaId,
+                            autorId: dbUser.id,
+                            secretariaId: portaria.secretariaId,
+                            metadata: { destinatarioId: portaria.criadoPorId } as any,
+                        },
+                    })
+                }
+            } catch { /* notificação não crítica */ }
+
+            await logAcaoIA(dbUser.id, `Assistente IA aprovou revisão da portaria "${portaria.titulo}"`, portaria.secretariaId, { acao: 'aprovar_revisao', portariaId })
+            return {
+                mensagem: `Revisão da portaria "${portaria.titulo}" aprovada com sucesso!`,
+                portaria: { id: portariaId, titulo: portaria.titulo, novoStatus: 'AGUARDANDO_ASSINATURA' },
+                proximoPasso: 'A portaria agora aguarda assinatura pelo Prefeito. Após a assinatura, estará pronta para publicação no Diário Oficial.',
+            }
+        }
+
+        case 'verificar_prontidao_publicacao': {
+            if (!context?.userAuth?.email) return { erro: 'Usuário não identificado.' }
+            const dbUser = await prisma.user.findFirst({ where: { email: context.userAuth.email, ativo: true } })
+            if (!dbUser) return { erro: 'Usuário não encontrado.' }
+
+            const { portariaId } = args
+            const portaria = await prisma.portaria.findUnique({
+                where: { id: portariaId },
+                include: {
+                    secretaria: { select: { sigla: true, nome: true } },
+                    modelo: { select: { nome: true, tipoDocumento: true } },
+                },
+            }) as any
+            if (!portaria) return { erro: `Portaria com ID "${portariaId}" não encontrada.` }
+
+            const checks = {
+                status: portaria.status === 'PRONTO_PUBLICACAO',
+                assinatura: portaria.assinaturaStatus !== 'NAO_ASSINADA',
+                pdfGerado: !!portaria.pdfUrl,
+                permissao: ['ADMIN_GERAL', 'PREFEITO', 'SECRETARIO'].includes(dbUser.role),
+            }
+
+            const prontoParaPublicar = Object.values(checks).every(Boolean)
+
+            return {
+                portaria: {
+                    id: portariaId, titulo: portaria.titulo,
+                    status: portaria.status,
+                    assinaturaStatus: portaria.assinaturaStatus,
+                    secretaria: portaria.secretaria?.sigla,
+                    modelo: portaria.modelo?.nome,
+                },
+                verificacoes: {
+                    statusCorreto: { ok: checks.status, detalhe: checks.status ? 'PRONTO_PUBLICACAO ✓' : `Status atual: ${portaria.status} — necessário: PRONTO_PUBLICACAO` },
+                    assinadaOuDispensada: { ok: checks.assinatura, detalhe: checks.assinatura ? `${portaria.assinaturaStatus} ✓` : 'Portaria não possui assinatura registrada' },
+                    pdfDisponivel: { ok: checks.pdfGerado, detalhe: checks.pdfGerado ? 'PDF gerado ✓' : 'PDF não gerado — o sistema irá gerar durante a publicação' },
+                    permissao: { ok: checks.permissao, detalhe: checks.permissao ? `Role ${dbUser.role} pode publicar ✓` : `Role ${dbUser.role} não pode publicar — necessário: PREFEITO, SECRETARIO ou ADMIN_GERAL` },
+                },
+                prontoParaPublicar,
+                instrucao: prontoParaPublicar
+                    ? `A portaria está pronta! Para publicar, acesse a portaria na interface e clique em "Publicar". A publicação aloca o número oficial, gera o PDF final e registra no Diário Oficial.`
+                    : `A portaria ainda não pode ser publicada. Corrija os itens marcados com ✗ acima.`,
+            }
+        }
+
+        // ── GESTÃO DE USUÁRIOS ─────────────────────────────────────────────────
+        case 'listar_usuarios': {
+            if (!context?.userAuth?.email) return { erro: 'Usuário não identificado.' }
+            const perm = await verificarPermissao(context.userAuth.email, ['ADMIN_GERAL'])
+            if (!perm.ok) return { erro: perm.erro }
+
+            const { role, secretariaId, busca, ativo } = args
+            const where: any = {}
+            if (role) where.role = role
+            if (secretariaId) where.secretariaId = secretariaId
+            if (typeof ativo === 'boolean') where.ativo = ativo
+            if (busca) {
+                where.OR = [
+                    { name: { contains: busca, mode: 'insensitive' } },
+                    { email: { contains: busca, mode: 'insensitive' } },
+                ]
+            }
+
+            const users = await prisma.user.findMany({
+                where,
+                take: 20,
+                select: {
+                    id: true, name: true, email: true, role: true, ativo: true,
+                    secretaria: { select: { sigla: true, nome: true } },
+                    setor: { select: { nome: true } },
+                },
+                orderBy: { name: 'asc' },
+            })
+
+            return {
+                mensagem: `${users.length} usuário(s) encontrado(s).`,
+                usuarios: users.map(u => ({
+                    id: u.id,
+                    nome: u.name,
+                    email: u.email,
+                    papel: u.role,
+                    ativo: u.ativo,
+                    secretaria: u.secretaria?.sigla ?? null,
+                    setor: u.setor?.nome ?? null,
+                })),
+            }
+        }
+
+        case 'alterar_papel': {
+            if (!context?.userAuth?.email) return { erro: 'Usuário não identificado.' }
+            const perm = await verificarPermissao(context.userAuth.email, ['ADMIN_GERAL'])
+            if (!perm.ok) return { erro: perm.erro }
+
+            const { userId, role, secretariaId, ativo } = args
+
+            // Valida: REVISOR, OPERADOR e SECRETARIO precisam de secretaria
+            const rolesRequeremSecretaria = ['REVISOR', 'OPERADOR', 'SECRETARIO']
+            if (rolesRequeremSecretaria.includes(role) && !secretariaId) {
+                return { erro: `O papel "${role}" exige uma secretaria de lotação. Informe secretariaId (use listar_secretarias para obter os IDs).` }
+            }
+
+            const target = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true } })
+            if (!target) return { erro: `Usuário com ID "${userId}" não encontrado.` }
+
+            // Impede rebaixar o próprio ADMIN para não travar o sistema
+            if (target.role === 'ADMIN_GERAL' && role !== 'ADMIN_GERAL' && perm.user!.id === userId) {
+                return { erro: 'Não é possível rebaixar a si mesmo de ADMIN_GERAL.' }
+            }
+
+            if (secretariaId) {
+                const sec = await prisma.secretaria.findFirst({ where: { id: secretariaId, ativo: true } })
+                if (!sec) return { erro: `Secretaria "${secretariaId}" não encontrada ou inativa.` }
+            }
+
+            const updateData: any = { role }
+            if (secretariaId !== undefined) updateData.secretariaId = secretariaId
+            if (typeof ativo === 'boolean') updateData.ativo = ativo
+
+            const atualizado = await prisma.user.update({
+                where: { id: userId },
+                data: updateData,
+                select: { id: true, name: true, email: true, role: true, ativo: true, secretaria: { select: { sigla: true } } },
+            })
+
+            await logAcaoIA(perm.user!.id, `Assistente IA alterou papel de "${target.name}": ${target.role} → ${role}`, secretariaId, { acao: 'alterar_papel', targetUserId: userId, roleAnterior: target.role, roleNovo: role })
+            return {
+                mensagem: `Papel de "${atualizado.name}" alterado de ${target.role} para ${role} com sucesso!`,
+                usuario: { id: atualizado.id, nome: atualizado.name, email: atualizado.email, papel: atualizado.role, ativo: atualizado.ativo, secretaria: atualizado.secretaria?.sigla },
+            }
+        }
+
+        case 'alterar_lotacao': {
+            if (!context?.userAuth?.email) return { erro: 'Usuário não identificado.' }
+            const perm = await verificarPermissao(context.userAuth.email, ['ADMIN_GERAL'])
+            if (!perm.ok) return { erro: perm.erro }
+
+            const { userId, secretariaId, setorId } = args
+
+            const target = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { name: true, role: true, secretariaId: true, secretaria: { select: { sigla: true } } },
+            })
+            if (!target) return { erro: `Usuário com ID "${userId}" não encontrado.` }
+
+            const sec = await prisma.secretaria.findFirst({ where: { id: secretariaId, ativo: true } })
+            if (!sec) return { erro: `Secretaria "${secretariaId}" não encontrada ou inativa.` }
+
+            if (setorId) {
+                const setor = await prisma.setor.findFirst({ where: { id: setorId, secretariaId, ativo: true } })
+                if (!setor) return { erro: `Setor "${setorId}" não encontrado ou não pertence à secretaria ${sec.sigla}.` }
+            }
+
+            const updateData: any = { secretariaId, setorId: setorId ?? null }
+            const atualizado = await prisma.user.update({
+                where: { id: userId },
+                data: updateData,
+                select: { id: true, name: true, role: true, secretaria: { select: { sigla: true, nome: true } }, setor: { select: { nome: true } } },
+            })
+
+            await logAcaoIA(perm.user!.id, `Assistente IA alterou lotação de "${target.name}": ${target.secretaria?.sigla ?? 'N/A'} → ${sec.sigla}`, secretariaId, { acao: 'alterar_lotacao', targetUserId: userId, secretariaAnterior: target.secretariaId, secretariaNova: secretariaId })
+            return {
+                mensagem: `Lotação de "${atualizado.name}" atualizada para ${sec.nome} (${sec.sigla})!`,
+                usuario: { id: atualizado.id, nome: atualizado.name, papel: atualizado.role, secretaria: atualizado.secretaria?.sigla, setor: atualizado.setor?.nome ?? null },
             }
         }
 

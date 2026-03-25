@@ -278,7 +278,7 @@ export class AssinaturaICPService {
             const pemKey = crypto.createPrivateKey({
                 key: pfxBuffer,
                 format: 'der',
-                type: 'pkcs12',
+                type: 'pkcs12' as any,
                 passphrase: config.senhaCertificado || '',
             })
 
@@ -315,15 +315,48 @@ export class AssinaturaICPService {
         config: AssinaturaICPConfig
     ): Promise<Result<string>> {
         try {
-            const pfxBuffer = Buffer.from(config.certificadoBase64!, 'base64')
+            if (!config.certificadoBase64) return err('Certificado não fornecido.')
 
-            // Extrair chave privada do PFX
-            const privateKey = crypto.createPrivateKey({
-                key: pfxBuffer,
-                format: 'der',
-                type: 'pkcs12',
-                passphrase: config.senhaCertificado || '',
-            })
+            let privateKey: crypto.KeyObject
+
+            try {
+                // Tenta usar node-forge para extrair a chave do PFX (suporte completo)
+                const forge: any = await import('node-forge')
+                const pfxDer = forge.util.decode64(config.certificadoBase64)
+                const pfxAsn1 = forge.asn1.fromDer(pfxDer)
+                
+                const p12 = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, config.senhaCertificado || '')
+                
+                // Procurar por chaves privadas (shroudedKeyBag para PFX comum)
+                const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })
+                const bag = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0]
+                
+                if (!bag || !bag.key) {
+                    return err('Chave privada não encontrada no certificado.')
+                }
+
+                // Converter chave do forge para PEM e depois para KeyObject nativo
+                const privateKeyPem = forge.pki.privateKeyToPem(bag.key)
+                privateKey = crypto.createPrivateKey({
+                    key: privateKeyPem,
+                    format: 'pem',
+                })
+            } catch (forgeError: any) {
+                console.warn('[AssinaturaICP] Falha ao usar node-forge, tentando fallback nativo:', forgeError.message)
+                
+                // Fallback nativo (limitado, pode falhar em versões do Node que não suportam PKCS#12 diretamente)
+                const pfxBuffer = Buffer.from(config.certificadoBase64, 'base64')
+                try {
+                    privateKey = crypto.createPrivateKey({
+                        key: pfxBuffer,
+                        format: 'der',
+                        type: 'pkcs12' as any,
+                        passphrase: config.senhaCertificado || '',
+                    })
+                } catch (nativeError: any) {
+                    return err(`Não foi possível extrair a chave privada: ${nativeError.message}. Certifique-se de que o node-forge está instalado para suporte completo a PFX.`)
+                }
+            }
 
             // Assinar com SHA-256 + RSA
             const sign = crypto.createSign('SHA256')

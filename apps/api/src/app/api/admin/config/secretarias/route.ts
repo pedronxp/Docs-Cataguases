@@ -3,33 +3,43 @@ import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
 import { z } from 'zod'
 import { FeedService } from '@/services/feed.service'
+import { CacheService, CACHE_TTL, CACHE_TAGS } from '@/services/cache.service'
 
 export const dynamic = 'force-dynamic'
+
+const CACHE_KEY_SECRETARIAS = 'secretarias:lista'
 
 // GET /api/admin/config/secretarias
 export async function GET() {
     try {
-        const secretarias = await prisma.secretaria.findMany({
-            where: { ativo: true },
-            orderBy: { nome: 'asc' },
-            include: {
-                _count: { select: { setores: true, usuarios: true } },
+        const data = await CacheService.getOrSet(
+            CACHE_KEY_SECRETARIAS,
+            async () => {
+                const secretarias = await prisma.secretaria.findMany({
+                    where: { ativo: true },
+                    orderBy: { nome: 'asc' },
+                    include: {
+                        _count: { select: { setores: true, usuarios: true } },
+                    },
+                })
+
+                // Join manual de titulares para evitar erro de client desatualizado no Next dev
+                const titularIds = secretarias.map(s => s.titularId).filter(Boolean) as string[]
+                const titulares = titularIds.length > 0
+                    ? await prisma.user.findMany({
+                        where: { id: { in: titularIds } },
+                        select: { id: true, name: true, image: true, email: true }
+                    })
+                    : []
+
+                return secretarias.map(sec => ({
+                    ...sec,
+                    titular: titulares.find(t => t.id === sec.titularId) || null
+                }))
             },
-        })
-
-        // Join manual de titulares para evitar erro de client desatualizado no Next dev
-        const titularIds = secretarias.map(s => s.titularId).filter(Boolean) as string[]
-        const titulares = titularIds.length > 0
-            ? await prisma.user.findMany({
-                where: { id: { in: titularIds } },
-                select: { id: true, name: true, image: true, email: true }
-            })
-            : []
-
-        const data = secretarias.map(sec => ({
-            ...sec,
-            titular: titulares.find(t => t.id === sec.titularId) || null
-        }))
+            CACHE_TTL.SECRETARIAS,
+            [CACHE_TAGS.SECRETARIAS]
+        )
 
         return NextResponse.json({ success: true, data })
     } catch (error: any) {
@@ -79,12 +89,13 @@ export async function POST(req: NextRequest) {
                     ativo: true
                 }
             })
-            // Registra no feed
+            // Registra no feed + invalida cache
             await FeedService.registrarEvento({
                 tipoEvento: 'SECRETARIA_CRIADA',
                 mensagem: `Secretaria "${parsed.data.nome}" (${siglaUpper}) criada`,
                 autorId: session.id as string,
             }).catch(() => {})
+            CacheService.invalidateByTag(CACHE_TAGS.SECRETARIAS).catch(() => {})
             return NextResponse.json({ success: true, data: reativada })
         }
 
@@ -96,12 +107,13 @@ export async function POST(req: NextRequest) {
             },
         })
 
-        // Registra no feed
+        // Registra no feed + invalida cache
         await FeedService.registrarEvento({
             tipoEvento: 'SECRETARIA_CRIADA',
             mensagem: `Secretaria "${parsed.data.nome}" (${siglaUpper}) criada`,
             autorId: session.id as string,
         }).catch(() => {})
+        CacheService.invalidateByTag(CACHE_TAGS.SECRETARIAS).catch(() => {})
 
         return NextResponse.json({ success: true, data: secretaria }, { status: 201 })
     } catch (error: any) {

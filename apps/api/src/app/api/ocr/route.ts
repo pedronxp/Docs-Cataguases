@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
 import { OCRService } from '@/services/ocr.service'
+import { RateLimitService, rateLimitHeaders } from '@/services/rate-limit.service'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,16 @@ export async function POST(request: Request) {
         const usuario = await getAuthUser()
         if (!usuario) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+        }
+
+        // ── Rate Limiting: 10 req/hora por usuário ────────────────────────────
+        const rl = await RateLimitService.check('OCR', usuario.id)
+        if (!rl.allowed) {
+            const minutos = Math.ceil(rl.retryAfter / 60)
+            return NextResponse.json(
+                { error: `Limite de OCR atingido (${rl.max} por hora). Tente novamente em ${minutos} minuto${minutos !== 1 ? 's' : ''}.` },
+                { status: 429, headers: rateLimitHeaders(rl) }
+            )
         }
 
         const formData = await request.formData()

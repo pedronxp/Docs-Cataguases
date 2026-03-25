@@ -46,17 +46,19 @@ import { ptBR } from 'date-fns/locale'
 export const Route = createFileRoute('/_sistema/administrativo/portarias/')({
     component: PortariasListPage,
 })
-
 const STATUS_LABELS: Partial<Record<StatusPortaria, string>> = {
     RASCUNHO: 'Rascunho',
     EM_REVISAO_ABERTA: 'Aguardando Revisor',
     EM_REVISAO_ATRIBUIDA: 'Em Revisão',
     CORRECAO_NECESSARIA: 'Correção Necessária',
     AGUARDANDO_ASSINATURA: 'Aguardando Assinatura',
-    PRONTO_PUBLICACAO: 'Fila do Diário',
+    PRONTO_PUBLICACAO: 'Pronta para Publicação',
     PUBLICADA: 'Publicada',
+    CANCELADA: 'Cancelada',
+    ARQUIVADA: 'Arquivada',
     FALHA_PROCESSAMENTO: 'Falha no PDF',
-    ERRO_GERACAO: 'Erro de Geração',
+    ERRO_GERACAO: 'Erro no PDF',
+    PROCESSANDO: 'Processando',
 }
 
 function getResponsavel(doc: Portaria): { tipo: string; nome: string } | null {

@@ -16,10 +16,8 @@ import { Badge } from '@/components/ui/badge'
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import {
-    Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useToast } from '@/hooks/use-toast'
 import { useUsuarios } from '@/hooks/use-usuarios'
 import { DataTableSkeleton } from '@/components/shared/DataTableSkeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'

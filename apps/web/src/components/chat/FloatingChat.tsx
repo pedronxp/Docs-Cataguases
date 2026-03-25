@@ -254,13 +254,58 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
     )
 }
 
+// ── Persistência no localStorage ──────────────────────────────────────────────
+const CHAT_STORAGE_KEY = (userId: string) => `docs_chat_messages_${userId}`
+const CHAT_TTL_MS = 24 * 60 * 60 * 1000 // 24 horas
+const CHAT_MAX_MESSAGES = 20
+
+interface StoredChat {
+    messages: ChatMessage[]
+    savedAt: number
+}
+
+function loadStoredMessages(userId: string): ChatMessage[] {
+    try {
+        const raw = localStorage.getItem(CHAT_STORAGE_KEY(userId))
+        if (!raw) return []
+        const stored: StoredChat = JSON.parse(raw)
+        // Descarta se passou do TTL
+        if (Date.now() - stored.savedAt > CHAT_TTL_MS) {
+            localStorage.removeItem(CHAT_STORAGE_KEY(userId))
+            return []
+        }
+        return stored.messages ?? []
+    } catch {
+        return []
+    }
+}
+
+function saveMessages(userId: string, messages: ChatMessage[]) {
+    try {
+        const toSave = messages.slice(-CHAT_MAX_MESSAGES)
+        const stored: StoredChat = { messages: toSave, savedAt: Date.now() }
+        localStorage.setItem(CHAT_STORAGE_KEY(userId), JSON.stringify(stored))
+    } catch { /* quota ou modo privado — silencioso */ }
+}
+
+function clearStoredMessages(userId: string) {
+    try { localStorage.removeItem(CHAT_STORAGE_KEY(userId)) } catch { /* noop */ }
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 export function FloatingChat() {
     // ── Auth: pega os dados reais do usuário logado ───────────────────────────
     const usuario = useAuthStore((s) => s.usuario)
 
     const [open, setOpen] = useState(false)
-    const [messages, setMessages] = useState<ChatMessage[]>([])
+    const [messages, setMessages] = useState<ChatMessage[]>(() => {
+        // Carrega do localStorage na inicialização (se disponível)
+        if (typeof window === 'undefined') return []
+        try {
+            // usuario ainda não disponível aqui — carregamos depois no useEffect
+            return []
+        } catch { return [] }
+    })
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
     const [unread, setUnread] = useState(0)
@@ -272,13 +317,28 @@ export function FloatingChat() {
     const messagesRef = useRef<ChatMessage[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    // Carregar modelo salvo
+    // Carregar modelo salvo e mensagens anteriores (uma vez que o usuário está disponível)
     useEffect(() => {
         try {
             const savedModel = localStorage.getItem('chatSelectedModel')
             if (savedModel) setSelectedModel(savedModel)
         } catch { /* silencioso */ }
     }, [])
+
+    // Carregar histórico salvo quando o usuário estiver disponível
+    useEffect(() => {
+        if (!usuario?.id) return
+        const stored = loadStoredMessages(usuario.id)
+        if (stored.length > 0) {
+            setMessages(stored)
+        }
+    }, [usuario?.id])
+
+    // Salvar mensagens no localStorage sempre que mudarem
+    useEffect(() => {
+        if (!usuario?.id || messages.length === 0) return
+        saveMessages(usuario.id, messages)
+    }, [messages, usuario?.id])
 
     // Manter messagesRef sincronizado com messages
     useEffect(() => {
@@ -506,7 +566,11 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
         }
     }
 
-    const handleClear = () => { setMessages([]); setDocxAnexado(null) }
+    const handleClear = () => {
+        setMessages([])
+        setDocxAnexado(null)
+        if (usuario?.id) clearStoredMessages(usuario.id)
+    }
     const isEmpty = messages.length === 0
 
     // Não renderiza se o usuário não estiver logado

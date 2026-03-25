@@ -32,6 +32,7 @@ import { Route as SistemaRevisaoMinhasRouteImport } from './routes/_sistema.revi
 import { Route as SistemaRevisaoFilaRouteImport } from './routes/_sistema.revisao.fila'
 import { Route as SistemaDiarioOficialGuiaRouteImport } from './routes/_sistema.diario-oficial.guia'
 import { Route as SistemaAdministrativoMemorandosRouteImport } from './routes/_sistema.administrativo.memorandos'
+import { Route as SistemaAdminWorkflowRouteImport } from './routes/_sistema.admin.workflow'
 import { Route as SistemaAdminVariaveisDicasRouteImport } from './routes/_sistema.admin.variaveis-dicas'
 import { Route as SistemaAdminVariaveisRouteImport } from './routes/_sistema.admin.variaveis'
 import { Route as SistemaAdminUsuariosOrgaoRouteImport } from './routes/_sistema.admin.usuarios-orgao'
@@ -176,6 +177,11 @@ const SistemaAdministrativoMemorandosRoute =
     path: '/administrativo/memorandos',
     getParentRoute: () => SistemaRoute,
   } as any)
+const SistemaAdminWorkflowRoute = SistemaAdminWorkflowRouteImport.update({
+  id: '/admin/workflow',
+  path: '/admin/workflow',
+  getParentRoute: () => SistemaRoute,
+} as any)
 const SistemaAdminVariaveisDicasRoute =
   SistemaAdminVariaveisDicasRouteImport.update({
     id: '/admin/variaveis-dicas',
@@ -366,6 +372,7 @@ export interface FileRoutesByFullPath {
   '/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/admin/variaveis-dicas': typeof SistemaAdminVariaveisDicasRoute
+  '/admin/workflow': typeof SistemaAdminWorkflowRoute
   '/administrativo/memorandos': typeof SistemaAdministrativoMemorandosRoute
   '/diario-oficial/guia': typeof SistemaDiarioOficialGuiaRoute
   '/revisao/fila': typeof SistemaRevisaoFilaRoute
@@ -417,6 +424,7 @@ export interface FileRoutesByTo {
   '/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/admin/variaveis-dicas': typeof SistemaAdminVariaveisDicasRoute
+  '/admin/workflow': typeof SistemaAdminWorkflowRoute
   '/administrativo/memorandos': typeof SistemaAdministrativoMemorandosRoute
   '/diario-oficial/guia': typeof SistemaDiarioOficialGuiaRoute
   '/revisao/fila': typeof SistemaRevisaoFilaRoute
@@ -471,6 +479,7 @@ export interface FileRoutesById {
   '/_sistema/admin/usuarios-orgao': typeof SistemaAdminUsuariosOrgaoRoute
   '/_sistema/admin/variaveis': typeof SistemaAdminVariaveisRoute
   '/_sistema/admin/variaveis-dicas': typeof SistemaAdminVariaveisDicasRoute
+  '/_sistema/admin/workflow': typeof SistemaAdminWorkflowRoute
   '/_sistema/administrativo/memorandos': typeof SistemaAdministrativoMemorandosRoute
   '/_sistema/diario-oficial/guia': typeof SistemaDiarioOficialGuiaRoute
   '/_sistema/revisao/fila': typeof SistemaRevisaoFilaRoute
@@ -525,6 +534,7 @@ export interface FileRouteTypes {
     | '/admin/usuarios-orgao'
     | '/admin/variaveis'
     | '/admin/variaveis-dicas'
+    | '/admin/workflow'
     | '/administrativo/memorandos'
     | '/diario-oficial/guia'
     | '/revisao/fila'
@@ -576,6 +586,7 @@ export interface FileRouteTypes {
     | '/admin/usuarios-orgao'
     | '/admin/variaveis'
     | '/admin/variaveis-dicas'
+    | '/admin/workflow'
     | '/administrativo/memorandos'
     | '/diario-oficial/guia'
     | '/revisao/fila'
@@ -629,6 +640,7 @@ export interface FileRouteTypes {
     | '/_sistema/admin/usuarios-orgao'
     | '/_sistema/admin/variaveis'
     | '/_sistema/admin/variaveis-dicas'
+    | '/_sistema/admin/workflow'
     | '/_sistema/administrativo/memorandos'
     | '/_sistema/diario-oficial/guia'
     | '/_sistema/revisao/fila'
@@ -815,6 +827,13 @@ declare module '@tanstack/react-router' {
       path: '/administrativo/memorandos'
       fullPath: '/administrativo/memorandos'
       preLoaderRoute: typeof SistemaAdministrativoMemorandosRouteImport
+      parentRoute: typeof SistemaRoute
+    }
+    '/_sistema/admin/workflow': {
+      id: '/_sistema/admin/workflow'
+      path: '/admin/workflow'
+      fullPath: '/admin/workflow'
+      preLoaderRoute: typeof SistemaAdminWorkflowRouteImport
       parentRoute: typeof SistemaRoute
     }
     '/_sistema/admin/variaveis-dicas': {
@@ -1099,6 +1118,7 @@ interface SistemaRouteChildren {
   SistemaAdminUsuariosOrgaoRoute: typeof SistemaAdminUsuariosOrgaoRoute
   SistemaAdminVariaveisRoute: typeof SistemaAdminVariaveisRoute
   SistemaAdminVariaveisDicasRoute: typeof SistemaAdminVariaveisDicasRoute
+  SistemaAdminWorkflowRoute: typeof SistemaAdminWorkflowRoute
   SistemaAdministrativoMemorandosRoute: typeof SistemaAdministrativoMemorandosRoute
   SistemaRevisaoFilaRoute: typeof SistemaRevisaoFilaRoute
   SistemaRevisaoMinhasRoute: typeof SistemaRevisaoMinhasRoute
@@ -1139,6 +1159,7 @@ const SistemaRouteChildren: SistemaRouteChildren = {
   SistemaAdminUsuariosOrgaoRoute: SistemaAdminUsuariosOrgaoRoute,
   SistemaAdminVariaveisRoute: SistemaAdminVariaveisRoute,
   SistemaAdminVariaveisDicasRoute: SistemaAdminVariaveisDicasRoute,
+  SistemaAdminWorkflowRoute: SistemaAdminWorkflowRoute,
   SistemaAdministrativoMemorandosRoute: SistemaAdministrativoMemorandosRoute,
   SistemaRevisaoFilaRoute: SistemaRevisaoFilaRoute,
   SistemaRevisaoMinhasRoute: SistemaRevisaoMinhasRoute,

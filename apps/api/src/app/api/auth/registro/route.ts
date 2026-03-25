@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { UsuarioService } from '@/services/usuario.service'
 import { createToken } from '@/lib/auth'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 const registroSchema = z.object({
     name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -13,6 +14,23 @@ const registroSchema = z.object({
 
 export async function POST(request: NextRequest) {
     try {
+        // Rate limiting: máx. 10 registros por IP a cada hora; bloqueio de 1 hora após exceder
+        const ip = getClientIp(request)
+        const rl = checkRateLimit(`registro:${ip}`, 10, 60 * 60_000, 60 * 60_000)
+        if (!rl.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Limite de registros atingido. Tente novamente em ${rl.retryAfterSeconds}s.` },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(rl.retryAfterSeconds),
+                        'X-RateLimit-Limit': '10',
+                        'X-RateLimit-Remaining': '0',
+                    },
+                }
+            )
+        }
+
         const body = await request.json()
         const parsed = registroSchema.safeParse(body)
 

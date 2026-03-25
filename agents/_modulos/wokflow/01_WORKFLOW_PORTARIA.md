@@ -45,14 +45,18 @@ Existem 3 caminhos possíveis. Só avança para a Etapa 4 se `assinaturaStatus !
   - `assinaturaStatus = 'DISPENSADA_COM_JUSTIFICATIVA'`.
   - `feedAtividade`: "Assinatura dispensada por [Nome]. Justificativa: '[Texto]'."
 
-## ETAPA 4: FILA JORNAL [Role: JORNALISTA]
+## ETAPA 4: FILA JORNAL [Roles: SECRETARIO / PREFEITO / ADMIN_GERAL / JORNALISTA]
 1. Portarias aprovadas na Etapa 3 entram na fila do Jornal.
-2. Jornalista visualiza a portaria e o status/comprovante de assinatura.
+2. Responsável visualiza a portaria e o status/comprovante de assinatura.
 3. O sistema sugere o próximo número baseado na tabela `livroNumeracao` (Ex: "007/2026").
-4. O Jornalista confirma ou edita o número.
-5. Pop-up de segurança: "O sistema previu Port. [Número]. Confirma a publicação?"
-6. Ao confirmar:
-   - `numeroOficial = número digitado`.
+4. O usuário confirma a publicação. A numeração é alocada **automaticamente e de forma atômica** pelo sistema (garantindo ausência de gaps ou duplicidades).
+5. Ao confirmar:
+   - `numeroOficial = alocado pelo sistema`.
    - Status muda para: `PUBLICADA`.
    - `dataPublicacao = now()`.
-   - `feedAtividade`: "Numerada como Port. [Número] e publicada no Diário Oficial por [Nome do Jornalista]."
+   - `feedAtividade`: "Portaria publicada com número [Número] por [Nome]."
+
+## ETAPA 5: CANCELAMENTO (EXCEÇÃO)
+- A qualquer momento ANTES da publicação oficial (Etapa 4), o Autor original ou Administrador podem cancelar o fluxo.
+- Status muda para `CANCELADA`.
+- Justificativa é obrigatória e gravada no log de auditoria.

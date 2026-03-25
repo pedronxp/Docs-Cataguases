@@ -41,7 +41,7 @@ async function runConcurrencyTest() {
     const startTime = Date.now()
 
     // Array de promessas - executam PARALELAMENTE
-    const promises = portariaIds.map(id => NumeracaoService.alocarNumeroPortaria(id, aprovadorId, '127.0.0.1'))
+    const promises = portariaIds.map(id => NumeracaoService.alocarNumero(id, 'PORTARIA', aprovadorId, '127.0.0.1'))
 
     const results = await Promise.allSettled(promises)
 

@@ -53,11 +53,11 @@ export async function GET() {
                   AND status = 'EM_REVISAO_ATRIBUIDA'
             `,
 
-            // Aguardando assinatura/publicação
+            // Acompanhamento geral (qualquer portaria ativa, incluindo rascunhos, exceto publicadas/arquivadas)
             canPublish
                 ? (isAdminOrPrefeito || !secretariaId
-                    ? prisma.$queryRaw`SELECT COUNT(*)::int as total FROM "Portaria" WHERE status IN ('AGUARDANDO_ASSINATURA', 'PRONTO_PUBLICACAO')`
-                    : prisma.$queryRaw`SELECT COUNT(*)::int as total FROM "Portaria" WHERE status IN ('AGUARDANDO_ASSINATURA', 'PRONTO_PUBLICACAO') AND "secretariaId" = ${secretariaId}`)
+                    ? prisma.$queryRaw`SELECT COUNT(*)::int as total FROM "Portaria" WHERE status NOT IN ('PUBLICADA', 'ARQUIVADO')`
+                    : prisma.$queryRaw`SELECT COUNT(*)::int as total FROM "Portaria" WHERE status NOT IN ('PUBLICADA', 'ARQUIVADO') AND "secretariaId" = ${secretariaId}`)
                 : Promise.resolve([{ total: 0 }]),
 
             // Notificações não lidas do usuário

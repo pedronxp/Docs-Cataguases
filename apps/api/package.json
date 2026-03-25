@@ -19,6 +19,8 @@
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
     "@supabase/supabase-js": "^2.97.0",
+    "@upstash/qstash": "^2.10.1",
+    "@upstash/redis": "^1.34.9",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "cloudconvert": "^3.0.0",

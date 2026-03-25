@@ -4,6 +4,7 @@ import { llmChat, type LLMMessage, type LLMProvider } from '@/services/llm.servi
 import { DOCS_SYSTEM_PROMPT, DOCS_SYSTEM_PROMPT_CHAT } from '@/lib/llm-system-prompt'
 import { LLM_TOOLS, executeToolCall } from '@/lib/llm-tools'
 import { sanitizeMessages } from '@/lib/llm-sanitizer'
+import { RateLimitService, rateLimitHeaders } from '@/services/rate-limit.service'
 import prisma from '@/lib/prisma'
 
 // Mapa modelo → provider (para determinar o provider correto quando o usuário escolhe um modelo específico)
@@ -32,6 +33,24 @@ export async function POST(req: NextRequest) {
     const session = await getSession()
     if (!session) {
         return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    }
+
+    // ── Rate Limiting: 50 req/hora por usuário ────────────────────────────────
+    const rl = await RateLimitService.check('LLM_CHAT', session.id as string)
+    const rlHeaders = rateLimitHeaders(rl)
+
+    if (!rl.allowed) {
+        const minutos = Math.ceil(rl.retryAfter / 60)
+        return NextResponse.json(
+            {
+                success: false,
+                error: `Doc's Cataguases — Limite de requisições excedido. Por gentileza, aguarde ${minutos} minuto${minutos !== 1 ? 's' : ''} antes de enviar novas solicitações ao assistente.`,
+                code: 429,
+                retryAfter: rl.retryAfter,
+                resetAt: rl.resetAt.toISOString(),
+            },
+            { status: 429, headers: rlHeaders }
+        )
     }
 
     let body: any
@@ -141,11 +160,11 @@ export async function POST(req: NextRequest) {
         ? [{ role: 'system', content: systemPrompt }, ...messages]
         : messages
 
-    // Modelo padrão: Cerebras Llama 3.1 8B (motor principal)
-    const defaultModel = 'llama3.1-8b'
-
-    // Se o usuário escolheu um modelo específico no seletor do chat, respeitar
-    const finalModel = selectedModel || model || defaultModel
+    // Se o usuário escolheu um modelo específico no seletor do chat, respeitar.
+    // Caso contrário, NÃO passar model — deixar o Smart Router escolher
+    // (ele usará 70B para tool calls e 8B para perguntas simples).
+    const userExplicitlyChoseModel = !!selectedModel
+    const finalModel = selectedModel || model || undefined  // undefined → Smart Router decide
 
     // Deriva o provider correto a partir do modelo selecionado (evita fallback silencioso)
     // Se o usuário escolheu 'mistral-large-latest', o provider DEVE ser 'mistral'
@@ -174,7 +193,7 @@ export async function POST(req: NextRequest) {
                 // Quando undefined, o Smart Router escolhe o melhor disponível.
                 provider: derivedProvider,
                 tools: LLM_TOOLS,
-                skipSmartRouter: !!selectedModel, // se o usuário escolheu modelo, NÃO faz fallback
+                skipSmartRouter: userExplicitlyChoseModel, // se o usuário escolheu modelo, NÃO faz fallback
             })
 
             // Timeout para não deixar o request pendurado
@@ -230,8 +249,33 @@ export async function POST(req: NextRequest) {
                 continue
             }
 
-            // Sem tool_calls, temos a resposta final
-            finalResult = result
+            // Sem tool_calls — mas faz última verificação: o content pode conter JSON
+            // de tool calls que o parser do service não conseguiu capturar.
+            // Isso evita que o usuário veja JSON cru na interface.
+            let safeContent = result.content || ''
+            
+            // Nova verificação agressiva para evitar entrega de JSON cru (seja tool call vazado ou erro do modelo)
+            const trimmedContent = safeContent.trim()
+            const isJsonBlock = trimmedContent.startsWith('```json') || trimmedContent.startsWith('```')
+            const isJsonLike = (trimmedContent.startsWith('{') && trimmedContent.endsWith('}')) || 
+                               (trimmedContent.startsWith('[') && trimmedContent.endsWith(']'))
+            
+            if (isJsonBlock || isJsonLike || (safeContent.includes('"name"') && safeContent.includes('"arguments"'))) {
+                try {
+                    let cleaned = trimmedContent.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/, '').trim()
+                    JSON.parse(cleaned) // Se parsear com sucesso, é um JSON puro ou tool call vazado
+                    
+                    console.warn('[LLM Chat] Content final consiste em um JSON (possível erro de geração ou tool call vazado) — substituindo por mensagem formal')
+                    safeContent = 'Desculpe, encontrei uma dificuldade técnica ao processar a solicitação e não consegui formatar a resposta adequadamente. Você poderia reformular sua pergunta ou pedido?'
+                } catch {
+                    // Se falhar no parse, mas tem cara muito forte de erro de geração de JSON quebrado
+                    if (isJsonLike || isJsonBlock) {
+                        console.warn('[LLM Chat] Content final parece um JSON incompleto/quebrado — substituindo')
+                        safeContent = 'Desculpe, ocorreu uma falha na geração da resposta final. Poderia tentar novamente de outra forma?'
+                    }
+                }
+            }
+            finalResult = { ...result, content: safeContent }
             break
         }
 
@@ -248,16 +292,19 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        return NextResponse.json({
-            success: true,
-            content: finalResult.content,
-            provider: finalResult.provider,
-            model: finalResult.model,
-            usage: finalResult.usage,
-            // Transparência: informa se houve fallback e qual provider foi solicitado
-            fallbackUsed: finalResult.fallbackUsed ?? false,
-            requestedProvider: finalResult.requestedProvider ?? null,
-        })
+        return NextResponse.json(
+            {
+                success: true,
+                content: finalResult.content,
+                provider: finalResult.provider,
+                model: finalResult.model,
+                usage: finalResult.usage,
+                // Transparência: informa se houve fallback e qual provider foi solicitado
+                fallbackUsed: finalResult.fallbackUsed ?? false,
+                requestedProvider: finalResult.requestedProvider ?? null,
+            },
+            { headers: rlHeaders }
+        )
     } catch (err: any) {
         console.error('[LLM API Error]:', err)
         const isTimeout = err.message?.includes('Timeout')

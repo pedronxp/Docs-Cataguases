@@ -124,6 +124,22 @@ function PortariaDetalhesPage() {
         loadPortaria()
     }, [id])
 
+    // Polling quando o documento estiver em processamento assíncrono
+    useEffect(() => {
+        if (portaria?.status === STATUS_PORTARIA.PROCESSANDO) {
+            const interval = setInterval(async () => {
+                const res = await portariaService.buscarPortaria(id)
+                if (res.success && res.data) {
+                    if (res.data.status !== STATUS_PORTARIA.PROCESSANDO) {
+                        // O status mudou (sucesso ou falha), recarrega a tela toda
+                        loadPortaria()
+                    }
+                }
+            }, 3000)
+            return () => clearInterval(interval)
+        }
+    }, [portaria?.status, id])
+
     async function loadPortaria() {
         setLoading(true)
         setPdfViewerUrl(null)
@@ -695,6 +711,23 @@ function PortariaDetalhesPage() {
                                         <PenTool className="mr-2 h-4 w-4" /> Editar Dados
                                     </Link>
                                 </Button>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* ACTIONS: PROCESSANDO → aguardando geração assíncrona */}
+                    {portaria.status === STATUS_PORTARIA.PROCESSANDO && (
+                        <Card className="border-blue-300 bg-blue-50 shadow-md">
+                            <CardHeader className="p-4 pb-2">
+                                <div className="flex items-center gap-2 text-blue-700">
+                                    <Loader2 size={16} className="animate-spin" />
+                                    <CardTitle className="text-sm font-black uppercase tracking-tight">Processando Documento</CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-3">
+                                <p className="text-xs text-blue-700 font-medium leading-relaxed">
+                                    O PDF oficial está sendo gerado em segundo plano. Por favor, aguarde alguns instantes. Esta página será atualizada automaticamente.
+                                </p>
                             </CardContent>
                         </Card>
                     )}

@@ -28,12 +28,14 @@ interface CacheStats {
 // ── Configurações de TTL por domínio ────────────────────────────────────────
 export const CACHE_TTL = {
     SIDEBAR_COUNTS: 15,       // 15s — atualiza frequentemente
+    FEED: 30,                 // 30s — feed de atividades
     SECRETARIAS: 300,         // 5min — raramente muda
     SETORES: 300,             // 5min
     MODELOS: 120,             // 2min
     ANALYTICS_DASHBOARD: 60,  // 1min — dados agregados
     ANALYTICS_SERIES: 30,     // 30s
     ACERVO_LISTA: 60,         // 1min
+    ACERVO_STATS: 120,        // 2min — contadores do acervo
     PORTARIA_DETALHE: 30,     // 30s
     USUARIOS_LISTA: 120,      // 2min
     LLM_KEYS: 600,            // 10min — admin only
@@ -160,80 +162,86 @@ class MemoryCacheProvider implements CacheProvider {
     }
 }
 
-// ── Redis Provider ──────────────────────────────────────────────────────────
-class RedisCacheProvider implements CacheProvider {
-    private redis: any = null
-    private connected = false
+// ── Upstash Redis Provider ──────────────────────────────────────────────────
+//
+// Usa @upstash/redis — cliente HTTP/REST, sem conexões TCP persistentes.
+// Compatível com Vercel Edge/Serverless e Supabase Edge Functions.
+//
+// Variáveis de ambiente necessárias:
+//   UPSTASH_REDIS_REST_URL   — ex: https://xxxxx.upstash.io
+//   UPSTASH_REDIS_REST_TOKEN — token de acesso (painel Upstash → REST API)
+//
+class UpstashRedisCacheProvider implements CacheProvider {
+    private client: any = null   // Redis | null
 
-    constructor(private redisUrl: string) {}
-
-    private async getClient() {
-        if (this.connected && this.redis) return this.redis
-
+    private async getClient(): Promise<any | null> {
+        if (this.client) return this.client
         try {
-            // @ts-ignore - módulo opcional não instalado (fallback em memória)
-            // Usa eval para o Webpack não tentar resolver estaticamente se não estiver instalado
-            const redisModule = eval('require("redis")')
-            const { createClient } = redisModule
-            this.redis = createClient({ url: this.redisUrl })
-            this.redis.on('error', (err: any) => {
-                console.warn('[Cache] Redis error, falling back to memory:', err.message)
-                this.connected = false
+            // IMPORTANTE: usar eval() para evitar que o Next.js resolva o import
+            // estaticamente em build time — o pacote pode não estar instalado no ambiente
+            // de desenvolvimento e o fallback para MemoryCache deve continuar funcionando.
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { Redis } = await (eval('import("@upstash/redis")') as Promise<any>)
+            this.client = new Redis({
+                url: process.env.UPSTASH_REDIS_REST_URL!,
+                token: process.env.UPSTASH_REDIS_REST_TOKEN!,
             })
-            await this.redis.connect()
-            this.connected = true
-            console.log('[Cache] Redis conectado com sucesso')
-            return this.redis
+            console.log('[Cache] Upstash Redis client inicializado')
+            return this.client
         } catch (err: any) {
-            console.warn('[Cache] Redis indisponível, usando cache em memória:', err.message)
-            this.connected = false
+            console.warn('[Cache] Upstash Redis indisponível, fallback para memória:', err.message)
             return null
         }
     }
 
+    private prefixed(key: string) { return `docs:${key}` }
+    private tagKey(tag: string)   { return `docs:tag:${tag}` }
+
     async get<T>(key: string): Promise<T | null> {
-        const client = await this.getClient()
-        if (!client) return null
+        const r = await this.getClient()
+        if (!r) return null
         try {
-            const data = await client.get(`docs:${key}`)
-            if (!data) return null
-            return JSON.parse(data) as T
+            // @upstash/redis desserializa JSON automaticamente
+            return (await r.get(this.prefixed(key))) as T
         } catch {
             return null
         }
     }
 
     async set<T>(key: string, value: T, ttlSeconds: number, tags: string[] = []): Promise<void> {
-        const client = await this.getClient()
-        if (!client) return
+        const r = await this.getClient()
+        if (!r) return
         try {
-            const fullKey = `docs:${key}`
-            await client.set(fullKey, JSON.stringify(value), { EX: ttlSeconds })
-            // Salvar tags como sets no Redis
-            for (const tag of tags) {
-                await client.sAdd(`docs:tag:${tag}`, fullKey)
+            const fullKey = this.prefixed(key)
+            await r.set(fullKey, value, { ex: ttlSeconds })
+            // Indexar por tags — pipeline para reduzir round-trips
+            if (tags.length > 0) {
+                const pipe = r.pipeline()
+                for (const tag of tags) {
+                    pipe.sadd(this.tagKey(tag), fullKey)
+                }
+                await pipe.exec()
             }
         } catch (err: any) {
-            console.warn('[Cache] Redis set error:', err.message)
+            console.warn('[Cache] Upstash set error:', err.message)
         }
     }
 
     async del(key: string): Promise<void> {
-        const client = await this.getClient()
-        if (!client) return
-        try {
-            await client.del(`docs:${key}`)
-        } catch {}
+        const r = await this.getClient()
+        if (!r) return
+        try { await r.del(this.prefixed(key)) } catch {}
     }
 
     async delByPattern(pattern: string): Promise<number> {
-        const client = await this.getClient()
-        if (!client) return 0
+        const r = await this.getClient()
+        if (!r) return 0
         try {
-            const keys = await client.keys(`docs:${pattern}`)
-            if (keys.length > 0) {
-                await client.del(keys)
-            }
+            // Upstash expõe SCAN via r.keys() — padrão glob
+            const prefix = pattern.replace(/\*/g, '')
+            const keys: string[] = await r.keys(`docs:${prefix}*`)
+            if (keys.length === 0) return 0
+            await r.del(...keys)
             return keys.length
         } catch {
             return 0
@@ -241,14 +249,13 @@ class RedisCacheProvider implements CacheProvider {
     }
 
     async delByTag(tag: string): Promise<number> {
-        const client = await this.getClient()
-        if (!client) return 0
+        const r = await this.getClient()
+        if (!r) return 0
         try {
-            const tagKey = `docs:tag:${tag}`
-            const keys = await client.sMembers(tagKey)
-            if (keys.length > 0) {
-                await client.del([...keys, tagKey])
-            }
+            const tKey = this.tagKey(tag)
+            const keys: string[] = await r.smembers(tKey)
+            if (keys.length === 0) return 0
+            await r.del(...keys, tKey)
             return keys.length
         } catch {
             return 0
@@ -256,19 +263,19 @@ class RedisCacheProvider implements CacheProvider {
     }
 
     async flush(): Promise<void> {
-        const client = await this.getClient()
-        if (!client) return
+        const r = await this.getClient()
+        if (!r) return
         try {
-            const keys = await client.keys('docs:*')
-            if (keys.length > 0) await client.del(keys)
+            const keys: string[] = await r.keys('docs:*')
+            if (keys.length > 0) await r.del(...keys)
         } catch {}
     }
 
     async size(): Promise<number> {
-        const client = await this.getClient()
-        if (!client) return 0
+        const r = await this.getClient()
+        if (!r) return 0
         try {
-            const keys = await client.keys('docs:*')
+            const keys: string[] = await r.keys('docs:*')
             return keys.filter((k: string) => !k.startsWith('docs:tag:')).length
         } catch {
             return 0
@@ -282,15 +289,15 @@ class CacheServiceImpl {
     private stats: CacheStats
 
     constructor() {
-        const redisUrl = process.env.REDIS_URL
-        if (redisUrl) {
-            this.provider = new RedisCacheProvider(redisUrl)
+        const hasUpstash = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+        if (hasUpstash) {
+            this.provider = new UpstashRedisCacheProvider()
             this.stats = { hits: 0, misses: 0, sets: 0, deletes: 0, provider: 'redis', entries: 0 }
-            console.log('[Cache] Iniciando com Redis provider')
+            console.log('[Cache] Iniciando com Upstash Redis provider')
         } else {
             this.provider = new MemoryCacheProvider()
             this.stats = { hits: 0, misses: 0, sets: 0, deletes: 0, provider: 'memory', entries: 0 }
-            console.log('[Cache] Iniciando com Memory provider (REDIS_URL não definida)')
+            console.log('[Cache] Iniciando com Memory provider (UPSTASH_REDIS_REST_URL não definida)')
         }
     }
 

@@ -1,37 +1,43 @@
 import prisma from '@/lib/prisma'
 import { ok, err } from '@/lib/result'
+import { CacheService, CACHE_TTL, CACHE_TAGS } from './cache.service'
 
 export class ModeloService {
     /**
      * Lista todos os modelos ativos, com filtro opcional por secretaria.
      * ADMIN_GERAL (secretariaId = undefined) vê todos.
      * SECRETARIO vê globais (secretariaId = null) + os da sua secretaria.
+     * Cache TTL: 2min — modelos mudam raramente.
      */
     static async listarTodos(secretariaId?: string) {
-        try {
-            const where: any = { ativo: true }
+        const cacheKey = CacheService.key('modelos', 'lista', secretariaId)
 
-            if (secretariaId) {
-                // Mostra modelos globais (null) + modelos da secretaria específica
-                where.OR = [
-                    { secretariaId: null },
-                    { secretariaId }
-                ]
+        return CacheService.getOrSet(cacheKey, async () => {
+            try {
+                const where: any = { ativo: true }
+
+                if (secretariaId) {
+                    // Mostra modelos globais (null) + modelos da secretaria específica
+                    where.OR = [
+                        { secretariaId: null },
+                        { secretariaId }
+                    ]
+                }
+
+                const modelos = await prisma.modeloDocumento.findMany({
+                    where,
+                    include: {
+                        variaveis: {
+                            orderBy: { ordem: 'asc' }
+                        }
+                    },
+                    orderBy: { nome: 'asc' }
+                })
+                return ok(modelos)
+            } catch (error) {
+                return err('Erro ao listar modelos.')
             }
-
-            const modelos = await prisma.modeloDocumento.findMany({
-                where,
-                include: {
-                    variaveis: {
-                        orderBy: { ordem: 'asc' }
-                    }
-                },
-                orderBy: { nome: 'asc' }
-            })
-            return ok(modelos)
-        } catch (error) {
-            return err('Erro ao listar modelos.')
-        }
+        }, CACHE_TTL.MODELOS, [CACHE_TAGS.MODELOS])
     }
 
     /**
@@ -101,6 +107,7 @@ export class ModeloService {
                 }
             }
             const modelo = await prisma.modeloDocumento.create({ data: createData, include: { variaveis: true } })
+            CacheService.invalidateByTag(CACHE_TAGS.MODELOS).catch(() => {})
             return ok(modelo)
         } catch (error) {
             console.error('Erro ao criar modelo:', error)
@@ -153,6 +160,7 @@ export class ModeloService {
                     where: { id },
                     data: { ativo: false }
                 })
+                CacheService.invalidateByTag(CACHE_TAGS.MODELOS).catch(() => {})
                 return ok({ modelo: novoModelo, novaVersao: true })
             }
 
@@ -168,6 +176,7 @@ export class ModeloService {
                     },
                     include: { variaveis: true }
                 })
+                CacheService.invalidateByTag(CACHE_TAGS.MODELOS).catch(() => {})
                 return ok({ modelo, novaVersao: false })
             }
 
@@ -176,6 +185,7 @@ export class ModeloService {
                 data,
                 include: { variaveis: true }
             })
+            CacheService.invalidateByTag(CACHE_TAGS.MODELOS).catch(() => {})
             return ok({ modelo, novaVersao: false })
         } catch (error) {
             return err('Erro ao atualizar modelo.')
@@ -212,6 +222,7 @@ export class ModeloService {
                 where: { id },
                 data: { ativo: false }
             })
+            CacheService.invalidateByTag(CACHE_TAGS.MODELOS).catch(() => {})
             return ok(true)
         } catch (error) {
             return err('Erro ao desativar modelo.')

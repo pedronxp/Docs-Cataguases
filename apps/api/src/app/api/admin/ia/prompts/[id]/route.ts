@@ -34,8 +34,8 @@ export async function GET(
         FROM "LlmPrompt" p
         LEFT JOIN "User" u ON u.id = p."criadoPorId"
         WHERE p.id = ${id}
-    `
-    if (!prompt) return NextResponse.json({ error: 'Prompt não encontrado' }, { status: 404 })
+    `;
+    if (!prompt) return NextResponse.json({ error: 'Prompt não encontrado' }, { status: 404 });
 
     return NextResponse.json({
         success: true,
@@ -61,12 +61,12 @@ export async function PATCH(
 
     const parsed = atualizarPromptSchema.safeParse(body)
     if (!parsed.success) {
-        return NextResponse.json({ error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }, { status: 400 })
+        return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }, { status: 400 })
     }
 
     // Verifica se existe
-    const [existente]: any[] = await prisma.$queryRaw`SELECT id FROM "LlmPrompt" WHERE id = ${id}`
-    if (!existente) return NextResponse.json({ error: 'Prompt não encontrado' }, { status: 404 })
+    const [existente]: any[] = await prisma.$queryRaw`SELECT id FROM "LlmPrompt" WHERE id = ${id}`;
+    if (!existente) return NextResponse.json({ error: 'Prompt não encontrado' }, { status: 404 });
 
     const { nome, categoria, conteudo, ativo, ordem } = parsed.data
 
@@ -88,7 +88,7 @@ export async function PATCH(
         ...values
     )
 
-    const [updated]: any[] = await prisma.$queryRaw`SELECT * FROM "LlmPrompt" WHERE id = ${id}`
+    const [updated]: any[] = await prisma.$queryRaw`SELECT * FROM "LlmPrompt" WHERE id = ${id}`;
     return NextResponse.json({ success: true, data: updated })
 }
 
@@ -103,10 +103,10 @@ export async function DELETE(
         return NextResponse.json({ error: 'Acesso restrito a administradores' }, { status: 403 })
     }
 
-    const [existente]: any[] = await prisma.$queryRaw`SELECT id, nome FROM "LlmPrompt" WHERE id = ${id}`
-    if (!existente) return NextResponse.json({ error: 'Prompt não encontrado' }, { status: 404 })
+    const [existente]: any[] = await prisma.$queryRaw`SELECT id, nome FROM "LlmPrompt" WHERE id = ${id}`;
+    if (!existente) return NextResponse.json({ error: 'Prompt não encontrado' }, { status: 404 });
 
-    await prisma.$executeRaw`DELETE FROM "LlmPrompt" WHERE id = ${id}`
+    await prisma.$executeRaw`DELETE FROM "LlmPrompt" WHERE id = ${id}`;
 
     return NextResponse.json({ success: true, message: 'Prompt excluído com sucesso' })
 }

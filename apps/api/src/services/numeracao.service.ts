@@ -35,7 +35,7 @@ export class NumeracaoService {
                     AND "tipoDocumento" = ${tipoDocumento}::"TipoDocumento"
                     LIMIT 1
                     FOR UPDATE
-                `
+                `;
 
                 if (!livros || livros.length === 0) {
                     throw new Error('Não foi possível encontrar ou travar o livro de numeração.')
@@ -82,7 +82,7 @@ export class NumeracaoService {
                         logs = ${JSON.stringify(novoLogs)}::jsonb,
                         "atualizado_em" = NOW()
                     WHERE id = ${livro.id}
-                `
+                `;
 
                 // Exemplo: 001/2024
                 const numeroFormatado = String(numeroAlocado).padStart(3, '0') // 3 dígitos

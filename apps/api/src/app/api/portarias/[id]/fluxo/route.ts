@@ -108,10 +108,38 @@ export async function PATCH(
                 novoStatus = 'CORRECAO_NECESSARIA'
                 revisoesCount += 1
                 revisorAtualId = null
-                mensagemLog = `Devolvida para correção por ${nomeAutor}: "${observacao}"`
+                
+                if (revisoesCount >= 3) {
+                    mensagemLog = `Devolvida para correção por ${nomeAutor}: "${observacao}". ATENÇÃO: Limite de rejeições atingido. A portaria foi escalada.`
+                    // Aqui pode-se disparar flag de escalada se houver campo na tabela, mas o importante é o evento
+                } else {
+                    mensagemLog = `Devolvida para correção por ${nomeAutor}: "${observacao}"`
+                }
                 break
 
-            case 'TRANSFERIR_REVISAO':
+            case 'CANCELAR_PORTARIA': {
+                if (portaria.status === 'PUBLICADA') {
+                    return NextResponse.json({ success: false, error: 'Portarias publicadas não podem ser canceladas' }, { status: 400 })
+                }
+                const portariaParaCancelar = await prisma.portaria.findUnique({
+                    where: { id },
+                    select: { criadoPorId: true }
+                }) as any
+                const isAutor = portariaParaCancelar?.criadoPorId === (session.id as string)
+                if (!isAutor && session.role !== 'ADMIN_GERAL') {
+                    return NextResponse.json({ success: false, error: 'Apenas o autor ou administrador pode cancelar' }, { status: 403 })
+                }
+                if (!justificativa) {
+                    return NextResponse.json({ success: false, error: 'Justificativa obrigatória para cancelamento' }, { status: 400 })
+                }
+                novoStatus = 'CANCELADA'
+                revisorAtualId = null
+                mensagemLog = `Portaria cancelada por ${nomeAutor}. Motivo: "${justificativa}"`
+                break
+            }
+
+            // Bloco {} obrigatório para permitir declaração de const dentro do case (no-case-declarations)
+            case 'TRANSFERIR_REVISAO': {
                 if (portaria.revisorAtualId !== (session.id as string) && session.role !== 'ADMIN_GERAL') {
                     return NextResponse.json({ success: false, error: 'Apenas o revisor atual pode transferir' }, { status: 403 })
                 }
@@ -126,9 +154,9 @@ export async function PATCH(
                 }
                 // Verifica se o revisor de destino existe e tem permissão (Admin/Prefeito ignoram secretaria)
                 const revisorDestino = await prisma.user.findFirst({
-                    where: { 
-                        id: revisorId, 
-                        role: { in: ['REVISOR', 'SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'] }, 
+                    where: {
+                        id: revisorId,
+                        role: { in: ['REVISOR', 'SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'] },
                         ativo: true,
                         OR: [
                             { secretariaId: portaria.secretariaId },
@@ -143,6 +171,7 @@ export async function PATCH(
                 revisorAtualId = revisorId
                 mensagemLog = `Revisão transferida de ${nomeAutor} para ${revisorDestino.name}. Justificativa: "${justificativa}"`
                 break
+            }
 
             case 'ROLLBACK_RASCUNHO': {
                 // Somente o autor ou ADMIN_GERAL podem fazer rollback de CORRECAO_NECESSARIA → RASCUNHO
