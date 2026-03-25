@@ -297,6 +297,35 @@ export const LLM_TOOLS = [
             },
         },
     },
+    // ── DESFAZER / REVERTER AÇÕES ──────────────────────────────────────────────
+    {
+        type: 'function',
+        function: {
+            name: 'deletar_portaria',
+            description: 'Deleta permanentemente uma portaria em status RASCUNHO. Use para "desfazer" a criação de uma portaria. Permitido para o autor ou ADMIN_GERAL. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    portariaId: { type: 'string', description: 'O ID da portaria a ser deletada.' },
+                },
+                required: ['portariaId'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'reverter_status_portaria',
+            description: 'Reverte o status de uma portaria um passo atrás (ex: de EM_REVISAO_ABERTA volta para RASCUNHO). Use para "desfazer" uma submissão ou aprovação. ATENÇÃO: É OBRIGATÓRIO pedir confirmação ao usuário antes de executar.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    portariaId: { type: 'string', description: 'O ID da portaria a reverter.' },
+                },
+                required: ['portariaId'],
+            },
+        },
+    },
     // ── GESTÃO DE USUÁRIOS ────────────────────────────────────────────────────
     {
         type: 'function',
@@ -950,6 +979,103 @@ export async function executeToolCall(
                 instrucao: prontoParaPublicar
                     ? `A portaria está pronta! Para publicar, acesse a portaria na interface e clique em "Publicar". A publicação aloca o número oficial, gera o PDF final e registra no Diário Oficial.`
                     : `A portaria ainda não pode ser publicada. Corrija os itens marcados com ✗ acima.`,
+            }
+        }
+
+        // ── DESFAZER / REVERTER AÇÕES ──────────────────────────────────────────
+        case 'deletar_portaria': {
+            if (!context?.userAuth?.email) return { erro: 'Ação negada. Usuário não identificado.' }
+            const perm = await verificarPermissao(context.userAuth.email, ['OPERADOR', 'SECRETARIO', 'REVISOR', 'PREFEITO', 'ADMIN_GERAL'])
+            if (!perm.ok) return { erro: perm.erro }
+
+            const { portariaId } = args
+            const portaria = await prisma.portaria.findUnique({
+                where: { id: portariaId },
+                include: { secretaria: { select: { sigla: true } } }
+            })
+            if (!portaria) return { erro: `Portaria com ID "${portariaId}" não encontrada.` }
+
+            // Apenas autor ou ADMIN_GERAL pode deletar
+            if (portaria.criadoPorId !== perm.user!.id && perm.user!.role !== 'ADMIN_GERAL') {
+                return { erro: 'Apenas o criador da portaria ou um ADMIN_GERAL pode deletá-la.' }
+            }
+
+            // Apenas deletar se for rascunho
+            if (portaria.status !== 'RASCUNHO') {
+                return { erro: `Não é possível deletar portaria no status "${portaria.status}". Apenas rascunhos podem ser deletados. Para outros status, use reverter_status_portaria.` }
+            }
+
+            await prisma.portaria.delete({
+                where: { id: portariaId }
+            })
+
+            await logAcaoIA(perm.user!.id, `Assistente IA deletou a portaria "${portaria.titulo}" (ID: ${portaria.id})`, portaria.secretariaId, { acao: 'deletar_portaria', portariaId })
+            
+            return {
+                mensagem: `Portaria "${portaria.titulo}" deletada com sucesso! Ação desfeita.`,
+            }
+        }
+
+        case 'reverter_status_portaria': {
+            if (!context?.userAuth?.email) return { erro: 'Usuário não identificado.' }
+            const dbUser = await prisma.user.findFirst({ where: { email: context.userAuth.email, ativo: true } })
+            if (!dbUser) return { erro: 'Usuário não encontrado.' }
+
+            const { portariaId } = args
+            const portaria = await prisma.portaria.findUnique({
+                where: { id: portariaId },
+                include: { secretaria: { select: { sigla: true } } }
+            }) as any
+            
+            if (!portaria) return { erro: `Portaria com ID "${portariaId}" não encontrada.` }
+
+            let novoStatus = ''
+            let revisorId = portaria.revisorAtualId
+
+            switch (portaria.status) {
+                case 'EM_REVISAO_ABERTA':
+                    novoStatus = 'RASCUNHO'
+                    break
+                case 'EM_REVISAO_ATRIBUIDA':
+                    novoStatus = 'EM_REVISAO_ABERTA'
+                    revisorId = null
+                    break
+                case 'AGUARDANDO_ASSINATURA':
+                    novoStatus = 'EM_REVISAO_ATRIBUIDA'
+                    break
+                case 'PRONTO_PUBLICACAO':
+                    novoStatus = 'AGUARDANDO_ASSINATURA'
+                    break
+                case 'PUBLICADA':
+                    return { erro: 'Não é possível reverter o status de uma portaria já PUBLICADA.' }
+                case 'RASCUNHO':
+                    return { erro: 'A portaria já está no estágio inicial (RASCUNHO). Se quiser apagá-la, use deletar_portaria.' }
+                default:
+                    novoStatus = 'RASCUNHO'
+            }
+
+            await prisma.$transaction(async (tx) => {
+                await (tx.portaria as any).update({
+                    where: { id: portariaId },
+                    data: { status: novoStatus, revisorAtualId: revisorId },
+                })
+                await tx.feedAtividade.create({
+                    data: {
+                        tipoEvento: 'MUDANCA_STATUS_REVERSAO',
+                        mensagem: `Status revertido de ${portaria.status} para ${novoStatus} por ${dbUser.name} (via assistente IA).`,
+                        portariaId,
+                        autorId: dbUser.id,
+                        secretariaId: portaria.secretariaId,
+                        metadata: { via: 'assistente_ia', action: 'REVERTER_STATUS' } as any,
+                    },
+                })
+            })
+
+            await logAcaoIA(dbUser.id, `Assistente IA reverteu status da portaria "${portaria.titulo}" para ${novoStatus}`, portaria.secretariaId, { acao: 'reverter_status_portaria', portariaId, novoStatus })
+            
+            return {
+                mensagem: `Ação desfeita com sucesso! O status da portaria "${portaria.titulo}" voltou para ${novoStatus}.`,
+                portaria: { id: portariaId, titulo: portaria.titulo, novoStatus },
             }
         }
 
