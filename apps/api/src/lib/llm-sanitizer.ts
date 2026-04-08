@@ -15,6 +15,9 @@
 
 // Padrões de dados sensíveis
 const PATTERNS = {
+    // Email: user@domain.com, nome.sobrenome@prefeitura.mg.gov.br, etc.
+    email: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g,
+
     // CPF: 123.456.789-00 ou 12345678900
     cpf: /\b\d{3}[\.\s]?\d{3}[\.\s]?\d{3}[-\s]?\d{2}\b/g,
 
@@ -39,6 +42,9 @@ export function sanitizeForLLM(text: string): string {
     if (!text || typeof text !== 'string') return text
 
     let sanitized = text
+
+    // Mascarar emails
+    sanitized = sanitized.replace(PATTERNS.email, '[EMAIL_OMITIDO]')
 
     // Mascarar CPFs
     sanitized = sanitized.replace(PATTERNS.cpf, '[CPF_OMITIDO]')
