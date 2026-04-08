@@ -264,7 +264,7 @@ export async function POST(req: NextRequest) {
                     tokens: Math.ceil(userMsgContentForLlm.length / 4)
                 }
             }),
-            // Resposta do assistente (apenas a mensagem final, sem intermediários de tool)
+            // Resposta do assistente com toolCalls salvos
             (prisma as any).chatMessage.create({
                 data: {
                     sessionId: chatSessionId,
@@ -273,6 +273,10 @@ export async function POST(req: NextRequest) {
                     provider: finalResult.provider,
                     model: finalResult.model,
                     tokens: finalResult.usage.outputTokens,
+                    // Salva tool_calls intermediários para contexto de resumo
+                    toolCalls: currentMessages
+                        .filter((m: any) => m.role === 'assistant' && m.tool_calls?.length)
+                        .flatMap((m: any) => m.tool_calls || []) as any || undefined,
                     metadata: {
                         durationMs: duration,
                         fallbackUsed: finalResult.fallbackUsed,
@@ -285,10 +289,15 @@ export async function POST(req: NextRequest) {
                 where: { id: dbUser.id },
                 data: { tokensUsadosMesLlm: { increment: finalResult.usage.totalTokens } } as any
             }),
-            // Atualizar timestamp da sessão
+            // Atualizar stats acumulados da sessão
             (prisma as any).chatSession.update({
                 where: { id: chatSessionId },
-                data: { updatedAt: new Date() }
+                data: {
+                    updatedAt: new Date(),
+                    tokensInputTotal:  { increment: finalResult.usage.inputTokens },
+                    tokensOutputTotal: { increment: finalResult.usage.outputTokens },
+                    requestsCount:     { increment: 1 },
+                }
             })
         ])
 
