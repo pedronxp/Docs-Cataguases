@@ -112,6 +112,8 @@ model FeedAtividade {
   autor        User      @relation(fields: [autorId], references: [id])
   metadata     Json      @default("{}")
   createdAt    DateTime  @default(now())
+
+  @@index([createdAt, secretariaId, setorId])
 }
 
 model ModeloDocumento {
@@ -273,6 +275,8 @@ model Notificacao {
   portaria   Portaria? @relation("NotificacaoPortaria", fields: [portariaId], references: [id], onDelete: SetNull)
   metadata   Json?
   criadoEm   DateTime  @default(now())
+
+  @@index([userId, criadoEm])
 }
 
 // ── ChatGPT Clone (Histórico e Sessões) ──────────────────────────────────────
@@ -281,24 +285,43 @@ model ChatSession {
   userId    String
   user      User          @relation("UserChatSessions", fields: [userId], references: [id], onDelete: Cascade)
   titulo    String
+
+  // Config da sessão
   provider  String?       @default("cerebras")
   model     String?       @default("llama3.1-8b")
+  temperature Float       @default(0.6)
+  maxTokens   Int         @default(2048)
+
+  // Stats acumulados da sessão
+  tokensInputTotal  Int   @default(0)
+  tokensOutputTotal Int   @default(0)
+  requestsCount     Int   @default(0)
+
   mensagens ChatMessage[] @relation("SessionMessages")
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 model ChatMessage {
   id         String      @id @default(cuid())
   sessionId  String
   session    ChatSession @relation("SessionMessages", fields: [sessionId], references: [id], onDelete: Cascade)
-  role       String      // "user", "assistant", "system" ou "tool"
+  role       String      // "user", "assistant", "system", "tool"
   content    String      @db.Text
   tokens     Int         @default(0)
   provider   String?
   model      String?
-  metadata   Json?       // tool_calls, erros, etc.
+
+  // Tool calls: array de { id, type, function: { name, arguments } }
+  toolCalls  Json?
+  // Metadata: durationMs, fallbackUsed, toolLoops, erros, etc.
+  metadata   Json?
+
   anexoId    String?
   anexo      Portaria?   @relation("MessageAnexo", fields: [anexoId], references: [id], onDelete: SetNull)
   createdAt  DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
 }
