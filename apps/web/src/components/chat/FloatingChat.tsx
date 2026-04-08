@@ -317,6 +317,7 @@ export function FloatingChat() {
     const [selectedModel, setSelectedModel] = useState('')
     const [docxAnalisando, setDocxAnalisando] = useState(false)
     const [docxAnexado, setDocxAnexado] = useState<{ nome: string; contexto: string; contextInjected?: boolean } | null>(null)
+    const [rateLimited, setRateLimited] = useState<{ until: Date | null }>({ until: null })
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesRef = useRef<ChatMessage[]>([])
@@ -551,18 +552,31 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                 }])
             }
         } catch (unexpectedErr: any) {
-            setMessages(prev => [...prev, {
-                id: Math.random().toString(36).slice(2),
-                role: 'assistant',
-                content: unexpectedErr?.message?.startsWith("Doc's Cataguases")
-                    ? unexpectedErr.message
-                    : `Doc's Cataguases — Erro inesperado. Tente novamente.`,
-                error: true,
-            }])
+            // Detecta 429 (rate limit) do axios e bloqueia o input até resetAt
+            if (unexpectedErr?.response?.status === 429) {
+                const data = unexpectedErr.response?.data ?? {}
+                const resetAt = data.resetAt ? new Date(data.resetAt) : new Date(Date.now() + 60_000)
+                setRateLimited({ until: resetAt })
+                setMessages(prev => [...prev, {
+                    id: Math.random().toString(36).slice(2),
+                    role: 'assistant',
+                    content: data.error || 'Limite de mensagens atingido. Aguarde antes de enviar novamente.',
+                    error: true,
+                }])
+            } else {
+                setMessages(prev => [...prev, {
+                    id: Math.random().toString(36).slice(2),
+                    role: 'assistant',
+                    content: unexpectedErr?.message?.startsWith("Doc's Cataguases")
+                        ? unexpectedErr.message
+                        : `Doc's Cataguases — Erro inesperado. Tente novamente.`,
+                    error: true,
+                }])
+            }
         } finally {
             setLoading(false)
         }
-    }, [loading, open, selectedModel, usuario, docxAnexado])
+    }, [loading, open, selectedModel, usuario, docxAnexado, rateLimited])
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -767,11 +781,11 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                                 placeholder="Digite sua dúvida... (Enter para enviar)"
                                 className="flex-1 resize-none border-none shadow-none focus-visible:ring-0 bg-transparent text-sm p-0 min-h-[36px] max-h-[120px]"
                                 rows={1}
-                                disabled={loading || docxAnalisando}
+                                disabled={loading || docxAnalisando || (rateLimited.until !== null && new Date() < rateLimited.until)}
                             />
                             <button
                                 onClick={() => sendMessage(input)}
-                                disabled={!input.trim() || loading || docxAnalisando}
+                                disabled={!input.trim() || loading || docxAnalisando || (rateLimited.until !== null && new Date() < rateLimited.until)}
                                 className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-[#0D3F8F] hover:from-primary/90 hover:to-[#0D3F8F]/90 flex items-center justify-center shrink-0 mb-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-primary/20 disabled:shadow-none"
                             >
                                 {loading
@@ -780,6 +794,11 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                                 }
                             </button>
                         </div>
+                        {rateLimited.until && new Date() < rateLimited.until && (
+                            <p className="text-xs text-amber-600 mt-1 text-center">
+                                Limite atingido. Liberado em {rateLimited.until.toLocaleTimeString('pt-BR')}.
+                            </p>
+                        )}
                         <p className="text-[9px] text-slate-400 text-center mt-1.5">Shift+Enter para nova linha · 📎 para anexar DOCX</p>
                     </div>
                 </div>
