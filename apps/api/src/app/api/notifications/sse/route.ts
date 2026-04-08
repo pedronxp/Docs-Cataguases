@@ -5,9 +5,10 @@ import prisma from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const secret = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'secret-key-docs-cataguases-2024'
-)
+if (!process.env.JWT_SECRET) {
+    throw new Error('[SSE] JWT_SECRET não configurado. Defina a variável de ambiente JWT_SECRET antes de iniciar o servidor.')
+}
+const secret = new TextEncoder().encode(process.env.JWT_SECRET)
 
 const POLL_INTERVAL_MS = 5_000
 const HEARTBEAT_INTERVAL_MS = 25_000
@@ -64,9 +65,11 @@ export async function GET(request: NextRequest) {
     // Aceita cursor do cliente para não perder eventos entre reconexões
     const lastEventAtParam = request.nextUrl.searchParams.get('lastEventAt')
     const encoder = new TextEncoder()
-    let lastEventAt = lastEventAtParam ? new Date(lastEventAtParam) : new Date()
-    // Cursor separado para notificações diretas (tabela Notificacao)
-    let lastNotifAt = lastEventAtParam ? new Date(lastEventAtParam) : new Date()
+    
+    // Se não informar lastEventAt, assume agora. 
+    // Mas se o front acabou de carregar a lista inicial, ele enviará o timestamp da última notificação.
+    let lastCursor = lastEventAtParam ? new Date(lastEventAtParam) : new Date()
+    
     let pollInterval: ReturnType<typeof setInterval> | null = null
     let heartbeatInterval: ReturnType<typeof setInterval> | null = null
     let gracefulTimeout: ReturnType<typeof setTimeout> | null = null
@@ -78,7 +81,7 @@ export async function GET(request: NextRequest) {
                 try {
                     // ── 1. FeedAtividade (broadcast por secretaria/setor) ──────────────
                     const eventos = await prisma.feedAtividade.findMany({
-                        where: { ...where, createdAt: { gt: lastEventAt } },
+                        where: { ...where, createdAt: { gt: lastCursor } },
                         include: {
                             portaria: {
                                 select: { id: true, titulo: true, numeroOficial: true },
@@ -87,9 +90,26 @@ export async function GET(request: NextRequest) {
                         orderBy: { createdAt: 'asc' },
                     })
 
-                    if (eventos.length > 0) {
-                        lastEventAt = new Date(eventos[eventos.length - 1].createdAt)
+                    // ── 2. Notificacoes diretas por userId ────────────────────────────
+                    let notifs: any[] = []
+                    if (userId) {
+                        notifs = await prisma.notificacao.findMany({
+                            where: {
+                                userId: userId as string,
+                                criadoEm: { gt: lastCursor }
+                            },
+                            include: {
+                                portaria: {
+                                    select: { titulo: true, numeroOficial: true }
+                                }
+                            },
+                            orderBy: { criadoEm: 'asc' },
+                            take: 20
+                        })
+                    }
 
+                    // Envia FeedAtividade
+                    if (eventos.length > 0) {
                         for (const evento of eventos) {
                             const data = JSON.stringify({
                                 id: evento.id,
@@ -99,53 +119,37 @@ export async function GET(request: NextRequest) {
                                 portariaTitulo: (evento as any).portaria?.titulo ?? null,
                                 portariaNumero: (evento as any).portaria?.numeroOficial ?? null,
                                 metadata: (evento.metadata as Record<string, string>) ?? {},
-                                createdAt: (evento.createdAt as Date).toISOString(),
+                                createdAt: evento.createdAt.toISOString(),
                             })
-                            controller.enqueue(
-                                encoder.encode(
-                                    `id: ${evento.id}\nevent: portaria-update\ndata: ${data}\n\n`
-                                )
-                            )
+                            controller.enqueue(encoder.encode(`id: ${evento.id}\nevent: portaria-update\ndata: ${data}\n\n`))
                         }
+                        // Atualiza cursor para o tempo do último evento processado
+                        const lastTime = eventos[eventos.length - 1].createdAt
+                        if (lastTime > lastCursor) lastCursor = lastTime
                     }
 
-                    // ── 2. Notificacoes diretas por userId ────────────────────────────
-                    if (userId) {
-                        const notifs: any[] = await prisma.$queryRaw`
-                            SELECT n.*, p.titulo as "portariaTitulo", p."numeroOficial" as "portariaNumero"
-                            FROM "Notificacao" n
-                            LEFT JOIN "Portaria" p ON p.id = n."portariaId"
-                            WHERE n."userId" = ${userId as string}
-                              AND n."criadoEm" > ${lastNotifAt}
-                            ORDER BY n."criadoEm" ASC
-                            LIMIT 20
-                        `
-
-                        if (notifs.length > 0) {
-                            lastNotifAt = new Date(notifs[notifs.length - 1].criadoEm)
-
-                            for (const notif of notifs) {
-                                const data = JSON.stringify({
-                                    id: notif.id,
-                                    tipo: notif.tipo,
-                                    mensagem: notif.mensagem,
-                                    lida: notif.lida,
-                                    portariaId: notif.portariaId ?? null,
-                                    portariaTitulo: notif.portariaTitulo ?? null,
-                                    portariaNumero: notif.portariaNumero ?? null,
-                                    metadata: notif.metadata ?? {},
-                                    criadoEm: new Date(notif.criadoEm).toISOString(),
-                                })
-                                controller.enqueue(
-                                    encoder.encode(
-                                        `id: notif-${notif.id}\nevent: notificacao\ndata: ${data}\n\n`
-                                    )
-                                )
-                            }
+                    // Envia Notificações Diretas
+                    if (notifs.length > 0) {
+                        for (const notif of notifs) {
+                            const data = JSON.stringify({
+                                id: notif.id,
+                                tipo: notif.tipo,
+                                mensagem: notif.mensagem,
+                                lida: notif.lida,
+                                portariaId: notif.portariaId ?? null,
+                                portariaTitulo: notif.portaria?.titulo ?? null,
+                                portariaNumero: notif.portaria?.numeroOficial ?? null,
+                                metadata: notif.metadata ?? {},
+                                criadoEm: notif.criadoEm.toISOString(),
+                            })
+                            controller.enqueue(encoder.encode(`id: notif-${notif.id}\nevent: notificacao\ndata: ${data}\n\n`))
                         }
+                        // Atualiza cursor
+                        const lastTime = notifs[notifs.length - 1].criadoEm
+                        if (lastTime > lastCursor) lastCursor = lastTime
                     }
-                } catch {
-                    // Erro silencioso — não fecha o stream por falha pontual de DB
+                } catch (error) {
+                    console.error('Erro no stream SSE:', error)
                 }
             }, POLL_INTERVAL_MS)
 
