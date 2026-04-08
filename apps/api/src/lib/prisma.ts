@@ -1,15 +1,21 @@
-import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '@prisma/client'
 
 const prismaClientSingleton = () => {
-    const connectionString = process.env.DATABASE_URL!
+    // IMPORTANTE: O @prisma/adapter-pg gerencia seu próprio pool e é incompatível
+    // com PgBouncer (DATABASE_URL, porta 6543, pgbouncer=true).
+    // Usar DIRECT_URL (porta 5432) para conexão direta ao PostgreSQL.
+    const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL!
     const pool = new Pool({
         connectionString,
-        // TODO (segurança): substituir rejectUnauthorized: false pelo certificado CA do Supabase.
-        // Instrução: https://supabase.com/docs/guides/database/connecting-to-postgres#ssl-connections
-        // Por ora, mantido para compatibilidade com o ambiente atual.
-        ssl: { rejectUnauthorized: false },
+        // SSL seguro: carrega certificado CA do Supabase se disponível,
+        // caso contrário usa rejectUnauthorized: true (rejeita certs inválidos).
+        // Para obter o cert: https://supabase.com/docs/guides/database/connecting-to-postgres#ssl-connections
+        // Configure SUPABASE_SSL_CERT no .env com o conteúdo PEM do certificado CA.
+        ssl: process.env.SUPABASE_SSL_CERT
+            ? { rejectUnauthorized: true, ca: process.env.SUPABASE_SSL_CERT }
+            : { rejectUnauthorized: true },
         connectionTimeoutMillis: 5000,
     })
     const adapter = new PrismaPg(pool)
