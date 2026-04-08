@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { llmChat, type LLMMessage, type LLMProvider } from '@/services/llm.service'
 import { DOCS_SYSTEM_PROMPT, DOCS_SYSTEM_PROMPT_CHAT } from '@/lib/llm-system-prompt'
-import { LLM_TOOLS, executeToolCall } from '@/lib/llm-tools'
+import { LLM_TOOLS, executeToolCall, filterToolsByRole } from '@/lib/llm-tools'
 import { sanitizeMessages } from '@/lib/llm-sanitizer'
 import { RateLimitService, rateLimitHeaders } from '@/services/rate-limit.service'
 import prisma from '@/lib/prisma'
@@ -159,6 +159,10 @@ export async function POST(req: NextRequest) {
     }
 
 
+    // Filtrar ferramentas pela role do usuário (defense in depth — V4.1 ASVS L1)
+    const userRole = userAuth?.role || 'OPERADOR'
+    const filteredTools = filterToolsByRole(userRole)
+
     const hasSystemMsg = messages[0]?.role === 'system'
     const finalMessages: LLMMessage[] = useSystemPrompt && !hasSystemMsg
         ? [{ role: 'system', content: systemPrompt }, ...messages]
@@ -196,7 +200,7 @@ export async function POST(req: NextRequest) {
                 // Isso garante que: 'mistral-large-latest' → provider='mistral', etc.
                 // Quando undefined, o Smart Router escolhe o melhor disponível.
                 provider: derivedProvider,
-                tools: LLM_TOOLS,
+                tools: filteredTools,
                 skipSmartRouter: userExplicitlyChoseModel, // se o usuário escolheu modelo, NÃO faz fallback
             })
 

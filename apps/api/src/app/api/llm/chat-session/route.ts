@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { llmChat, type LLMMessage } from '@/services/llm.service'
 import { DOCS_SYSTEM_PROMPT_DOCS, DOCS_SYSTEM_PROMPT } from '@/lib/llm-system-prompt'
-import { LLM_TOOLS, executeToolCall } from '@/lib/llm-tools'
+import { LLM_TOOLS, executeToolCall, filterToolsByRole } from '@/lib/llm-tools'
 import { sanitizeMessages } from '@/lib/llm-sanitizer'
 import { RateLimitService, rateLimitHeaders } from '@/services/rate-limit.service'
 
@@ -74,6 +74,9 @@ export async function POST(req: NextRequest) {
         // Extrair IDs para contexto das ferramentas
         const userSecretariaId: string | undefined = dbUser.secretariaId ?? undefined
         const userSetorId: string | undefined = dbUser.setorId ?? undefined
+
+        // Filtrar ferramentas pela role do usuário (defense in depth — V4.1 ASVS L1)
+        const filteredTools = filterToolsByRole(dbUser.role)
 
         // Montar userAuth para repassar às ferramentas (mesmo formato de /api/llm/chat)
         const userAuth = {
@@ -170,7 +173,7 @@ export async function POST(req: NextRequest) {
                 provider: resolvedProvider as any,
                 maxTokens: MAX_TOKENS_PER_CHAT,
                 temperature: 0.7,
-                tools: LLM_TOOLS,
+                tools: filteredTools,
             })
 
             const timeoutPromise = new Promise<never>((_, reject) =>

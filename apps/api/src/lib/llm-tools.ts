@@ -378,6 +378,45 @@ export const LLM_TOOLS = [
     },
 ]
 
+// ── Mapa de permissões por ferramenta ────────────────────────────────────────
+// Defense-in-depth: LLM já recebe instrução no system prompt,
+// mas aqui garantimos server-side que tools admin nunca chegam ao LLM para usuários comuns.
+const TOOL_ROLE_REQUIREMENTS: Record<string, string[]> = {
+    // Ferramentas de leitura — sem restrição: qualquer role (incluindo desconhecidos) recebe.
+    // Omitidas aqui propositalmente — o filtro inclui por padrão se não há entrada no mapa.
+
+    // Revisão — apenas revisores e superiores
+    'aprovar_revisao':               ['REVISOR', 'SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'],
+    // Setores — ADMIN_SETORIAL ou superior
+    'criar_setor':                   ['ADMIN_SETORIAL', 'SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'],
+    'deletar_setor':                 ['ADMIN_SETORIAL', 'SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'],
+    // Modelos — ADMIN_GERAL apenas (criação)
+    'criar_modelo':                  ['ADMIN_GERAL'],
+    // Usuários — ADMIN_SETORIAL ou superior (listagem), ADMIN_GERAL (mutações)
+    'listar_usuarios':               ['ADMIN_SETORIAL', 'SECRETARIO', 'ADMIN_GERAL', 'PREFEITO'],
+    'alterar_papel':                 ['ADMIN_GERAL'],
+    'alterar_lotacao':               ['ADMIN_GERAL'],
+    // Secretarias — ADMIN_GERAL apenas
+    'criar_secretaria':              ['ADMIN_GERAL'],
+    'deletar_secretaria':            ['ADMIN_GERAL'],
+    'editar_secretaria':             ['ADMIN_GERAL'],
+}
+
+/**
+ * Filtra LLM_TOOLS pela role do usuário.
+ * Ferramentas sem entrada em TOOL_ROLE_REQUIREMENTS são incluídas por padrão (safe default).
+ * Deve ser chamado antes de passar tools ao llmChat().
+ */
+export function filterToolsByRole(role: string): typeof LLM_TOOLS {
+    return LLM_TOOLS.filter(tool => {
+        const funcName = tool.function.name
+        const allowedRoles = TOOL_ROLE_REQUIREMENTS[funcName]
+        // Se não há restrição mapeada, incluir (pode ser uma ferramenta nova/segura por padrão)
+        if (!allowedRoles) return true
+        return allowedRoles.includes(role)
+    })
+}
+
 // ── Helper: registrar ação do assistente de IA no feed de auditoria ──────────
 async function logAcaoIA(
     autorId: string,
