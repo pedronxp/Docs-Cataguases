@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import DOMPurify from 'dompurify'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { llmChat, type LLMMessage } from '@/services/llm.service'
@@ -225,7 +226,11 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
                         ? <span className="flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 shrink-0" />{msg.content}</span>
                         : <div
                             className="leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content), {
+                                ALLOWED_TAGS: ['p', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'br', 'a', 'h1', 'h2', 'h3', 'blockquote', 'hr', 'span'],
+                                ALLOWED_ATTR: ['href', 'target', 'class', 'rel'],
+                                ALLOW_DATA_ATTR: false,
+                            }) }}
                         />
                     }
                     {!msg.error && (
