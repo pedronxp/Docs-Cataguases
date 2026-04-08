@@ -325,3 +325,19 @@ model ChatMessage {
 
   @@index([sessionId, createdAt])
 }
+
+// ── Estatísticas Diárias de LLM (persistência de stats que antes eram em memória) ──
+model LlmStatistic {
+  id                String   @id @default(cuid())
+  provider          String   // "cerebras" | "mistral" | "groq" | "openrouter" | "kimi"
+  date              DateTime @default(now()) @db.Date // granularidade diária
+  requestsTotal     Int      @default(0)
+  tokensInputTotal  Int      @default(0)
+  tokensOutputTotal Int      @default(0)
+  rateLimitCount    Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([provider, date])
+  @@index([provider, date])
+}

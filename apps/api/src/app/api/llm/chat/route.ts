@@ -10,20 +10,24 @@ import prisma from '@/lib/prisma'
 // Mapa modelo → provider (para determinar o provider correto quando o usuário escolhe um modelo específico)
 const MODEL_TO_PROVIDER: Record<string, LLMProvider> = {
     // Cerebras
-    'llama3.1-8b':                    'cerebras',
-    'llama3.3-70b':                   'cerebras',
+    'llama3.1-8b':                              'cerebras',
+    'llama3.3-70b':                             'cerebras',
     // Mistral
-    'mistral-large-latest': 'mistral',
-    'mistral-small-latest': 'mistral',
-    'open-mistral-nemo':    'mistral',
+    'mistral-large-latest':                     'mistral',
+    'mistral-small-latest':                     'mistral',
+    'open-mistral-nemo':                        'mistral',
     // Groq
-    'llama-3.3-70b-versatile':       'groq',
-    'llama-3.1-8b-instant':          'groq',
-    'qwen-2.5-32b':                  'groq',
-    'deepseek-r1-distill-llama-70b': 'groq',
+    'llama-3.3-70b-versatile':                  'groq',
+    'llama-3.1-8b-instant':                     'groq',
+    'qwen-2.5-32b':                             'groq',
+    'deepseek-r1-distill-llama-70b':            'groq',
+    // OpenRouter
+    'meta-llama/llama-3.3-70b-instruct:free':   'openrouter',
+    'google/gemma-3-27b-it:free':               'openrouter',
+    'deepseek/deepseek-r1:free':                'openrouter',
     // Kimi
-    'moonshot-v1-8k':                'kimi',
-    'moonshot-v1-32k':               'kimi',
+    'moonshot-v1-8k':                           'kimi',
+    'moonshot-v1-32k':                          'kimi',
 }
 
 // Timeout para evitar que o request fique pendurado (30s)

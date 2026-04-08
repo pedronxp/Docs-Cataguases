@@ -675,12 +675,12 @@ async function callProviderRaw(
             }
 
             // Filtra apenas objetos que parecem tool calls válidas
-            const validCalls = candidates.filter(c =>
+            const validCalls = candidates.filter((c: any) =>
                 c && typeof c === 'object' && typeof c.name === 'string' && c.name.length > 0
             )
 
             if (validCalls.length > 0) {
-                tool_calls = validCalls.map(c => {
+                tool_calls = validCalls.map((c: any) => {
                     // Normaliza arguments: pode vir como string JSON ou como objeto
                     let args = c.arguments ?? c.parameters ?? '{}'
                     if (typeof args === 'object') args = JSON.stringify(args)
@@ -718,6 +718,36 @@ async function callProviderRaw(
 
 // ── Helpers de Rastreamento ───────────────────────────────────────────────────
 
+/**
+ * Persiste incrementalmente as estatísticas de uso no banco.
+ * Usa upsert diário por provider para manter histórico sem duplicatas.
+ * Fire-and-forget — nunca bloqueia o response path.
+ */
+async function flushStatsToDB(
+    provider: LLMProvider,
+    inputTokens: number,
+    outputTokens: number
+): Promise<void> {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    await (prisma as any).llmStatistic.upsert({
+        where: { provider_date: { provider, date: today } },
+        update: {
+            requestsTotal:    { increment: 1 },
+            tokensInputTotal:  { increment: inputTokens },
+            tokensOutputTotal: { increment: outputTokens },
+        },
+        create: {
+            provider,
+            date:              today,
+            requestsTotal:     1,
+            tokensInputTotal:  inputTokens,
+            tokensOutputTotal: outputTokens,
+        },
+    })
+}
+
 function trackSuccess(
     provider: LLMProvider,
     model: string,
@@ -734,6 +764,11 @@ function trackSuccess(
     s.tokensOutputToday += result.usage.outputTokens
 
     addLog({ provider, model, keyId, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens, totalTokens: result.usage.totalTokens, durationMs, success: true })
+
+    // Flush assíncrono para o banco (não bloqueia a resposta)
+    setImmediate(() => flushStatsToDB(provider, result.usage.inputTokens, result.usage.outputTokens).catch(
+        (e) => console.warn('[LLM Stats] Falha ao persistir stats:', e)
+    ))
 }
 
 function trackError(provider: LLMProvider, model: string, error: string, durationMs: number) {
