@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import DOMPurify from 'dompurify'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
@@ -189,6 +189,16 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
     const [copied, setCopied] = useState(false)
     const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+    // Cache do HTML sanitizado — só recomputa quando msg.content muda (P3 performance)
+    const sanitizedHtml = useMemo(
+        () => DOMPurify.sanitize(renderMarkdown(msg.content), {
+            ALLOWED_TAGS: ['p', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'br', 'a', 'h1', 'h2', 'h3', 'blockquote', 'hr', 'span'],
+            ALLOWED_ATTR: ['href', 'target', 'class', 'rel'],
+            ALLOW_DATA_ATTR: false,
+        }),
+        [msg.content]
+    )
+
     const handleCopy = () => {
         navigator.clipboard.writeText(msg.content)
         setCopied(true)
@@ -226,11 +236,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
                         ? <span className="flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 shrink-0" />{msg.content}</span>
                         : <div
                             className="leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content), {
-                                ALLOWED_TAGS: ['p', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'br', 'a', 'h1', 'h2', 'h3', 'blockquote', 'hr', 'span'],
-                                ALLOWED_ATTR: ['href', 'target', 'class', 'rel'],
-                                ALLOW_DATA_ATTR: false,
-                            }) }}
+                            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
                         />
                     }
                     {!msg.error && (
