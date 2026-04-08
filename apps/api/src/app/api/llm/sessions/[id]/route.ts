@@ -10,16 +10,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     try {
-        const dbUser = await prisma.user.findUnique({ where: { id: session.id as string } })
-        if (!dbUser) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
-
         const chatSession = await (prisma as any).chatSession.findFirst({
-            where: { id, userId: dbUser.id },
+            where: { id, userId: session.id as string }, // userId garante isolamento
             include: {
                 mensagens: {
                     orderBy: { createdAt: 'asc' },
-                    include: {
-                        anexo: { select: { id: true, titulo: true, numeroOficial: true } }
+                    select: {
+                        id: true,
+                        role: true,
+                        content: true,
+                        tokens: true,
+                        provider: true,
+                        model: true,
+                        toolCalls: true,
+                        createdAt: true,
                     }
                 }
             }
@@ -36,19 +40,50 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+    try {
+        const body = await req.json().catch(() => ({}))
+        const { titulo, provider, model, temperature, maxTokens } = body
+
+        const existing = await (prisma as any).chatSession.findFirst({
+            where: { id, userId: session.id as string }
+        })
+        if (!existing) return NextResponse.json({ error: 'Sessão não encontrada' }, { status: 404 })
+
+        const updated = await (prisma as any).chatSession.update({
+            where: { id },
+            data: {
+                ...(titulo !== undefined && { titulo }),
+                ...(provider !== undefined && { provider }),
+                ...(model !== undefined && { model }),
+                ...(temperature !== undefined && { temperature }),
+                ...(maxTokens !== undefined && { maxTokens }),
+            }
+        })
+
+        return NextResponse.json({ session: updated })
+    } catch (err: any) {
+        console.error(`[PATCH /api/llm/sessions/${id}]`, err)
+        return NextResponse.json({ error: 'Erro interno ao atualizar sessão' }, { status: 500 })
+    }
+}
+
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
     try {
-        const dbUser = await prisma.user.findUnique({ where: { id: session.id as string } })
-        if (!dbUser) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
-
-        await (prisma as any).chatSession.deleteMany({
-            where: { id, userId: dbUser.id }
+        const existing = await (prisma as any).chatSession.findFirst({
+            where: { id, userId: session.id as string }
         })
+        if (!existing) return NextResponse.json({ error: 'Sessão não encontrada' }, { status: 404 })
 
+        await (prisma as any).chatSession.delete({ where: { id } })
         return NextResponse.json({ success: true })
     } catch (err: any) {
         console.error(`[DELETE /api/llm/sessions/${id}]`, err)

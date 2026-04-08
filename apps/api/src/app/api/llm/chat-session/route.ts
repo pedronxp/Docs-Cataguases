@@ -84,19 +84,25 @@ export async function POST(req: NextRequest) {
 
         // 2. Resolver Sessão
         let chatSessionId = sessionId
+        let resolvedProvider = provider || undefined
+        let resolvedModel = model || undefined
+
         if (!chatSessionId) {
             const newSession = await (prisma as any).chatSession.create({
                 data: {
                     userId: dbUser.id,
                     titulo: message.length > 30 ? message.substring(0, 30) + '...' : message,
-                    provider: provider || 'auto',
-                    model: model || 'auto'
+                    provider: provider || 'cerebras',  // persiste escolha manual
+                    model: model || 'llama3.1-8b',     // persiste escolha manual
                 }
             })
             chatSessionId = newSession.id
         } else {
             const s = await (prisma as any).chatSession.findFirst({ where: { id: chatSessionId, userId: dbUser.id } })
             if (!s) return NextResponse.json({ error: 'Sessão inválida.' }, { status: 404 })
+            // Usa provider/model da sessão persistida se não especificado no body
+            resolvedProvider = provider || s.provider || undefined
+            resolvedModel = model || s.model || undefined
         }
 
         // 3. Montar histórico
@@ -160,8 +166,8 @@ export async function POST(req: NextRequest) {
 
             const llmPromise = llmChat({
                 messages: currentMessages,
-                model: model || undefined,
-                provider: provider || undefined,
+                model: resolvedModel,
+                provider: resolvedProvider as any,
                 maxTokens: MAX_TOKENS_PER_CHAT,
                 temperature: 0.7,
                 tools: LLM_TOOLS,
