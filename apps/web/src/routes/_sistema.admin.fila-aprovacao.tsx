@@ -23,6 +23,7 @@ import {
     CheckCircle2, XCircle
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Usuario, RoleUsuario, Secretaria } from '@/types/domain'
 import { atualizarUsuario } from '@/services/usuario.service'
 import { listarSetores, type Setor } from '@/services/secretaria.service'
@@ -65,6 +66,7 @@ function formatRelativeTime(dateStr: string): string {
 
 function FilaAprovacaoPage() {
     const { toast } = useToast()
+    const queryClient = useQueryClient()
     const { usuarios, loading, refetch } = useUsuarios()
     const [busca, setBusca] = useState('')
 
@@ -99,7 +101,7 @@ function FilaAprovacaoPage() {
     }, [secretariaSelecionada])
 
     const pendentes = useMemo(() => {
-        let lista = usuarios.filter(u => u.role === 'PENDENTE' && u.ativo !== false)
+        let lista = usuarios.filter(u => u.role === 'PENDENTE')
         if (busca.trim()) {
             const q = busca.toLowerCase()
             lista = lista.filter(u =>
@@ -134,6 +136,10 @@ function FilaAprovacaoPage() {
         })
         if (res.success) {
             toast({ title: 'Acesso liberado!', description: `${modalAprovar.name} agora é ${ROLES_APROVACAO.find(r => r.value === roleSelecionada)?.label}.` })
+            // Remove o usuário aprovado da lista imediatamente (otimista)
+            queryClient.setQueryData(['admin-usuarios'], (oldData: Usuario[] | undefined) =>
+                oldData ? oldData.filter(u => u.id !== modalAprovar.id) : oldData
+            )
             setModalAprovar(null)
             refetch()
         } else {
@@ -152,6 +158,10 @@ function FilaAprovacaoPage() {
             } as any)
             if (res.success) {
                 toast({ title: 'Solicitação recusada', description: `O acesso de ${modalRejeitar.name} foi recusado.` })
+                // Remove o usuário rejeitado da lista imediatamente (otimista)
+                queryClient.setQueryData(['admin-usuarios'], (oldData: Usuario[] | undefined) =>
+                    oldData ? oldData.filter(u => u.id !== modalRejeitar.id) : oldData
+                )
                 setModalRejeitar(null)
                 setMotivoRejeicao('')
                 refetch()
