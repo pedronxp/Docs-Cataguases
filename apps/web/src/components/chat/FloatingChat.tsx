@@ -777,6 +777,24 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                             </select>
                         </div>
 
+                        {/* Ações rápidas de portaria (visível apenas quando em /portarias/:id) */}
+                        {portariaId && (
+                            <div className="flex gap-2 mb-2 flex-wrap">
+                                <button
+                                    onClick={() => navigate({ to: '/administrativo/portarias/$id', params: { id: portariaId } })}
+                                    className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded px-2 py-1 transition-colors"
+                                >
+                                    Ver esta portaria →
+                                </button>
+                                <button
+                                    onClick={() => navigate({ to: '/administrativo/portarias/novo' })}
+                                    className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded px-2 py-1 transition-colors"
+                                >
+                                    + Nova portaria
+                                </button>
+                            </div>
+                        )}
+
                         {/* Preview de documento anexado */}
                         {docxAnexado && (
                             <div className="mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5 text-xs text-blue-700">
