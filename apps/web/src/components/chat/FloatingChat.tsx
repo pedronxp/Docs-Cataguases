@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import DOMPurify from 'dompurify'
+import { useNavigate } from '@tanstack/react-router'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { llmChat, type LLMMessage } from '@/services/llm.service'
 import { useAuthStore } from '@/store/auth.store'
+import { useChatSession } from '@/hooks/use-chat-session'
+import { usePageContext } from '@/hooks/use-page-context'
 import api from '@/lib/api'
 import {
     Bot, X, Send, RefreshCw, ChevronDown, Sparkles,
@@ -308,6 +311,12 @@ function clearStoredMessages(userId: string) {
 export function FloatingChat() {
     // ── Auth: pega os dados reais do usuário logado ───────────────────────────
     const usuario = useAuthStore((s) => s.usuario)
+    const navigate = useNavigate()
+
+    // ── Hooks de sessão e contexto de página ─────────────────────────────────
+    const { createSession, saveMessages: saveSessionMessages } = useChatSession()
+    const { systemContext, portariaId } = usePageContext()
+    const sessionIdRef = useRef<string | null>(null)
 
     const [open, setOpen] = useState(false)
     const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -369,8 +378,17 @@ export function FloatingChat() {
                 scrollToBottom()
                 textareaRef.current?.focus()
             }, 100)
+            // Criar sessão server-side se ainda não existir
+            if (!sessionIdRef.current && usuario?.id) {
+                createSession(
+                    selectedModel ? MODELS.find(m => m.value === selectedModel)?.provider : undefined,
+                    selectedModel || undefined
+                ).then(sid => {
+                    if (sid) sessionIdRef.current = sid
+                })
+            }
         }
-    }, [open, scrollToBottom])
+    }, [open, scrollToBottom, createSession, selectedModel, usuario?.id])
 
     useEffect(() => {
         if (open) scrollToBottom()
@@ -512,15 +530,23 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
         try {
             const baseHistory = messagesRef.current.map(m => ({ role: m.role, content: m.content }))
 
-            // Se há documento analisado pendente E o contexto ainda não foi injetado,
-            // injeta como mensagem de sistema antes da mensagem do usuário.
-            // O docxAnexado persiste até o chat ser limpo — o HTML completo fica no cache server-side.
+            // Contexto de página (portaria aberta) + docx se presente
+            const contextMessages: LLMMessage[] = []
+            if (systemContext) {
+                contextMessages.push({ role: 'system' as const, content: systemContext })
+            }
             const needsContextInjection = docxAnexado?.contexto && !docxAnexado.contextInjected
-            const history: LLMMessage[] = needsContextInjection
-                ? [...baseHistory, { role: 'system' as const, content: docxAnexado.contexto }, { role: 'user' as const, content }]
-                : [...baseHistory, { role: 'user' as const, content }]
+            if (needsContextInjection) {
+                contextMessages.push({ role: 'system' as const, content: docxAnexado.contexto })
+            }
 
-            // Marca o contexto como já injetado (não repete em mensagens futuras, economiza tokens)
+            const history: LLMMessage[] = [
+                ...baseHistory,
+                ...contextMessages,
+                { role: 'user' as const, content }
+            ]
+
+            // Marca o contexto docx como já injetado (não repete em mensagens futuras, economiza tokens)
             if (needsContextInjection) {
                 setDocxAnexado(prev => prev ? { ...prev, contextInjected: true } : null)
             }
@@ -550,6 +576,11 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                 }
                 setMessages(prev => [...prev, assistantMsg])
                 if (!open) setUnread(u => u + 1)
+                // Persistir sessão server-side (fire-and-forget — não bloqueia a UI)
+                if (sessionIdRef.current) {
+                    const allMessages = [...messagesRef.current, assistantMsg]
+                    saveSessionMessages(sessionIdRef.current, allMessages).catch(() => {})
+                }
             } else {
                 setMessages(prev => [...prev, {
                     id: Math.random().toString(36).slice(2),
@@ -583,7 +614,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
         } finally {
             setLoading(false)
         }
-    }, [loading, open, selectedModel, usuario, docxAnexado, rateLimited])
+    }, [loading, open, selectedModel, usuario, docxAnexado, rateLimited, systemContext, saveSessionMessages])
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -596,6 +627,8 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
         setMessages([])
         setDocxAnexado(null)
         if (usuario?.id) clearStoredMessages(usuario.id)
+        // Resetar sessão para que a próxima abertura crie uma nova
+        sessionIdRef.current = null
     }
     const isEmpty = messages.length === 0
 
