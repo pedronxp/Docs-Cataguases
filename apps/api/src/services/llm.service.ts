@@ -79,8 +79,7 @@ export const MISTRAL_MODELS = [
 export const GROQ_MODELS = [
     { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Versatile)', contextWindow: 128000 },
     { id: 'llama-3.1-8b-instant',    label: 'Llama 3.1 8B (Instant)', contextWindow: 131072 },
-    { id: 'qwen-2.5-32b',            label: 'Qwen 2.5 32B (Raciocínio)', contextWindow: 32768 },
-    { id: 'deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 (Contexto longo)', contextWindow: 128000 },
+    { id: 'deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 (Contexto longo)', contextWindow: 32768 },
 ]
 
 // OPENROUTER — Fallback final
@@ -375,6 +374,11 @@ async function callWithCircuitBreaker(
                 await markKeyExhausted(key.id, 24 * 60) // Cooldown de 24h para chave inválida
                 continue  // Tenta a próxima chave do mesmo provider
             }
+            // 404 no OpenRouter = modelo indisponível, não a chave — não penalizar a chave
+            if (status === 404 && provider === 'openrouter') {
+                console.warn(`[LLM Pool] OpenRouter modelo '${model}' não disponível (404) → sem cooldown na chave`)
+                return { tried: false, skipReason: 'api_error' } as any
+            }
             // Erro inesperado (500) ou formato inválido / modelo inexistente (400, 404)
             console.error(`[LLM Pool] Chave ${key.mask} do ${provider} erro (${status}): ${err.message?.slice(0, 80)}`)
             await markKeyExhausted(key.id, 5)
@@ -581,7 +585,7 @@ async function callProviderRaw(
     const body: any = {
         model,
         messages: normalizedMessages,
-        max_tokens: options.maxTokens ?? 2048,
+        max_tokens: options.maxTokens ?? (provider === 'cerebras' ? 8192 : 2048),
         temperature: options.temperature ?? 0.7,
     }
 

@@ -32,9 +32,10 @@ const MODELS = [
     { value: 'llama3.3-70b',  provider: 'cerebras', label: 'Llama 3.3 70B ⚡',    sub: 'Tarefas complexas e longas' },
     { value: 'mistral-large-latest', provider: 'mistral', label: 'Mistral Large',      sub: 'Raciocínio avançado' },
     { value: 'llama-3.3-70b-versatile', provider: 'groq', label: 'Llama 3.3 70B (Groq)', sub: 'Fallback rápido' },
-    { value: 'deepseek-r1-distill-llama-70b', provider: 'groq', label: 'DeepSeek R1 70B', sub: 'Raciocínio longo' },
     { value: 'moonshot-v1-8k', provider: 'kimi', label: 'Kimi (Moonshot 8K)', sub: 'Inteligência chinesa' },
     { value: 'moonshot-v1-32k', provider: 'kimi', label: 'Kimi (Moonshot 32K)', sub: 'Janela estendida' },
+    { value: 'google/gemma-3-27b-it:free', provider: 'openrouter', label: 'Gemma 3 27B (free)', sub: 'Google via OpenRouter' },
+    { value: 'deepseek/deepseek-r1:free', provider: 'openrouter', label: 'DeepSeek R1 (free)', sub: 'Raciocínio via OpenRouter' },
 ]
 
 // ── Sugestões de perguntas por role ───────────────────────────────────────────
