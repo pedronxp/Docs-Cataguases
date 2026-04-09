@@ -130,9 +130,7 @@ export async function POST(
                     assinaturaComprovanteUrl: comprovanteUrl || null,
                     status: 'PRONTO_PUBLICACAO',
                     assinadoPorId: session.id,
-                    assinadoEm: new Date(),
-                    pdfUrl: null, // Clear cached pdf so it can be regenerated with signature
-                    docxRascunhoUrl: null
+                    assinadoEm: new Date()
                 }
             })
 
