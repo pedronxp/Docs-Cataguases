@@ -42,6 +42,12 @@ export class NumeracaoService {
                 }
 
                 let livro = livros[0]
+
+                // Normaliza formato legado sem prefixo (ex: '{N}/{ANO}' → 'PORT-{N}/{ANO}')
+                if (livro.formato_base && !livro.formato_base.startsWith('PORT-')) {
+                    livro = { ...livro, formato_base: `PORT-${livro.formato_base}` }
+                }
+
                 const anoAtual = new Date().getFullYear()
 
                 // Lógica de reset anual
