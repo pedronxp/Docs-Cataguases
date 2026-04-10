@@ -33,11 +33,14 @@ pnpm-debug.log*
 *.sln
 *.sw?
 
+# Explicitly ignore env files under any app subdirectory
+apps/**/.env
+apps/**/.env.local
+apps/**/.env.*.local
+
 # Include project documents
 !*.md
-!apps/**
 !.github/
-nul
 
 # Build e type-check logs do projeto (após !apps/** para ter precedência)
 apps/api/build.log
