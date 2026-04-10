@@ -9,6 +9,8 @@ const STATUS_CONFIG: Record<StatusPortaria, { label: string; className: string }
     AGUARDANDO_ASSINATURA: { label: 'Aguardando Assinatura', className: 'bg-primary/10 text-primary border-primary/20' },
     PRONTO_PUBLICACAO: { label: 'Pronto para Publicar', className: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
     PUBLICADA: { label: 'Publicada', className: 'bg-emerald-600 text-white border-transparent' },
+    CANCELADA: { label: 'Cancelada', className: 'bg-red-100 text-red-700 border-red-300' },
+    ARQUIVADA: { label: 'Arquivada', className: 'bg-slate-100 text-slate-500 border-slate-200' },
     FALHA_PROCESSAMENTO: { label: 'Falha no PDF', className: 'bg-rose-100 text-rose-700 border-rose-300' },
     ERRO_GERACAO: { label: 'Erro de Geração', className: 'bg-rose-100 text-rose-700 border-rose-300' },
     PROCESSANDO: { label: 'Processando...', className: 'bg-blue-100 text-blue-700 border-blue-300' },

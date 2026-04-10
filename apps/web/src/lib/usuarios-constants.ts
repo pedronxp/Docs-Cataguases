@@ -6,6 +6,7 @@ export const ROLE_LABELS: Record<RoleUsuario, string> = {
     SECRETARIO: 'Secretário',
     REVISOR: 'Revisor',
     OPERADOR: 'Operador',
+    JORNALISTA: 'Jornalista',
     PENDENTE: 'Aguardando Liberação',
 }
 
@@ -15,6 +16,7 @@ export const ROLE_COLORS: Record<RoleUsuario, string> = {
     SECRETARIO:  'border-[#1351b4] text-[#1351b4] bg-[#e8f0fb]',
     REVISOR:     'border-[#0c7b41] text-[#0c7b41] bg-[#e6f4eb]',
     OPERADOR:    'border-[#555555] text-[#555555] bg-[#f8f9fa]',
+    JORNALISTA:  'border-[#0077b6] text-[#0077b6] bg-[#e0f4ff]',
     PENDENTE:    'border-[#e57700] text-[#e57700] bg-[#fff5e6]',
 }
 
