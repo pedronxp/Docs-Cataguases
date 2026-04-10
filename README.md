@@ -112,21 +112,34 @@ apps/
 git clone https://github.com/pedronxp/Docs-Cataguases.git
 cd Docs-Cataguases
 
-# 2. Instalar dependencias
-npm install
+# 2. Instalar dependencias (cada app tem seu próprio package.json)
+cd apps/api && npm install
+cd ../web && npm install
+cd ../..
 
 # 3. Configurar ambiente
 cp apps/api/.env.example apps/api/.env
-# Editar .env com suas credenciais (Supabase, CloudConvert, etc.)
+cp apps/web/.env.example apps/web/.env
+# Editar ambos os .env com suas credenciais (Supabase, CloudConvert, etc.)
 
 # 4. Gerar Prisma Client
 cd apps/api && npx prisma generate
 
 # 5. Rodar seed (dados iniciais)
 npx prisma db seed
+cd ../..
 
-# 6. Executar em desenvolvimento
-cd ../.. && npm run dev
+# 6. Executar em desenvolvimento (em terminais separados)
+cd apps/api && npm run dev   # API na porta 3001
+cd apps/web && npm run dev   # Web na porta 5173
+```
+
+### Comandos úteis (raiz do projeto)
+
+```bash
+npm run build   # build dos dois apps
+npm run test    # testes dos dois apps
+npm run lint    # lint dos dois apps
 ```
 
 ## Variaveis de Ambiente
