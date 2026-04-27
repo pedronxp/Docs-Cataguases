@@ -280,7 +280,7 @@ export class AssinaturaICPService {
                 format: 'der',
                 type: 'pkcs12',
                 passphrase: config.senhaCertificado || '',
-            })
+            } as any)
 
             if (!pemKey) {
                 return err('Certificado inválido ou senha incorreta.')
@@ -323,7 +323,7 @@ export class AssinaturaICPService {
                 format: 'der',
                 type: 'pkcs12',
                 passphrase: config.senhaCertificado || '',
-            })
+            } as any)
 
             // Assinar com SHA-256 + RSA
             const sign = crypto.createSign('SHA256')

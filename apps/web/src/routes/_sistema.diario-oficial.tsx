@@ -98,7 +98,6 @@ function MetricCard({ label, value, sub, icon: Icon, highlight, color }: {
   highlight?: boolean
   color?: string
 }) {
-  const iconBg = color || 'bg-slate-100'
   const iconColor = color ? 'text-white' : 'text-slate-500'
   return (
     <Card className={cn(

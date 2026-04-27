@@ -61,7 +61,7 @@ export async function PATCH(
 
     const parsed = atualizarPromptSchema.safeParse(body)
     if (!parsed.success) {
-        return NextResponse.json({ error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }, { status: 400 })
+        return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }, { status: 400 })
     }
 
     // Verifica se existe

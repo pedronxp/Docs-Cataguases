@@ -1,9 +1,29 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.SUPABASE_URL || ''
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+type SupabaseAdminClient = ReturnType<typeof createClient>
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+let supabaseAdminClient: SupabaseAdminClient | null = null
+
+function getSupabaseAdmin(): SupabaseAdminClient {
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+        throw new Error('SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY devem estar configuradas.')
+    }
+
+    if (!supabaseAdminClient) {
+        supabaseAdminClient = createClient(supabaseUrl, supabaseServiceKey)
+    }
+
+    return supabaseAdminClient
+}
+
+export const supabaseAdmin = new Proxy({} as SupabaseAdminClient, {
+    get(_target, prop) {
+        return (getSupabaseAdmin() as any)[prop]
+    },
+})
 
 export class StorageService {
     private static BUCKET = 'portarias'
@@ -23,7 +43,7 @@ export class StorageService {
     static async uploadBuffer(path: string, buffer: Buffer, contentType: string) {
         const safePath = this.sanitizePath(path)
 
-        const { data, error } = await supabaseAdmin.storage
+        const { data, error } = await getSupabaseAdmin().storage
             .from(this.BUCKET)
             .upload(safePath, buffer, {
                 contentType,
@@ -40,7 +60,7 @@ export class StorageService {
 
     static async getSignedUrl(path: string, expiresIn = 3600) {
         const safePath = this.sanitizePath(path)
-        const { data, error } = await supabaseAdmin.storage
+        const { data, error } = await getSupabaseAdmin().storage
             .from(this.BUCKET)
             .createSignedUrl(safePath, expiresIn)
 
