@@ -1,6 +1,6 @@
 /**
- * PATCH /api/notifications/:id   — Marca notificação como lida
- * DELETE /api/notifications/:id  — Remove notificação
+ * PATCH /api/notifications/:id   - Marca notificacao como lida
+ * DELETE /api/notifications/:id  - Remove notificacao
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
@@ -14,14 +14,14 @@ export async function PATCH(
 ) {
     const { id } = await params
     const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    if (!session) return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 })
 
     const userId = session.id as string
 
-    // Garante que a notificação pertence ao usuário
     const [existente]: any[] = await prisma.$queryRaw`
         SELECT id FROM "Notificacao" WHERE id = ${id} AND "userId" = ${userId}
-    `    if (!existente) return NextResponse.json({ error: 'Notificação não encontrada' }, { status: 404 })
+    `
+    if (!existente) return NextResponse.json({ error: 'Notificacao nao encontrada' }, { status: 404 })
 
     await prisma.$executeRaw`
         UPDATE "Notificacao" SET lida = true WHERE id = ${id}
@@ -35,7 +35,7 @@ export async function DELETE(
 ) {
     const { id } = await params
     const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    if (!session) return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 })
 
     const userId = session.id as string
 

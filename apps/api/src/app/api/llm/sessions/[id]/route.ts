@@ -46,7 +46,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         if (!dbUser) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
 
         await (prisma as any).chatSession.deleteMany({
-            where: { id: params.id, userId: dbUser.id }
+            where: { id, userId: dbUser.id }
         })
 
         return NextResponse.json({ success: true })

@@ -7,7 +7,7 @@ import {
     CheckCircle2, AlertCircle, Clock, Stamp, Newspaper,
     ChevronDown, RotateCcw, UserPlus, FolderOpen,
     Bot, Brain, MessageSquare, Zap, Settings, Shield,
-    Globe, Sparkles, Lock, Unlock, Database
+    Globe, Sparkles, Lock, Database
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_sistema/tutorial')({

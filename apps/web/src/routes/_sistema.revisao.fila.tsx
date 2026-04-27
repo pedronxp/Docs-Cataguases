@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
     ClipboardList, Loader2, Inbox, Clock, UserCheck, Eye,
-    RefreshCw, Building2, User, CalendarDays, ArrowRight,
+    RefreshCw, Building2, User, CalendarDays,
 } from 'lucide-react'
 import { STATUS_PORTARIA, type Portaria } from '@/types/domain'
 import { useToast } from '@/hooks/use-toast'
@@ -19,7 +19,7 @@ export const Route = createFileRoute('/_sistema/revisao/fila')({
 })
 
 function FilaRevisaoPage() {
-    const { usuario } = useAuthStore()
+    useAuthStore()
     const navigate = useNavigate()
     const { toast } = useToast()
     const [loading, setLoading] = useState(true)
