@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Navigate } from '@tanstack/react-router'
 import {
     Clock, TrendingDown, Users, Calendar, BarChart3, Activity,
-    Building2, Target, ArrowUpRight, ArrowDownRight, Timer, AlertTriangle
+    Building2, Target, ArrowUpRight, ArrowDownRight, Timer, AlertTriangle,
+    RotateCcw, CheckCircle2, FileWarning
 } from 'lucide-react'
 import api from '@/lib/api'
 import { Can } from '@/lib/ability'
@@ -37,6 +38,15 @@ interface AvancadoData {
         idadeMediaHoras: number
         maisAntigo: { id: string; titulo: string; horas: number; secretaria: string } | null
     }[]
+    retrabalho: {
+        firstPassYield: number
+        taxaRetrabalho: number
+        mediaDevolucoes: number
+        totalDevolucoes: number
+        documentosComRetrabalho: number
+        modelos: { nome: string; devolucoes: number; documentos: number }[]
+        secretarias: { nome: string; devolucoes: number; documentos: number }[]
+    }
     periodo: number
 }
 
@@ -249,6 +259,109 @@ function AnalyticsAvancadoPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="border-slate-200">
+                    <CardContent className="pt-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-500 font-medium">First Pass Yield</p>
+                                <p className="text-2xl font-bold text-slate-800 mt-1">{data.retrabalho.firstPassYield}%</p>
+                                <p className="text-xs text-slate-500 mt-1">Aprovadas sem devolucao</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-emerald-100">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-slate-200">
+                    <CardContent className="pt-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-500 font-medium">Taxa de Retrabalho</p>
+                                <p className="text-2xl font-bold text-slate-800 mt-1">{data.retrabalho.taxaRetrabalho}%</p>
+                                <p className="text-xs text-slate-500 mt-1">{data.retrabalho.documentosComRetrabalho} documentos com devolucao</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-amber-100">
+                                <RotateCcw className="h-5 w-5 text-amber-600" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-slate-200">
+                    <CardContent className="pt-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-500 font-medium">Media de Devolucoes</p>
+                                <p className="text-2xl font-bold text-slate-800 mt-1">{data.retrabalho.mediaDevolucoes}</p>
+                                <p className="text-xs text-slate-500 mt-1">{data.retrabalho.totalDevolucoes} devolucoes no periodo</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-red-100">
+                                <FileWarning className="h-5 w-5 text-red-600" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="border-slate-200">
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <FileWarning className="h-4 w-4 text-red-600" />
+                            Modelos com Mais Correcoes
+                        </CardTitle>
+                        <CardDescription>Modelos que concentraram devolucoes no periodo</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {data.retrabalho.modelos.length === 0 ? (
+                            <p className="text-sm text-slate-400 text-center py-8">Nenhuma devolucao no periodo</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {data.retrabalho.modelos.map((item) => (
+                                    <div key={item.nome} className="flex items-center justify-between gap-4 border-b border-slate-100 pb-2 last:border-0">
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium text-slate-700">{item.nome}</p>
+                                            <p className="text-xs text-slate-400">{item.documentos} documentos afetados</p>
+                                        </div>
+                                        <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700">{item.devolucoes}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="border-slate-200">
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-blue-600" />
+                            Secretarias com Mais Correcoes
+                        </CardTitle>
+                        <CardDescription>Orgaos que concentraram devolucoes no periodo</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {data.retrabalho.secretarias.length === 0 ? (
+                            <p className="text-sm text-slate-400 text-center py-8">Nenhuma devolucao no periodo</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {data.retrabalho.secretarias.map((item) => (
+                                    <div key={item.nome} className="flex items-center justify-between gap-4 border-b border-slate-100 pb-2 last:border-0">
+                                        <div>
+                                            <p className="text-sm font-medium text-slate-700">{item.nome}</p>
+                                            <p className="text-xs text-slate-400">{item.documentos} documentos afetados</p>
+                                        </div>
+                                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{item.devolucoes}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="lg:col-span-2 border-slate-200">
