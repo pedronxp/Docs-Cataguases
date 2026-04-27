@@ -113,7 +113,8 @@ export async function POST(
         }
 
         const updateData: Record<string, any> = {
-            status: 'EM_REVISAO_ABERTA'
+            status: 'EM_REVISAO_ABERTA',
+            statusChangedAt: new Date()
         }
 
         // ── Gera DOCX preenchido + PDF a partir do template Word ─────────────────

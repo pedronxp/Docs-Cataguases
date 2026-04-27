@@ -137,6 +137,7 @@ export class AssinaturaICPService {
                     data: {
                         status: 'PRONTO_PUBLICACAO',
                         assinadoEm: new Date(),
+                        statusChangedAt: new Date(),
                         assinadoPorId: usuarioId,
                         assinaturaStatus: 'ASSINADA_DIGITAL',
                         hashIntegridade: hashDocumento,

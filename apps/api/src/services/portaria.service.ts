@@ -32,6 +32,7 @@ export class PortariaService {
                     setorId: data.setorId,
                     criadoPorId: data.criadoPorId,
                     status: data.submetido ? 'EM_REVISAO_ABERTA' : 'RASCUNHO',
+                    statusChangedAt: new Date(),
                 },
                 include: { modelo: true }
             })
@@ -66,7 +67,7 @@ export class PortariaService {
 
             const atualizada = await prisma.portaria.update({
                 where: { id },
-                data: { status: 'PRONTO_PUBLICACAO' }
+                data: { status: 'PRONTO_PUBLICACAO', statusChangedAt: new Date() }
             })
 
             await this.registrarEvento({
@@ -104,6 +105,7 @@ export class PortariaService {
                 where: { id },
                 data: {
                     status: 'RASCUNHO',
+                    statusChangedAt: new Date(),
                     pdfUrl: null
                 }
             })
@@ -136,7 +138,7 @@ export class PortariaService {
 
             const atualizada = await prisma.portaria.update({
                 where: { id },
-                data: { status: 'PROCESSANDO' }
+                data: { status: 'PROCESSANDO', statusChangedAt: new Date() }
             })
 
             await this.registrarEvento({

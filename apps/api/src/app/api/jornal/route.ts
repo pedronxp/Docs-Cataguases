@@ -112,6 +112,7 @@ export async function POST(request: Request) {
                 data: {
                     numeroOficial,
                     status: 'PUBLICADA',
+                    statusChangedAt: new Date(),
                     // @ts-ignore
                     dataPublicacao: new Date()
                 }

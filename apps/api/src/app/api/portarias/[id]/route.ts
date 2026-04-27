@@ -171,6 +171,9 @@ export async function PATCH(
         if (dadosFiltrados.formData !== undefined) {
             dadosParaSalvar.docxRascunhoUrl = null
         }
+        if (dadosFiltrados.status !== undefined && dadosFiltrados.status !== portaria.status) {
+            dadosParaSalvar.statusChangedAt = new Date()
+        }
 
         const atualizada = await prisma.portaria.update({
             where: { id },
