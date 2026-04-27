@@ -10,7 +10,7 @@ import { Navigate } from '@tanstack/react-router'
 import {
     Clock, TrendingDown, Users, Calendar, BarChart3, Activity,
     Building2, Target, ArrowUpRight, ArrowDownRight, Timer, AlertTriangle,
-    RotateCcw, CheckCircle2, FileWarning
+    RotateCcw, CheckCircle2, FileWarning, Inbox, Send, Scale, Hourglass
 } from 'lucide-react'
 import api from '@/lib/api'
 import { Can } from '@/lib/ability'
@@ -46,6 +46,23 @@ interface AvancadoData {
         documentosComRetrabalho: number
         modelos: { nome: string; devolucoes: number; documentos: number }[]
         secretarias: { nome: string; devolucoes: number; documentos: number }[]
+    }
+    produtividadeFluxo: {
+        entradasPeriodo: number
+        saidasPeriodo: number
+        saldoPeriodo: number
+        taxaConclusao: number
+        backlogAberto: number
+        idadeMediaBacklogDias: number
+        porStatus: {
+            status: string
+            label: string
+            total: number
+            percentualBacklog: number
+            idadeMediaDias: number
+            idadeMaximaDias: number
+            maisAntigo: { id: string; titulo: string; idadeDias: number; horasNaEtapa: number; secretaria: string } | null
+        }[]
     }
     periodo: number
 }
@@ -97,6 +114,8 @@ function AnalyticsAvancadoPage() {
     const totalPipeline = data.pipeline.reduce((a, b) => a + b.quantidade, 0)
     const totalAtrasados = data.slaEtapas.reduce((total, etapa) => total + etapa.atrasados, 0)
     const etapasComAtraso = data.slaEtapas.filter(etapa => etapa.atrasados > 0).length
+    const saldoFluxo = data.produtividadeFluxo.saldoPeriodo
+    const saldoFluxoLabel = saldoFluxo > 0 ? `+${saldoFluxo}` : String(saldoFluxo)
 
     return (
         <Can I="manage" a="all" passThrough>
@@ -204,6 +223,126 @@ function AnalyticsAvancadoPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="border-slate-200">
+                    <CardContent className="pt-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-500 font-medium">Entradas no Periodo</p>
+                                <p className="text-2xl font-bold text-slate-800 mt-1">{data.produtividadeFluxo.entradasPeriodo}</p>
+                                <p className="text-xs text-slate-500 mt-1">Documentos criados</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-blue-100">
+                                <Inbox className="h-5 w-5 text-blue-600" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-slate-200">
+                    <CardContent className="pt-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-500 font-medium">Saidas Publicadas</p>
+                                <p className="text-2xl font-bold text-slate-800 mt-1">{data.produtividadeFluxo.saidasPeriodo}</p>
+                                <p className="text-xs text-slate-500 mt-1">Publicadas no periodo</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-emerald-100">
+                                <Send className="h-5 w-5 text-emerald-600" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-slate-200">
+                    <CardContent className="pt-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-500 font-medium">Saldo da Fila</p>
+                                <p className={`text-2xl font-bold mt-1 ${saldoFluxo > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{saldoFluxoLabel}</p>
+                                <p className="text-xs text-slate-500 mt-1">{data.produtividadeFluxo.backlogAberto} documentos abertos</p>
+                            </div>
+                            <div className={`p-3 rounded-xl ${saldoFluxo > 0 ? 'bg-amber-100' : 'bg-emerald-100'}`}>
+                                <Scale className={`h-5 w-5 ${saldoFluxo > 0 ? 'text-amber-600' : 'text-emerald-600'}`} />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-slate-200">
+                    <CardContent className="pt-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-slate-500 font-medium">Idade Media Backlog</p>
+                                <p className="text-2xl font-bold text-slate-800 mt-1">{data.produtividadeFluxo.idadeMediaBacklogDias}d</p>
+                                <p className="text-xs text-slate-500 mt-1">{data.produtividadeFluxo.taxaConclusao}% de conclusao</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-100">
+                                <Hourglass className="h-5 w-5 text-slate-600" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Card className="border-slate-200">
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <Hourglass className="h-4 w-4 text-slate-600" />
+                        Envelhecimento do Backlog
+                    </CardTitle>
+                    <CardDescription>Distribuicao dos documentos abertos por status e idade desde a criacao</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                                    <th className="py-2 pr-4 font-semibold">Status</th>
+                                    <th className="py-2 px-4 font-semibold text-right">Total</th>
+                                    <th className="py-2 px-4 font-semibold text-right">Backlog</th>
+                                    <th className="py-2 px-4 font-semibold text-right">Media</th>
+                                    <th className="py-2 px-4 font-semibold text-right">Maxima</th>
+                                    <th className="py-2 pl-4 font-semibold">Mais antigo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.produtividadeFluxo.porStatus.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="py-8 text-center text-slate-400">Nenhum documento aberto</td>
+                                    </tr>
+                                ) : data.produtividadeFluxo.porStatus.map((item) => (
+                                    <tr key={item.status} className="border-b border-slate-100 last:border-0">
+                                        <td className="py-3 pr-4">
+                                            <div className="font-medium text-slate-700">{item.label}</div>
+                                            <div className="text-xs text-slate-400">{item.status}</div>
+                                        </td>
+                                        <td className="py-3 px-4 text-right font-semibold text-slate-800">{item.total}</td>
+                                        <td className="py-3 px-4 text-right text-slate-600">{item.percentualBacklog}%</td>
+                                        <td className="py-3 px-4 text-right text-slate-600">{item.idadeMediaDias}d</td>
+                                        <td className="py-3 px-4 text-right">
+                                            <span className={`inline-flex min-w-12 justify-center rounded-full px-2 py-1 text-xs font-bold ${item.idadeMaximaDias >= 7 ? 'bg-amber-50 text-amber-700' : 'bg-slate-50 text-slate-600'}`}>
+                                                {item.idadeMaximaDias}d
+                                            </span>
+                                        </td>
+                                        <td className="py-3 pl-4">
+                                            {item.maisAntigo ? (
+                                                <div>
+                                                    <div className="max-w-[280px] truncate font-medium text-slate-700">{item.maisAntigo.titulo}</div>
+                                                    <div className="text-xs text-slate-400">{item.maisAntigo.secretaria} - {item.maisAntigo.horasNaEtapa}h na etapa</div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-400">Sem documentos</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Evolução Diária + Pipeline */}
             <Card className="border-slate-200">
