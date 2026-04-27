@@ -621,6 +621,7 @@ export class AnalyticsService {
             descricao: string
             metrica: string
             acao: string
+            destino: 'kpi-sla' | 'kpi-backlog' | 'kpi-retrabalho'
         }[] = []
 
         const etapasCriticas = slaEtapas
@@ -636,6 +637,7 @@ export class AnalyticsService {
                 descricao: `${etapaMaisCritica.atrasados} de ${etapaMaisCritica.total} documentos acima do prazo.`,
                 metrica: `${etapaMaisCritica.percentualAtraso}% atrasado`,
                 acao: 'Priorizar a etapa com maior atraso e redistribuir responsaveis.',
+                destino: 'kpi-sla',
             })
         }
 
@@ -647,6 +649,7 @@ export class AnalyticsService {
                 descricao: `Entraram ${produtividadeFluxo.entradasPeriodo} documentos e sairam ${produtividadeFluxo.saidasPeriodo} no periodo.`,
                 metrica: `Saldo +${produtividadeFluxo.saldoPeriodo}`,
                 acao: 'Aumentar vazao nas etapas com maior backlog antes de criar novas frentes.',
+                destino: 'kpi-backlog',
             })
         }
 
@@ -663,6 +666,7 @@ export class AnalyticsService {
                     : `${statusEnvelhecido.total} documentos com idade elevada neste status.`,
                 metrica: `${statusEnvelhecido.idadeMaximaDias}d max`,
                 acao: 'Revisar o item mais antigo e remover bloqueios operacionais.',
+                destino: 'kpi-backlog',
             })
         }
 
@@ -677,6 +681,7 @@ export class AnalyticsService {
                     : `${retrabalho.documentosComRetrabalho} documentos tiveram devolucao.`,
                 metrica: `${retrabalho.taxaRetrabalho}% retrabalho`,
                 acao: 'Revisar modelos, instrucoes de preenchimento e criterios de revisao.',
+                destino: 'kpi-retrabalho',
             })
         }
 
@@ -688,6 +693,7 @@ export class AnalyticsService {
                 descricao: 'A proporcao de revisoes rejeitadas esta acima do limiar operacional.',
                 metrica: `${taxaRejeicao}% rejeicao`,
                 acao: 'Comparar motivos de rejeicao e alinhar criterios antes da submissao.',
+                destino: 'kpi-retrabalho',
             })
         }
 
