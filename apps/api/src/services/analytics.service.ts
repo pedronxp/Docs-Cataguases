@@ -381,6 +381,12 @@ export class AnalyticsService {
             const slaEtapas = await this.obterSlaEtapas(where)
             const retrabalho = await this.obterMetricasRetrabalho(where, dataCorte)
             const produtividadeFluxo = await this.obterProdutividadeFluxo(where, dataCorte)
+            const alertasRisco = this.obterAlertasRisco({
+                slaEtapas,
+                retrabalho,
+                produtividadeFluxo,
+                taxaRejeicao,
+            })
 
             return ok({
                 tempoMedioTramitacaoHoras,
@@ -394,6 +400,7 @@ export class AnalyticsService {
                 slaEtapas,
                 retrabalho,
                 produtividadeFluxo,
+                alertasRisco,
                 periodo,
             })
         } catch (error) {
@@ -598,5 +605,95 @@ export class AnalyticsService {
             idadeMediaBacklogDias,
             porStatus,
         }
+    }
+
+    private static obterAlertasRisco(params: {
+        slaEtapas: Awaited<ReturnType<typeof AnalyticsService.obterSlaEtapas>>
+        retrabalho: Awaited<ReturnType<typeof AnalyticsService.obterMetricasRetrabalho>>
+        produtividadeFluxo: Awaited<ReturnType<typeof AnalyticsService.obterProdutividadeFluxo>>
+        taxaRejeicao: number
+    }) {
+        const { slaEtapas, retrabalho, produtividadeFluxo, taxaRejeicao } = params
+        const alertas: {
+            tipo: 'SLA' | 'BACKLOG' | 'RETRABALHO' | 'REJEICAO'
+            prioridade: 'CRITICA' | 'ALTA' | 'MEDIA'
+            titulo: string
+            descricao: string
+            metrica: string
+            acao: string
+        }[] = []
+
+        const etapasCriticas = slaEtapas
+            .filter(etapa => etapa.atrasados > 0)
+            .sort((a, b) => b.percentualAtraso - a.percentualAtraso || b.atrasados - a.atrasados)
+
+        const etapaMaisCritica = etapasCriticas[0]
+        if (etapaMaisCritica) {
+            alertas.push({
+                tipo: 'SLA',
+                prioridade: etapaMaisCritica.percentualAtraso >= 50 ? 'CRITICA' : 'ALTA',
+                titulo: `SLA em risco: ${etapaMaisCritica.label}`,
+                descricao: `${etapaMaisCritica.atrasados} de ${etapaMaisCritica.total} documentos acima do prazo.`,
+                metrica: `${etapaMaisCritica.percentualAtraso}% atrasado`,
+                acao: 'Priorizar a etapa com maior atraso e redistribuir responsaveis.',
+            })
+        }
+
+        if (produtividadeFluxo.saldoPeriodo > 0) {
+            alertas.push({
+                tipo: 'BACKLOG',
+                prioridade: produtividadeFluxo.saldoPeriodo >= 10 ? 'CRITICA' : 'ALTA',
+                titulo: 'Fila acumulando demanda',
+                descricao: `Entraram ${produtividadeFluxo.entradasPeriodo} documentos e sairam ${produtividadeFluxo.saidasPeriodo} no periodo.`,
+                metrica: `Saldo +${produtividadeFluxo.saldoPeriodo}`,
+                acao: 'Aumentar vazao nas etapas com maior backlog antes de criar novas frentes.',
+            })
+        }
+
+        const statusEnvelhecido = produtividadeFluxo.porStatus
+            .filter(item => item.idadeMaximaDias >= 7)
+            .sort((a, b) => b.idadeMaximaDias - a.idadeMaximaDias)[0]
+        if (statusEnvelhecido) {
+            alertas.push({
+                tipo: 'BACKLOG',
+                prioridade: statusEnvelhecido.idadeMaximaDias >= 15 ? 'CRITICA' : 'MEDIA',
+                titulo: `Documento envelhecido em ${statusEnvelhecido.label}`,
+                descricao: statusEnvelhecido.maisAntigo
+                    ? `${statusEnvelhecido.maisAntigo.titulo} esta aberto ha ${statusEnvelhecido.maisAntigo.idadeDias} dias.`
+                    : `${statusEnvelhecido.total} documentos com idade elevada neste status.`,
+                metrica: `${statusEnvelhecido.idadeMaximaDias}d max`,
+                acao: 'Revisar o item mais antigo e remover bloqueios operacionais.',
+            })
+        }
+
+        if (retrabalho.taxaRetrabalho >= 20) {
+            const principalModelo = retrabalho.modelos[0]
+            alertas.push({
+                tipo: 'RETRABALHO',
+                prioridade: retrabalho.taxaRetrabalho >= 35 ? 'CRITICA' : 'ALTA',
+                titulo: 'Retrabalho acima do ideal',
+                descricao: principalModelo
+                    ? `${principalModelo.nome} concentra ${principalModelo.devolucoes} devolucoes.`
+                    : `${retrabalho.documentosComRetrabalho} documentos tiveram devolucao.`,
+                metrica: `${retrabalho.taxaRetrabalho}% retrabalho`,
+                acao: 'Revisar modelos, instrucoes de preenchimento e criterios de revisao.',
+            })
+        }
+
+        if (taxaRejeicao >= 20) {
+            alertas.push({
+                tipo: 'REJEICAO',
+                prioridade: taxaRejeicao >= 35 ? 'CRITICA' : 'MEDIA',
+                titulo: 'Taxa de rejeicao elevada',
+                descricao: 'A proporcao de revisoes rejeitadas esta acima do limiar operacional.',
+                metrica: `${taxaRejeicao}% rejeicao`,
+                acao: 'Comparar motivos de rejeicao e alinhar criterios antes da submissao.',
+            })
+        }
+
+        const peso = { CRITICA: 3, ALTA: 2, MEDIA: 1 }
+        return alertas
+            .sort((a, b) => peso[b.prioridade] - peso[a.prioridade])
+            .slice(0, 5)
     }
 }
