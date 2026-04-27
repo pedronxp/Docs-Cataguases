@@ -425,6 +425,7 @@ export class AnalyticsService {
                 id: true,
                 titulo: true,
                 status: true,
+                statusChangedAt: true,
                 updatedAt: true,
                 secretaria: { select: { sigla: true, nome: true } }
             }
@@ -433,7 +434,10 @@ export class AnalyticsService {
         return statuses.map(status => {
             const config = SLA_ETAPAS[status]
             const itens = portarias.filter(p => p.status === status)
-            const idadesHoras = itens.map(p => Math.max(0, Math.round((agora - new Date(p.updatedAt).getTime()) / (1000 * 60 * 60))))
+            const idadesHoras = itens.map(p => {
+                const dataEntradaEtapa = p.statusChangedAt ?? p.updatedAt
+                return Math.max(0, Math.round((agora - new Date(dataEntradaEtapa).getTime()) / (1000 * 60 * 60)))
+            })
             const atrasados = idadesHoras.filter(horas => horas > config.slaHoras).length
             const maisAntigo = itens
                 .map((p, index) => ({ portaria: p, horas: idadesHoras[index] ?? 0 }))

@@ -45,6 +45,7 @@ model Portaria {
   assinadoPor     User?           @relation("AssinadoPor", fields: [assinadoPorId], references: [id])
   dataPublicacao  DateTime?
   formData        Json            @default("{}")
+  statusChangedAt DateTime        @default(now())
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   atividades      FeedAtividade[]

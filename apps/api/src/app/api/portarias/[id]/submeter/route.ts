@@ -72,7 +72,8 @@ export async function POST(
         }
 
         const updateData: Record<string, any> = {
-            status: 'PROCESSANDO'
+            status: 'PROCESSANDO',
+            statusChangedAt: new Date()
         }
 
         // ── Gera DOCX preenchido localmente ─────────────────

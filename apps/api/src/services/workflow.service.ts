@@ -388,7 +388,7 @@ export class WorkflowService {
             const atualizada = await prisma.$transaction(async (tx: any) => {
                 const p = await tx.portaria.update({
                     where: { id: params.portariaId },
-                    data: { status: transicao.para }
+                    data: { status: transicao.para, statusChangedAt: new Date() }
                 })
 
                 // Registrar evento no feed

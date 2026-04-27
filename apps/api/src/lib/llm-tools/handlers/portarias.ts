@@ -59,6 +59,7 @@ export async function handlePortarias(toolName: string, args: any, context?: Too
                 titulo,
                 descricao: descricao || titulo,
                 status: 'RASCUNHO',
+                statusChangedAt: new Date(),
                 criadoPorId: perm.user!.id,
                 secretariaId,
                 modeloId,
@@ -185,7 +186,7 @@ export async function handlePortarias(toolName: string, args: any, context?: Too
         await prisma.$transaction(async (tx) => {
             await (tx.portaria as any).update({
                 where: { id: portariaId },
-                data: { status: 'EM_REVISAO_ABERTA' },
+                data: { status: 'EM_REVISAO_ABERTA', statusChangedAt: new Date() },
             })
             await tx.feedAtividade.create({
                 data: {
@@ -238,7 +239,7 @@ export async function handlePortarias(toolName: string, args: any, context?: Too
         await prisma.$transaction(async (tx) => {
             await (tx.portaria as any).update({
                 where: { id: portariaId },
-                data: { status: 'AGUARDANDO_ASSINATURA', revisorAtualId: null },
+                data: { status: 'AGUARDANDO_ASSINATURA', statusChangedAt: new Date(), revisorAtualId: null },
             })
             await tx.feedAtividade.create({
                 data: {
@@ -381,7 +382,7 @@ export async function handlePortarias(toolName: string, args: any, context?: Too
         await prisma.$transaction(async (tx) => {
             await (tx.portaria as any).update({
                 where: { id: portariaId },
-                data: { status: novoStatus, revisorAtualId: revisorId },
+                data: { status: novoStatus, statusChangedAt: new Date(), revisorAtualId: revisorId },
             })
             await tx.feedAtividade.create({
                 data: {

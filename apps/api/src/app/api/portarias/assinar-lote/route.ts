@@ -55,6 +55,7 @@ export async function POST(request: Request) {
                 data: {
                     assinaturaStatus: 'ASSINADA_DIGITAL',
                     status: 'PRONTO_PUBLICACAO',
+                    statusChangedAt: new Date(),
                     assinadoPorId: session.id,
                     assinadoEm: new Date()
                 }

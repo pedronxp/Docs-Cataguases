@@ -182,6 +182,7 @@ export async function PATCH(
                 where: { id },
                 data: {
                     status: novoStatus,
+                    statusChangedAt: novoStatus !== portaria.status ? new Date() : undefined,
                     revisorAtualId,
                     revisoesCount
                 }

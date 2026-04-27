@@ -142,6 +142,7 @@ export async function POST(
                 where: { id },
                 data: {
                     status: 'PUBLICADA',
+                    statusChangedAt: agora,
                     numeroOficial,
                     dataPublicacao: agora,
                     ...(pdfUrlFinal ? { pdfUrl: pdfUrlFinal } : {})
