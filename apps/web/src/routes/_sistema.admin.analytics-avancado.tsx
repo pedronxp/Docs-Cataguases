@@ -10,7 +10,7 @@ import { Navigate } from '@tanstack/react-router'
 import {
     Clock, TrendingDown, Users, Calendar, BarChart3, Activity,
     Building2, Target, ArrowUpRight, ArrowDownRight, Timer, AlertTriangle,
-    RotateCcw, CheckCircle2, FileWarning, Inbox, Send, Scale, Hourglass
+    RotateCcw, CheckCircle2, FileWarning, Inbox, Send, Scale, Hourglass, ShieldAlert
 } from 'lucide-react'
 import api from '@/lib/api'
 import { Can } from '@/lib/ability'
@@ -64,10 +64,24 @@ interface AvancadoData {
             maisAntigo: { id: string; titulo: string; idadeDias: number; horasNaEtapa: number; secretaria: string } | null
         }[]
     }
+    alertasRisco: {
+        tipo: 'SLA' | 'BACKLOG' | 'RETRABALHO' | 'REJEICAO'
+        prioridade: 'CRITICA' | 'ALTA' | 'MEDIA'
+        titulo: string
+        descricao: string
+        metrica: string
+        acao: string
+    }[]
     periodo: number
 }
 
 const CORES_GRAFICO = ['#1351B4', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#f87171', '#ec4899', '#6366f1']
+
+const ALERTA_STYLES = {
+    CRITICA: 'border-red-200 bg-red-50 text-red-800',
+    ALTA: 'border-amber-200 bg-amber-50 text-amber-800',
+    MEDIA: 'border-blue-200 bg-blue-50 text-blue-800',
+}
 
 function AnalyticsAvancadoPage() {
     const [data, setData] = useState<AvancadoData | null>(null)
@@ -223,6 +237,48 @@ function AnalyticsAvancadoPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card className="border-slate-200">
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <ShieldAlert className="h-4 w-4 text-amber-600" />
+                        Alertas Operacionais
+                    </CardTitle>
+                    <CardDescription>Prioridades sugeridas a partir de SLA, retrabalho e backlog</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {data.alertasRisco.length === 0 ? (
+                        <div className="flex items-center justify-between rounded-md border border-emerald-100 bg-emerald-50 px-4 py-3">
+                            <div>
+                                <p className="text-sm font-semibold text-emerald-800">Nenhum alerta ativo</p>
+                                <p className="text-xs text-emerald-700">Os indicadores operacionais estao dentro dos limites definidos.</p>
+                            </div>
+                            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                            {data.alertasRisco.map((alerta, index) => (
+                                <div key={`${alerta.tipo}-${index}`} className={`rounded-md border p-4 ${ALERTA_STYLES[alerta.prioridade]}`}>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold">{alerta.prioridade}</span>
+                                                <span className="text-[11px] font-semibold">{alerta.tipo}</span>
+                                            </div>
+                                            <p className="mt-2 text-sm font-bold">{alerta.titulo}</p>
+                                            <p className="mt-1 text-xs opacity-90">{alerta.descricao}</p>
+                                            <p className="mt-2 text-xs font-medium opacity-90">{alerta.acao}</p>
+                                        </div>
+                                        <div className="shrink-0 rounded-md bg-white/75 px-2.5 py-1 text-xs font-bold">
+                                            {alerta.metrica}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="border-slate-200">
