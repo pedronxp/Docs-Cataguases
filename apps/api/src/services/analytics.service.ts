@@ -380,6 +380,7 @@ export class AnalyticsService {
 
             const slaEtapas = await this.obterSlaEtapas(where)
             const retrabalho = await this.obterMetricasRetrabalho(where, dataCorte)
+            const produtividadeFluxo = await this.obterProdutividadeFluxo(where, dataCorte)
 
             return ok({
                 tempoMedioTramitacaoHoras,
@@ -392,6 +393,7 @@ export class AnalyticsService {
                 pipeline,
                 slaEtapas,
                 retrabalho,
+                produtividadeFluxo,
                 periodo,
             })
         } catch (error) {
@@ -505,6 +507,96 @@ export class AnalyticsService {
             documentosComRetrabalho: comRetrabalho,
             modelos,
             secretarias,
+        }
+    }
+
+    private static async obterProdutividadeFluxo(where: any, dataCorte: Date) {
+        const [entradasPeriodo, saidasPeriodo, backlog] = await Promise.all([
+            prisma.portaria.count({
+                where: { ...where, createdAt: { gte: dataCorte } }
+            }),
+            prisma.portaria.count({
+                where: { ...where, status: 'PUBLICADA', dataPublicacao: { gte: dataCorte } }
+            }),
+            prisma.portaria.findMany({
+                where: {
+                    ...where,
+                    status: { not: 'PUBLICADA' }
+                },
+                select: {
+                    id: true,
+                    titulo: true,
+                    status: true,
+                    createdAt: true,
+                    statusChangedAt: true,
+                    secretaria: { select: { sigla: true, nome: true } }
+                }
+            })
+        ])
+
+        const agora = Date.now()
+        const statusLabels: Record<string, string> = {
+            RASCUNHO: 'Rascunho',
+            PROCESSANDO: 'Processando',
+            EM_REVISAO_ABERTA: 'Aguardando Revisor',
+            EM_REVISAO_ATRIBUIDA: 'Em Revisao',
+            CORRECAO_NECESSARIA: 'Correcao Necessaria',
+            AGUARDANDO_ASSINATURA: 'Aguardando Assinatura',
+            PRONTO_PUBLICACAO: 'Pronto Publicacao',
+            FALHA_PROCESSAMENTO: 'Falha no Processamento',
+        }
+
+        const horasDesde = (data: Date) => Math.max(0, Math.round((agora - new Date(data).getTime()) / (1000 * 60 * 60)))
+        const diasDesde = (data: Date) => Math.max(0, Number((horasDesde(data) / 24).toFixed(1)))
+
+        const porStatus = Object.entries(
+            backlog.reduce((acc: Record<string, typeof backlog>, item) => {
+                if (!acc[item.status]) acc[item.status] = []
+                acc[item.status].push(item)
+                return acc
+            }, {})
+        ).map(([status, itens]) => {
+            const idades = itens.map(item => diasDesde(item.createdAt))
+            const idadesEtapa = itens.map(item => horasDesde(item.statusChangedAt ?? item.createdAt))
+            const maisAntigo = itens
+                .map((item, index) => ({ item, idadeDias: idades[index] ?? 0, horasEtapa: idadesEtapa[index] ?? 0 }))
+                .sort((a, b) => b.idadeDias - a.idadeDias)[0]
+
+            return {
+                status,
+                label: statusLabels[status] ?? status,
+                total: itens.length,
+                percentualBacklog: backlog.length > 0 ? Math.round((itens.length / backlog.length) * 100) : 0,
+                idadeMediaDias: idades.length > 0
+                    ? Number((idades.reduce((acc, idade) => acc + idade, 0) / idades.length).toFixed(1))
+                    : 0,
+                idadeMaximaDias: idades.length > 0 ? Math.max(...idades) : 0,
+                maisAntigo: maisAntigo
+                    ? {
+                        id: maisAntigo.item.id,
+                        titulo: maisAntigo.item.titulo,
+                        idadeDias: maisAntigo.idadeDias,
+                        horasNaEtapa: maisAntigo.horasEtapa,
+                        secretaria: maisAntigo.item.secretaria?.sigla ?? maisAntigo.item.secretaria?.nome ?? 'Sem secretaria',
+                    }
+                    : null,
+            }
+        }).sort((a, b) => b.total - a.total)
+
+        const saldoPeriodo = entradasPeriodo - saidasPeriodo
+        const taxaConclusao = entradasPeriodo > 0 ? Math.round((saidasPeriodo / entradasPeriodo) * 100) : 0
+        const idadeMediaBacklogDias = backlog.length > 0
+            ? Number((backlog.reduce((acc, item) => acc + diasDesde(item.createdAt), 0) / backlog.length).toFixed(1))
+            : 0
+
+        return {
+            entradasPeriodo,
+            saidasPeriodo,
+            saldoPeriodo,
+            taxaConclusao,
+            backlogAberto: backlog.length,
+            idadeMediaBacklogDias,
+            porStatus,
         }
     }
 }
