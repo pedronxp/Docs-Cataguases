@@ -15,7 +15,6 @@ export const Route = createFileRoute('/_sistema/admin/usuarios-orgao' as any)({
 const ROLE_LABELS: Record<RoleUsuario, string> = {
     ADMIN_GERAL: 'Admin Geral',
     PREFEITO: 'Prefeito',
-    JORNALISTA: 'Jornalista',
     SECRETARIO: 'Secretário',
     REVISOR: 'Revisor',
     OPERADOR: 'Operador',
@@ -25,7 +24,6 @@ const ROLE_LABELS: Record<RoleUsuario, string> = {
 const ROLE_COLORS: Record<RoleUsuario, string> = {
     ADMIN_GERAL: 'border-[#9b59b6] text-[#9b59b6] bg-[#f9f0ff]',
     PREFEITO:    'border-[#d4a017] text-[#7d5c00] bg-[#fffbea]',
-    JORNALISTA:  'border-[#0f766e] text-[#0f766e] bg-[#ecfdf5]',
     SECRETARIO:  'border-[#1351b4] text-[#1351b4] bg-[#e8f0fb]',
     REVISOR:     'border-[#0c7b41] text-[#0c7b41] bg-[#e6f4eb]',
     OPERADOR:    'border-[#555555] text-[#555555] bg-[#f8f9fa]',

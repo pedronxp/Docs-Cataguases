@@ -91,14 +91,13 @@ const CATEGORIAS = [...new Set(CATALOGO.map(p => p.categoria))]
 const ROLE_LABELS: Record<RoleUsuario, string> = {
     ADMIN_GERAL: 'Administrador Geral',
     PREFEITO: 'Prefeito',
-    JORNALISTA: 'Jornalista',
     SECRETARIO: 'Secretário',
     REVISOR: 'Revisor',
     OPERADOR: 'Operador',
     PENDENTE: 'Aguardando Liberação',
 }
 
-const ROLES_AVAILABLE: RoleUsuario[] = ['ADMIN_GERAL', 'PREFEITO', 'SECRETARIO', 'JORNALISTA', 'REVISOR', 'OPERADOR']
+const ROLES_AVAILABLE: RoleUsuario[] = ['ADMIN_GERAL', 'PREFEITO', 'SECRETARIO', 'REVISOR', 'OPERADOR']
 const ROLES_REQUEREM_SECRETARIA: RoleUsuario[] = ['REVISOR', 'OPERADOR', 'SECRETARIO']
 
 function getInitials(name: string) {
