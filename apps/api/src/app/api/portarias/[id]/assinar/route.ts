@@ -106,6 +106,7 @@ export async function POST(
                     assinaturaJustificativa: justificativa || null,
                     assinaturaComprovanteUrl: comprovanteUrl || null,
                     status: 'PRONTO_PUBLICACAO',
+                    statusChangedAt: new Date(),
                     assinadoPorId: session.id,
                     assinadoEm: new Date(),
                     pdfUrl: null, // Clear cached pdf so it can be regenerated with signature

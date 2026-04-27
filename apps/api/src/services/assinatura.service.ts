@@ -88,6 +88,7 @@ export class AssinaturaService {
                     where: { id: portariaId },
                     data: {
                         status: 'PRONTO_PUBLICACAO',
+                        statusChangedAt: new Date(),
                         assinadoEm: new Date(),
                         assinadoPorId: usuarioId,
                         assinaturaStatus: 'ASSINADA_DIGITAL',

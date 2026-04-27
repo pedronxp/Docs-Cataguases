@@ -89,6 +89,7 @@ export async function POST(
                     assinaturaStatus: 'ASSINADA_DIGITAL',
                     assinaturaJustificativa: justificativa || null,
                     status: 'PRONTO_PUBLICACAO',
+                    statusChangedAt: new Date(),
                     assinadoPorId: session.id,
                     assinadoEm: new Date(),
                 }

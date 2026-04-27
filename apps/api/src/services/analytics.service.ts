@@ -3,6 +3,16 @@ import { ok, err } from '@/lib/result'
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
+const SLA_ETAPAS: Record<string, { label: string; slaHoras: number }> = {
+    PROCESSANDO: { label: 'Processando PDF', slaHoras: 1 },
+    EM_REVISAO_ABERTA: { label: 'Aguardando Revisor', slaHoras: 24 },
+    EM_REVISAO_ATRIBUIDA: { label: 'Em RevisÃ£o', slaHoras: 48 },
+    CORRECAO_NECESSARIA: { label: 'CorreÃ§Ã£o NecessÃ¡ria', slaHoras: 72 },
+    AGUARDANDO_ASSINATURA: { label: 'Aguardando Assinatura', slaHoras: 24 },
+    PRONTO_PUBLICACAO: { label: 'Pronto para PublicaÃ§Ã£o', slaHoras: 24 },
+    FALHA_PROCESSAMENTO: { label: 'Falha no Processamento', slaHoras: 4 },
+}
+
 export class AnalyticsService {
     /**
      * Obtém o dashboard completo para o frontend.
@@ -239,14 +249,34 @@ export class AnalyticsService {
             // 2. Taxa de rejeição
             const totalRevisadas = await prisma.feedAtividade.count({
                 where: {
-                    tipoEvento: { in: ['PORTARIA_APROVADA', 'PORTARIA_REJEITADA', 'WORKFLOW_APROVAR_REVISAO', 'WORKFLOW_SOLICITAR_CORRECAO'] },
+                    tipoEvento: {
+                        in: [
+                            'PORTARIA_APROVADA',
+                            'PORTARIA_REJEITADA',
+                            'WORKFLOW_APROVAR_REVISAO',
+                            'WORKFLOW_REJEITAR_REVISAO',
+                            'WORKFLOW_REJEITAR_CHEFIA',
+                            'MUDANCA_STATUS_APROVAR_REVISAO',
+                            'MUDANCA_STATUS_APROVAR_CHEFIA',
+                            'MUDANCA_STATUS_REJEITAR_REVISAO',
+                            'MUDANCA_STATUS_REJEITAR_CHEFIA',
+                        ]
+                    },
                     createdAt: { gte: dataCorte },
                     ...(secretariaId && !isAdmin ? { secretariaId } : {})
                 }
             })
             const totalRejeitadas = await prisma.feedAtividade.count({
                 where: {
-                    tipoEvento: { in: ['PORTARIA_REJEITADA', 'WORKFLOW_SOLICITAR_CORRECAO'] },
+                    tipoEvento: {
+                        in: [
+                            'PORTARIA_REJEITADA',
+                            'WORKFLOW_REJEITAR_REVISAO',
+                            'WORKFLOW_REJEITAR_CHEFIA',
+                            'MUDANCA_STATUS_REJEITAR_REVISAO',
+                            'MUDANCA_STATUS_REJEITAR_CHEFIA',
+                        ]
+                    },
                     createdAt: { gte: dataCorte },
                     ...(secretariaId && !isAdmin ? { secretariaId } : {})
                 }
@@ -328,8 +358,11 @@ export class AnalyticsService {
             }
 
             // 8. Pipeline/funil
-            const statusOrder = ['RASCUNHO', 'EM_REVISAO_ABERTA', 'EM_REVISAO_ATRIBUIDA', 'AGUARDANDO_ASSINATURA', 'PRONTO_PUBLICACAO', 'PUBLICADA']
+            const statusOrder = ['RASCUNHO', 'PROCESSANDO', 'EM_REVISAO_ABERTA', 'EM_REVISAO_ATRIBUIDA', 'CORRECAO_NECESSARIA', 'AGUARDANDO_ASSINATURA', 'PRONTO_PUBLICACAO', 'PUBLICADA', 'FALHA_PROCESSAMENTO']
             const statusLabels: Record<string, string> = {
+                PROCESSANDO: 'Processando',
+                CORRECAO_NECESSARIA: 'CorreÃ§Ã£o NecessÃ¡ria',
+                FALHA_PROCESSAMENTO: 'Falha no Processamento',
                 RASCUNHO: 'Rascunho', EM_REVISAO_ABERTA: 'Aguardando Revisor', EM_REVISAO_ATRIBUIDA: 'Em Revisão',
                 AGUARDANDO_ASSINATURA: 'Aguardando Assinatura', PRONTO_PUBLICACAO: 'Pronto Publicação', PUBLICADA: 'Publicada',
             }
@@ -345,6 +378,9 @@ export class AnalyticsService {
                 cor: this.getColorForStatus(status),
             }))
 
+            const slaEtapas = await this.obterSlaEtapas(where)
+            const retrabalho = await this.obterMetricasRetrabalho(where, dataCorte)
+
             return ok({
                 tempoMedioTramitacaoHoras,
                 taxaRejeicao,
@@ -354,11 +390,121 @@ export class AnalyticsService {
                 distribuicaoSecretarias,
                 evolucaoDiaria,
                 pipeline,
+                slaEtapas,
+                retrabalho,
                 periodo,
             })
         } catch (error) {
             console.error('Erro ao obter dashboard avançado:', error)
             return err('Falha ao processar métricas avançadas.')
+        }
+    }
+
+    private static async obterSlaEtapas(where: any) {
+        const statuses = Object.keys(SLA_ETAPAS)
+        const agora = Date.now()
+
+        const portarias = await prisma.portaria.findMany({
+            where: {
+                ...where,
+                status: { in: statuses }
+            },
+            select: {
+                id: true,
+                titulo: true,
+                status: true,
+                statusChangedAt: true,
+                updatedAt: true,
+                secretaria: { select: { sigla: true, nome: true } }
+            }
+        })
+
+        return statuses.map(status => {
+            const config = SLA_ETAPAS[status]
+            const itens = portarias.filter(p => p.status === status)
+            const idadesHoras = itens.map(p => {
+                const dataEntradaEtapa = p.statusChangedAt ?? p.updatedAt
+                return Math.max(0, Math.round((agora - new Date(dataEntradaEtapa).getTime()) / (1000 * 60 * 60)))
+            })
+            const atrasados = idadesHoras.filter(horas => horas > config.slaHoras).length
+            const maisAntigo = itens
+                .map((p, index) => ({ portaria: p, horas: idadesHoras[index] ?? 0 }))
+                .sort((a, b) => b.horas - a.horas)[0]
+
+            const idadeMediaHoras = idadesHoras.length > 0
+                ? Math.round(idadesHoras.reduce((acc, horas) => acc + horas, 0) / idadesHoras.length)
+                : 0
+
+            return {
+                status,
+                label: config.label,
+                slaHoras: config.slaHoras,
+                total: itens.length,
+                atrasados,
+                percentualAtraso: itens.length > 0 ? Math.round((atrasados / itens.length) * 100) : 0,
+                idadeMediaHoras,
+                maisAntigo: maisAntigo
+                    ? {
+                        id: maisAntigo.portaria.id,
+                        titulo: maisAntigo.portaria.titulo,
+                        horas: maisAntigo.horas,
+                        secretaria: maisAntigo.portaria.secretaria?.sigla ?? maisAntigo.portaria.secretaria?.nome ?? 'Sem secretaria',
+                    }
+                    : null,
+            }
+        })
+    }
+
+    private static async obterMetricasRetrabalho(where: any, dataCorte: Date) {
+        const portarias = await prisma.portaria.findMany({
+            where: { ...where, createdAt: { gte: dataCorte } },
+            select: {
+                revisoesCount: true,
+                status: true,
+                modelo: { select: { id: true, nome: true } },
+                secretaria: { select: { id: true, nome: true, sigla: true } }
+            }
+        })
+
+        const total = portarias.length
+        const comRetrabalho = portarias.filter(p => p.revisoesCount > 0).length
+        const totalDevolucoes = portarias.reduce((acc, p) => acc + p.revisoesCount, 0)
+        const statusesAposRevisao = new Set(['AGUARDANDO_ASSINATURA', 'PRONTO_PUBLICACAO', 'PUBLICADA'])
+        const aprovadas = portarias.filter(p => statusesAposRevisao.has(p.status))
+        const aprovadasPrimeira = aprovadas.filter(p => p.revisoesCount === 0).length
+
+        const agruparCorrecoes = <T extends { chave: string; nome: string }>(
+            itens: T[]
+        ) => Object.values(itens.reduce((acc: Record<string, { nome: string; devolucoes: number; documentos: number }>, item: any) => {
+            if (!acc[item.chave]) acc[item.chave] = { nome: item.nome, devolucoes: 0, documentos: 0 }
+            acc[item.chave].devolucoes += item.revisoesCount
+            acc[item.chave].documentos += 1
+            return acc
+        }, {}))
+            .filter(item => item.devolucoes > 0)
+            .sort((a, b) => b.devolucoes - a.devolucoes)
+            .slice(0, 5)
+
+        const modelos = agruparCorrecoes(portarias.map(p => ({
+            chave: p.modelo?.id ?? 'sem-modelo',
+            nome: p.modelo?.nome ?? 'Sem modelo',
+            revisoesCount: p.revisoesCount
+        })))
+
+        const secretarias = agruparCorrecoes(portarias.map(p => ({
+            chave: p.secretaria?.id ?? 'sem-secretaria',
+            nome: p.secretaria?.sigla ?? p.secretaria?.nome ?? 'Sem secretaria',
+            revisoesCount: p.revisoesCount
+        })))
+
+        return {
+            firstPassYield: aprovadas.length > 0 ? Math.round((aprovadasPrimeira / aprovadas.length) * 100) : 0,
+            taxaRetrabalho: total > 0 ? Math.round((comRetrabalho / total) * 100) : 0,
+            mediaDevolucoes: total > 0 ? Number((totalDevolucoes / total).toFixed(2)) : 0,
+            totalDevolucoes,
+            documentosComRetrabalho: comRetrabalho,
+            modelos,
+            secretarias,
         }
     }
 }
