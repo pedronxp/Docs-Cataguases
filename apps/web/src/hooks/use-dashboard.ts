@@ -35,7 +35,7 @@ export function useDashboard() {
         try {
             const [resFeed, resPortarias, resAnalytics] = await Promise.all([
                 feedService.listarFeed(undefined, true),
-                portariaService.listarPortarias({ pageSize: 200 }),
+                portariaService.listarPortarias({ pageSize: 1000 }),
                 buscarDadosAnalytics().catch(() => ({ success: false, data: null } as any)),
             ])
 
@@ -62,8 +62,8 @@ export function useDashboard() {
                     // Publicadas no mês atual
                     publicadasMes: docs.filter(d =>
                         d.status === STATUS_PORTARIA.PUBLICADA &&
-                        d.createdAt &&
-                        new Date(d.createdAt) >= inicioMes
+                        d.dataPublicacao &&
+                        new Date(d.dataPublicacao) >= inicioMes
                     ).length,
                     // Aguardando assinatura ou pronto para publicação
                     assinaturasPendentes: docs.filter(d =>

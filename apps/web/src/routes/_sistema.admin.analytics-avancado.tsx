@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Navigate } from '@tanstack/react-router'
 import {
     Clock, TrendingDown, Users, Calendar, BarChart3, Activity,
-    Building2, Target, ArrowUpRight, ArrowDownRight, Timer
+    Building2, Target, ArrowUpRight, ArrowDownRight, Timer, AlertTriangle
 } from 'lucide-react'
 import api from '@/lib/api'
 import { Can } from '@/lib/ability'
@@ -27,6 +27,16 @@ interface AvancadoData {
     distribuicaoSecretarias: { nome: string; sigla: string; cor: string; total: number; publicadas: number }[]
     evolucaoDiaria: { data: string; criados: number; publicados: number }[]
     pipeline: { status: string; label: string; quantidade: number; cor: string }[]
+    slaEtapas: {
+        status: string
+        label: string
+        slaHoras: number
+        total: number
+        atrasados: number
+        percentualAtraso: number
+        idadeMediaHoras: number
+        maisAntigo: { id: string; titulo: string; horas: number; secretaria: string } | null
+    }[]
     periodo: number
 }
 
@@ -75,6 +85,8 @@ function AnalyticsAvancadoPage() {
     }
 
     const totalPipeline = data.pipeline.reduce((a, b) => a + b.quantidade, 0)
+    const totalAtrasados = data.slaEtapas.reduce((total, etapa) => total + etapa.atrasados, 0)
+    const etapasComAtraso = data.slaEtapas.filter(etapa => etapa.atrasados > 0).length
 
     return (
         <Can I="manage" a="all" passThrough>
@@ -171,12 +183,12 @@ function AnalyticsAvancadoPage() {
                     <CardContent className="pt-5">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-slate-500 font-medium">Secretarias Ativas</p>
-                                <p className="text-2xl font-bold text-slate-800 mt-1">{data.distribuicaoSecretarias.length}</p>
-                                <p className="text-xs text-slate-500 mt-1">Com documentos no período</p>
+                                <p className="text-sm text-slate-500 font-medium">SLA em Atraso</p>
+                                <p className="text-2xl font-bold text-slate-800 mt-1">{totalAtrasados}</p>
+                                <p className="text-xs text-slate-500 mt-1">{etapasComAtraso} etapas com pendencia</p>
                             </div>
-                            <div className="p-3 rounded-xl bg-emerald-100">
-                                <Building2 className="h-5 w-5 text-emerald-600" />
+                            <div className={`p-3 rounded-xl ${totalAtrasados > 0 ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                                <AlertTriangle className={`h-5 w-5 ${totalAtrasados > 0 ? 'text-red-600' : 'text-emerald-600'}`} />
                             </div>
                         </div>
                     </CardContent>
@@ -184,6 +196,60 @@ function AnalyticsAvancadoPage() {
             </div>
 
             {/* Evolução Diária + Pipeline */}
+            <Card className="border-slate-200">
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                        SLA por Etapa
+                    </CardTitle>
+                    <CardDescription>Documentos abertos acima do prazo operacional definido para cada fase</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                                    <th className="py-2 pr-4 font-semibold">Etapa</th>
+                                    <th className="py-2 px-4 font-semibold text-right">SLA</th>
+                                    <th className="py-2 px-4 font-semibold text-right">Total</th>
+                                    <th className="py-2 px-4 font-semibold text-right">Atrasados</th>
+                                    <th className="py-2 px-4 font-semibold text-right">Media</th>
+                                    <th className="py-2 pl-4 font-semibold">Mais antigo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.slaEtapas.map((etapa) => (
+                                    <tr key={etapa.status} className="border-b border-slate-100 last:border-0">
+                                        <td className="py-3 pr-4">
+                                            <div className="font-medium text-slate-700">{etapa.label}</div>
+                                            <div className="text-xs text-slate-400">{etapa.status}</div>
+                                        </td>
+                                        <td className="py-3 px-4 text-right text-slate-600">{etapa.slaHoras}h</td>
+                                        <td className="py-3 px-4 text-right font-semibold text-slate-800">{etapa.total}</td>
+                                        <td className="py-3 px-4 text-right">
+                                            <span className={`inline-flex min-w-10 justify-center rounded-full px-2 py-1 text-xs font-bold ${etapa.atrasados > 0 ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                                {etapa.atrasados}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-right text-slate-600">{etapa.idadeMediaHoras}h</td>
+                                        <td className="py-3 pl-4">
+                                            {etapa.maisAntigo ? (
+                                                <div>
+                                                    <div className="max-w-[260px] truncate font-medium text-slate-700">{etapa.maisAntigo.titulo}</div>
+                                                    <div className="text-xs text-slate-400">{etapa.maisAntigo.secretaria} - {etapa.maisAntigo.horas}h na etapa</div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-400">Sem documentos</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="lg:col-span-2 border-slate-200">
                     <CardHeader>

@@ -134,10 +134,12 @@ O Doc's Cataguases é um sistema web de criação, revisão, assinatura e public
 - O sistema usa um modelo DOCX previamente cadastrado com variáveis como \`{{SYS_PREFEITO_NOME}}\`.
 - A portaria fica com status **RASCUNHO**.
 
-### Passo 2 — Submissão para Revisão (EM_REVISAO_ABERTA)
+### Passo 2 — Submissão e Processamento (PROCESSANDO → EM_REVISAO_ABERTA)
 - O servidor clica em "Submeter para Revisão".
 - Endpoint: \`POST /api/portarias/:id/submeter\`
-- Status muda para **EM_REVISAO_ABERTA** — visível na fila de revisão.
+- Status muda temporariamente para **PROCESSANDO** enquanto o PDF é gerado.
+- Se o PDF for gerado com sucesso, o status avança para **EM_REVISAO_ABERTA** e fica visível na fila de revisão.
+- Se a geração falhar, o status muda para **FALHA_PROCESSAMENTO** e deve ser reprocessado.
 
 ### Passo 3 — Solicitação de Revisão (EM_REVISAO_ATRIBUIDA)
 - Um revisor clica em "Solicitar Revisão" na fila, atribuindo o documento a si mesmo.
@@ -152,7 +154,7 @@ O Doc's Cataguases é um sistema web de criação, revisão, assinatura e public
 ### Passo 5 — Assinatura Digital
 - Autoridade competente assina digitalmente.
 - Endpoint: \`POST /api/portarias/:id/assinar\`
-- O sistema registra a assinatura com hash de integridade SHA-256.
+- O sistema registra a assinatura. O hash de integridade público é calculado sobre o PDF final assinado/publicado.
 - Status muda para **PRONTO_PUBLICACAO**.
 
 ### Passo 6 — Publicação (PUBLICADA)
@@ -162,7 +164,7 @@ O Doc's Cataguases é um sistema web de criação, revisão, assinatura e public
 - Status final: **PUBLICADA** — aparece no Diário Oficial e Portal de Publicações.
 
 ### Status especial
-- **FALHA_PROCESSAMENTO**: Falha na geração de PDF. O número já foi alocado. Reprocessar sem perder numeração.
+- **FALHA_PROCESSAMENTO**: Falha na geração de PDF antes da publicação. Nenhum número oficial foi alocado; reprocessar e tentar novamente.
 
 ---
 
@@ -242,16 +244,16 @@ Arquivo histórico de documentos publicados.
 ## ASSINATURA DIGITAL
 
 - O sistema usa assinatura própria — não há integração com ICP-Brasil ou certificado externo.
-- A assinatura é registrada com: timestamp, userId do assinante, hash SHA-256 do conteúdo HTML.
-- Na publicação, o hash é recalculado e comparado para garantir integridade.
+- A assinatura é registrada com timestamp e userId do assinante.
+- Na publicação, o hash SHA-256 é calculado sobre o PDF final para validação pública de integridade.
 - A assinatura aparece como rodapé no PDF gerado.
 
 ---
 
 ## REGRAS DE NEGÓCIO IMPORTANTES
 
-1. **Número da portaria é alocado antes de gerar o PDF** — se o PDF falhar, o número é preservado e o status vai para FALHA_PROCESSAMENTO (não é desperdiçado).
-2. **Hash de integridade** é calculado sobre o HTML final com o número real — não sobre o rascunho.
+1. **Número da portaria é alocado apenas na publicação** — rascunhos, revisões e falhas de PDF não reservam número oficial.
+2. **Hash de integridade** é calculado sobre o PDF final publicado — não sobre o rascunho, DOCX intermediário ou HTML.
 3. **Rate limiting no login**: 10 tentativas em 10 minutos → bloqueio de 15 minutos.
 4. **CASL para autorização**: cada ação (criar, ler, publicar, etc.) é verificada por regras de permissão baseadas no papel do usuário.
 5. **Paginação real**: a listagem de portarias usa SQL com \`take\`/\`skip\` e filtragem no banco (não em memória).
