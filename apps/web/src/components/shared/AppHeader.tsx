@@ -1,8 +1,10 @@
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/button'
-import { LogOut, User as UserIcon, Wifi } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { LogOut, Search, User as UserIcon, Wifi, X } from 'lucide-react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { useRef, useState, type FormEvent } from 'react'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,6 +25,9 @@ export function AppHeader({ title, actions }: AppHeaderProps) {
     const usuario = useAuthStore((s) => s.usuario)
     const clearSession = useAuthStore((s) => s.clearSession)
     const navigate = useNavigate()
+    const [searchOpen, setSearchOpen] = useState(false)
+    const [query, setQuery] = useState('')
+    const searchInputRef = useRef<HTMLInputElement>(null)
 
     const handleLogout = () => {
         clearSession()
@@ -32,6 +37,30 @@ export function AppHeader({ title, actions }: AppHeaderProps) {
     const initials = usuario?.name.substring(0, 2).toUpperCase() || 'US'
 
     useNotificationsSSE()
+
+    function openSearch() {
+        setSearchOpen(true)
+        window.setTimeout(() => searchInputRef.current?.focus(), 0)
+    }
+
+    function closeSearch() {
+        setSearchOpen(false)
+        setQuery('')
+    }
+
+    function handleSearchSubmit(e: FormEvent<HTMLFormElement>) {
+        e.preventDefault()
+        const busca = query.trim()
+        if (!busca) {
+            openSearch()
+            return
+        }
+        navigate({
+            to: '/administrativo/portarias',
+            search: { busca },
+        } as any)
+        setSearchOpen(false)
+    }
 
     return (
         <header className="h-14 border-b border-slate-200/80 bg-white/95 backdrop-blur-sm px-6 flex items-center justify-between shrink-0 sticky top-0 z-10 transition-all duration-300 shadow-sm shadow-slate-100/50">
@@ -49,6 +78,39 @@ export function AppHeader({ title, actions }: AppHeaderProps) {
             </div>
             <div className="flex items-center gap-3">
                 {actions && <div className="flex items-center gap-2">{actions}</div>}
+
+                <form onSubmit={handleSearchSubmit} className="relative flex items-center">
+                    {searchOpen ? (
+                        <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm">
+                            <Search className="h-4 w-4 text-slate-400" />
+                            <Input
+                                ref={searchInputRef}
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Escape') closeSearch()
+                                }}
+                                placeholder="Pesquisar portarias..."
+                                className="h-7 w-64 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
+                            />
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 rounded-full" onClick={closeSearch}>
+                                <X className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    ) : (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                            onClick={openSearch}
+                            aria-label="Pesquisar portarias"
+                            title="Pesquisar"
+                        >
+                            <Search className="h-4 w-4" />
+                        </Button>
+                    )}
+                </form>
 
                 <NotificationBell />
 
