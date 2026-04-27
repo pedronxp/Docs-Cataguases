@@ -379,6 +379,7 @@ export class AnalyticsService {
             }))
 
             const slaEtapas = await this.obterSlaEtapas(where)
+            const retrabalho = await this.obterMetricasRetrabalho(where, dataCorte)
 
             return ok({
                 tempoMedioTramitacaoHoras,
@@ -390,6 +391,7 @@ export class AnalyticsService {
                 evolucaoDiaria,
                 pipeline,
                 slaEtapas,
+                retrabalho,
                 periodo,
             })
         } catch (error) {
@@ -451,5 +453,58 @@ export class AnalyticsService {
                     : null,
             }
         })
+    }
+
+    private static async obterMetricasRetrabalho(where: any, dataCorte: Date) {
+        const portarias = await prisma.portaria.findMany({
+            where: { ...where, createdAt: { gte: dataCorte } },
+            select: {
+                revisoesCount: true,
+                status: true,
+                modelo: { select: { id: true, nome: true } },
+                secretaria: { select: { id: true, nome: true, sigla: true } }
+            }
+        })
+
+        const total = portarias.length
+        const comRetrabalho = portarias.filter(p => p.revisoesCount > 0).length
+        const totalDevolucoes = portarias.reduce((acc, p) => acc + p.revisoesCount, 0)
+        const statusesAposRevisao = new Set(['AGUARDANDO_ASSINATURA', 'PRONTO_PUBLICACAO', 'PUBLICADA'])
+        const aprovadas = portarias.filter(p => statusesAposRevisao.has(p.status))
+        const aprovadasPrimeira = aprovadas.filter(p => p.revisoesCount === 0).length
+
+        const agruparCorrecoes = <T extends { chave: string; nome: string }>(
+            itens: T[]
+        ) => Object.values(itens.reduce((acc: Record<string, { nome: string; devolucoes: number; documentos: number }>, item: any) => {
+            if (!acc[item.chave]) acc[item.chave] = { nome: item.nome, devolucoes: 0, documentos: 0 }
+            acc[item.chave].devolucoes += item.revisoesCount
+            acc[item.chave].documentos += 1
+            return acc
+        }, {}))
+            .filter(item => item.devolucoes > 0)
+            .sort((a, b) => b.devolucoes - a.devolucoes)
+            .slice(0, 5)
+
+        const modelos = agruparCorrecoes(portarias.map(p => ({
+            chave: p.modelo?.id ?? 'sem-modelo',
+            nome: p.modelo?.nome ?? 'Sem modelo',
+            revisoesCount: p.revisoesCount
+        })))
+
+        const secretarias = agruparCorrecoes(portarias.map(p => ({
+            chave: p.secretaria?.id ?? 'sem-secretaria',
+            nome: p.secretaria?.sigla ?? p.secretaria?.nome ?? 'Sem secretaria',
+            revisoesCount: p.revisoesCount
+        })))
+
+        return {
+            firstPassYield: aprovadas.length > 0 ? Math.round((aprovadasPrimeira / aprovadas.length) * 100) : 0,
+            taxaRetrabalho: total > 0 ? Math.round((comRetrabalho / total) * 100) : 0,
+            mediaDevolucoes: total > 0 ? Number((totalDevolucoes / total).toFixed(2)) : 0,
+            totalDevolucoes,
+            documentosComRetrabalho: comRetrabalho,
+            modelos,
+            secretarias,
+        }
     }
 }
