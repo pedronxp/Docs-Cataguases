@@ -6,11 +6,12 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
 import { Navigate } from '@tanstack/react-router'
 import {
     Clock, TrendingDown, Users, Calendar, BarChart3, Activity,
     Building2, Target, ArrowUpRight, ArrowDownRight, Timer, AlertTriangle,
-    RotateCcw, CheckCircle2, FileWarning, Inbox, Send, Scale, Hourglass, ShieldAlert
+    RotateCcw, CheckCircle2, FileWarning, Inbox, Send, Scale, Hourglass, ShieldAlert, ArrowRight
 } from 'lucide-react'
 import api from '@/lib/api'
 import { Can } from '@/lib/ability'
@@ -71,6 +72,7 @@ interface AvancadoData {
         descricao: string
         metrica: string
         acao: string
+        destino: 'kpi-sla' | 'kpi-backlog' | 'kpi-retrabalho'
     }[]
     periodo: number
 }
@@ -130,6 +132,14 @@ function AnalyticsAvancadoPage() {
     const etapasComAtraso = data.slaEtapas.filter(etapa => etapa.atrasados > 0).length
     const saldoFluxo = data.produtividadeFluxo.saldoPeriodo
     const saldoFluxoLabel = saldoFluxo > 0 ? `+${saldoFluxo}` : String(saldoFluxo)
+    const alertasPorPrioridade = data.alertasRisco.reduce((acc, alerta) => {
+        acc[alerta.prioridade] += 1
+        return acc
+    }, { CRITICA: 0, ALTA: 0, MEDIA: 0 })
+    const focoOperacional = data.alertasRisco[0]?.titulo ?? 'Operacao dentro dos limites'
+    const irParaSecao = (id: string) => {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
 
     return (
         <Can I="manage" a="all" passThrough>
@@ -246,7 +256,21 @@ function AnalyticsAvancadoPage() {
                     </CardTitle>
                     <CardDescription>Prioridades sugeridas a partir de SLA, retrabalho e backlog</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 md:col-span-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Foco operacional</p>
+                            <p className="mt-1 truncate text-sm font-bold text-slate-800">{focoOperacional}</p>
+                        </div>
+                        <div className="rounded-md border border-red-100 bg-red-50 px-3 py-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-red-600">Criticos</p>
+                            <p className="mt-1 text-lg font-bold text-red-700">{alertasPorPrioridade.CRITICA}</p>
+                        </div>
+                        <div className="rounded-md border border-amber-100 bg-amber-50 px-3 py-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">Altos/Medios</p>
+                            <p className="mt-1 text-lg font-bold text-amber-700">{alertasPorPrioridade.ALTA + alertasPorPrioridade.MEDIA}</p>
+                        </div>
+                    </div>
                     {data.alertasRisco.length === 0 ? (
                         <div className="flex items-center justify-between rounded-md border border-emerald-100 bg-emerald-50 px-4 py-3">
                             <div>
@@ -268,6 +292,16 @@ function AnalyticsAvancadoPage() {
                                             <p className="mt-2 text-sm font-bold">{alerta.titulo}</p>
                                             <p className="mt-1 text-xs opacity-90">{alerta.descricao}</p>
                                             <p className="mt-2 text-xs font-medium opacity-90">{alerta.acao}</p>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="mt-3 h-7 px-2 text-xs"
+                                                onClick={() => irParaSecao(alerta.destino)}
+                                            >
+                                                Ver detalhe
+                                                <ArrowRight className="ml-1 h-3 w-3" />
+                                            </Button>
                                         </div>
                                         <div className="shrink-0 rounded-md bg-white/75 px-2.5 py-1 text-xs font-bold">
                                             {alerta.metrica}
@@ -342,7 +376,7 @@ function AnalyticsAvancadoPage() {
                 </Card>
             </div>
 
-            <Card className="border-slate-200">
+            <Card id="kpi-backlog" className="scroll-mt-6 border-slate-200">
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                         <Hourglass className="h-4 w-4 text-slate-600" />
@@ -401,7 +435,7 @@ function AnalyticsAvancadoPage() {
             </Card>
 
             {/* Evolução Diária + Pipeline */}
-            <Card className="border-slate-200">
+            <Card id="kpi-sla" className="scroll-mt-6 border-slate-200">
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -455,7 +489,7 @@ function AnalyticsAvancadoPage() {
                 </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div id="kpi-retrabalho" className="scroll-mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="border-slate-200">
                     <CardContent className="pt-5">
                         <div className="flex items-center justify-between">
