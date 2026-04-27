@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useRouterState } from '@tanstack/react-router'
 import { usePortarias } from '@/hooks/use-portarias'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { DataTableSkeleton } from '@/components/shared/DataTableSkeleton'
 import { STATUS_PORTARIA, type StatusPortaria, type Portaria } from '@/types/domain'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { BatchActionBar } from '@/components/portarias/batch-action-bar'
 import { SignatureModal } from '@/components/portarias/signature-modal'
@@ -83,7 +83,11 @@ function getResponsavel(doc: Portaria): { tipo: string; nome: string } | null {
 
 
 function PortariasListPage() {
-    const { portarias, loading, filters, updateFilters, refresh } = usePortarias()
+    const routerState = useRouterState()
+    const buscaUrl = typeof (routerState.location.search as any).busca === 'string'
+        ? (routerState.location.search as any).busca
+        : ''
+    const { portarias, loading, filters, updateFilters, refresh } = usePortarias({ busca: buscaUrl || undefined })
     const [selectedIds, setSelectedIds] = useState<string[]>([])
     const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false)
     const [deleteIds, setDeleteIds] = useState<string[]>([])
@@ -97,6 +101,10 @@ function PortariasListPage() {
 
     const canSignBatch = usuario?.role === 'PREFEITO' || usuario?.role === 'ADMIN_GERAL'
     const canDelete = usuario?.role === 'ADMIN_GERAL'
+
+    useEffect(() => {
+        updateFilters({ busca: buscaUrl || undefined })
+    }, [buscaUrl])
 
     const handleConfirmDelete = async () => {
         if (deleteIds.length === 0) return
