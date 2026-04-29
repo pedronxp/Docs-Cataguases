@@ -10,12 +10,8 @@ function getApiBaseUrl(): string {
         const localHosts = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
         const isLocalTarget = localHosts.has(configuredUrl.hostname)
         const isLocalPage = localHosts.has(window.location.hostname)
-        const configuredPort = configuredUrl.port || (configuredUrl.protocol === 'https:' ? '443' : '80')
 
         if (isLocalTarget && !isLocalPage) return ''
-        if (isLocalTarget && isLocalPage && configuredPort !== window.location.port && configuredPort !== '3000') {
-            return ''
-        }
     } catch {
         return configured
     }

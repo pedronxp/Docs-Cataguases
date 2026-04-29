@@ -34,17 +34,8 @@ function getDashboardApiBase(): string {
         const configuredUrl = new URL(configured, window.location.origin)
         const currentHost = window.location.hostname
         const localHosts = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
-        const configuredPort = configuredUrl.port || (configuredUrl.protocol === 'https:' ? '443' : '80')
 
         if (localHosts.has(configuredUrl.hostname) && !localHosts.has(currentHost)) {
-            return ''
-        }
-        if (
-            localHosts.has(configuredUrl.hostname)
-            && localHosts.has(currentHost)
-            && configuredPort !== window.location.port
-            && configuredPort !== '3000'
-        ) {
             return ''
         }
     } catch {
