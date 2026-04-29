@@ -26,8 +26,50 @@ import {
     type LLMStatus, type LLMProvider, type LLMRequestLog
 } from '@/services/llm.service'
 
-const API_BASE = (import.meta as any).env.VITE_API_BASE_URL || ''
+function getDashboardApiBase(): string {
+    const configured = ((import.meta as any).env.VITE_API_BASE_URL || '').trim()
+    if (!configured || typeof window === 'undefined') return configured
+
+    try {
+        const configuredUrl = new URL(configured, window.location.origin)
+        const currentHost = window.location.hostname
+        const localHosts = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
+        const configuredPort = configuredUrl.port || (configuredUrl.protocol === 'https:' ? '443' : '80')
+
+        if (localHosts.has(configuredUrl.hostname) && !localHosts.has(currentHost)) {
+            return ''
+        }
+        if (
+            localHosts.has(configuredUrl.hostname)
+            && localHosts.has(currentHost)
+            && configuredPort !== window.location.port
+            && configuredPort !== '3000'
+        ) {
+            return ''
+        }
+    } catch {
+        return configured
+    }
+
+    return configured.replace(/\/+$/, '')
+}
+
+const API_BASE = getDashboardApiBase()
 const apiUrl = (path: string) => `${API_BASE}${path}`
+
+async function fetchJson<T>(url: string, init?: RequestInit, timeoutMs = 15000): Promise<{ res: Response; data: T | null }> {
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+        const res = await fetch(url, { ...init, signal: controller.signal })
+        const text = await res.text()
+        const data = text ? JSON.parse(text) as T : null
+        return { res, data }
+    } finally {
+        window.clearTimeout(timeout)
+    }
+}
 
 export const Route = createFileRoute('/_sistema/admin/llm')({
     component: LLMDashboard,
@@ -240,12 +282,16 @@ function KeysTab() {
     const fetchKeys = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch(apiUrl('/api/admin/llm/keys'), { credentials: 'include' })
+            const { res, data } = await fetchJson<{ keys: LlmKey[]; stats: any }>(
+                apiUrl('/api/admin/llm/keys'),
+                { credentials: 'include' },
+            )
             if (res.ok) {
-                const data = await res.json()
-                setKeys(data.keys)
-                setPoolStats(data.stats)
+                setKeys(data?.keys ?? [])
+                setPoolStats(data?.stats ?? null)
             }
+        } catch (err: any) {
+            console.error('[LLM Keys] Falha ao buscar chaves:', err)
         } finally { setLoading(false) }
     }, [])
 
@@ -257,21 +303,40 @@ function KeysTab() {
             return
         }
         setAdding(true)
-        const res = await fetch(apiUrl('/api/admin/llm/keys'), {
-            method: 'POST', credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(form),
-        })
-        const data = await res.json()
-        if (res.ok) {
-            toast({ title: 'Chave adicionada com sucesso!', className: 'bg-green-600 text-white' })
-            setForm({ provider: 'groq', label: '', key: '' })
-            setShowModal(false)
-            await fetchKeys()
-        } else {
-            toast({ title: 'Erro', description: data.error, variant: 'destructive' })
+        try {
+            const { res, data } = await fetchJson<{ error?: string }>(
+                apiUrl('/api/admin/llm/keys'),
+                {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(form),
+                },
+            )
+            if (res.ok) {
+                toast({ title: 'Chave adicionada com sucesso!', className: 'bg-green-600 text-white' })
+                setForm({ provider: 'groq', label: '', key: '' })
+                setShowModal(false)
+                await fetchKeys()
+            } else {
+                toast({
+                    title: 'Erro ao salvar chave',
+                    description: data?.error || `Servidor respondeu com status ${res.status}.`,
+                    variant: 'destructive',
+                })
+            }
+        } catch (err: any) {
+            const timeout = err?.name === 'AbortError'
+            toast({
+                title: timeout ? 'Tempo esgotado ao salvar' : 'Falha de conexao',
+                description: timeout
+                    ? 'A API nao respondeu em 15 segundos. Verifique se o backend esta online.'
+                    : 'Nao foi possivel falar com a API. Verifique URL do backend, proxy ou login.',
+                variant: 'destructive',
+            })
+        } finally {
+            setAdding(false)
         }
-        setAdding(false)
     }
 
     const handleToggle = async (key: LlmKey) => {
