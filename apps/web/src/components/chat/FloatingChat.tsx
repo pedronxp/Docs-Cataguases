@@ -30,11 +30,13 @@ interface ChatMessage {
 
 // ── Modelos disponíveis para seleção manual (com mapeamento para provider) ───
 const MODELS = [
-    { value: '', provider: '',          label: 'Automatico online (Sistema escolhe)', sub: 'Provider configurado no painel' },
+    { value: '', provider: '',          label: 'Automatico recomendado', sub: 'Groq GPT-OSS 120B por padrao' },
+    { value: 'openai/gpt-oss-120b', provider: 'groq', label: 'GPT-OSS 120B (Groq)', sub: 'Melhor desempenho online' },
+    { value: 'openai/gpt-oss-20b', provider: 'groq', label: 'GPT-OSS 20B (Groq)', sub: 'Mais rapido para respostas curtas' },
+    { value: 'llama-3.3-70b-versatile', provider: 'groq', label: 'Llama 3.3 70B (Groq)', sub: 'Fallback estavel no Groq' },
     { value: 'llama3.1-8b',    provider: 'cerebras', label: 'Llama 3.1 8B',     sub: 'Padrao e textos rapidos' },
     { value: 'llama3.3-70b',  provider: 'cerebras', label: 'Llama 3.3 70B',    sub: 'Tarefas complexas e longas' },
     { value: 'mistral-large-latest', provider: 'mistral', label: 'Mistral Large',      sub: 'Raciocinio avancado' },
-    { value: 'llama-3.3-70b-versatile', provider: 'groq', label: 'Llama 3.3 70B (Groq)', sub: 'Online com ZDR configuravel' },
     { value: 'moonshot-v1-8k', provider: 'kimi', label: 'Kimi (Moonshot 8K)', sub: 'Inteligencia chinesa' },
     { value: 'moonshot-v1-32k', provider: 'kimi', label: 'Kimi (Moonshot 32K)', sub: 'Janela estendida' },
     { value: 'google/gemma-3-27b-it:free', provider: 'openrouter', label: 'Gemma 3 27B (free)', sub: 'Google via OpenRouter' },

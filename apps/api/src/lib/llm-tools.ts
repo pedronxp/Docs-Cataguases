@@ -382,9 +382,30 @@ const TOOL_ROLE_REQUIREMENTS: Record<string, string[]> = {
  * Ferramentas sem entrada em TOOL_ROLE_REQUIREMENTS são incluídas por padrão (safe default).
  * Deve ser chamado antes de passar tools ao llmChat().
  */
-export function filterToolsByRole(role: string): typeof LLM_TOOLS {
+const MUTATING_TOOL_NAMES = new Set([
+    'criar_secretaria',
+    'criar_setor',
+    'deletar_secretaria',
+    'deletar_setor',
+    'editar_secretaria',
+    'criar_modelo',
+    'criar_portaria',
+    'submeter_portaria',
+    'aprovar_revisao',
+    'devolver_revisao',
+    'assinar_portaria',
+    'publicar_portaria',
+    'cancelar_portaria',
+    'deletar_portaria',
+    'reverter_status_portaria',
+    'alterar_papel',
+    'alterar_lotacao',
+])
+
+export function filterToolsByRole(role: string, options: { includeMutating?: boolean } = {}): typeof LLM_TOOLS {
     return LLM_TOOLS.filter(tool => {
         const funcName = tool.function.name
+        if (options.includeMutating === false && MUTATING_TOOL_NAMES.has(funcName)) return false
         const allowedRoles = TOOL_ROLE_REQUIREMENTS[funcName]
         // Se não há restrição mapeada, incluir (pode ser uma ferramenta nova/segura por padrão)
         if (!allowedRoles) return true

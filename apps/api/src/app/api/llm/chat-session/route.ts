@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
         const userSetorId: string | undefined = dbUser.setorId ?? undefined
 
         // Filtrar ferramentas pela role do usuário (defense in depth — V4.1 ASVS L1)
-        const filteredTools = filterToolsByRole(dbUser.role)
+        const filteredTools = filterToolsByRole(dbUser.role, { includeMutating: false })
 
         // Montar userAuth para repassar às ferramentas (mesmo formato de /api/llm/chat)
         const userAuth = {
@@ -95,8 +95,8 @@ export async function POST(req: NextRequest) {
                 data: {
                     userId: dbUser.id,
                     titulo: message.length > 30 ? message.substring(0, 30) + '...' : message,
-                    provider: provider || 'cerebras',  // persiste escolha manual
-                    model: model || 'llama3.1-8b',     // persiste escolha manual
+                    provider: provider || 'groq',       // persiste escolha manual
+                    model: model || 'openai/gpt-oss-120b',
                 }
             })
             chatSessionId = newSession.id

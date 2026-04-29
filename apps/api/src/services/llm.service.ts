@@ -78,6 +78,8 @@ export const MISTRAL_MODELS = [
 
 // GROQ — Fallback rápido
 export const GROQ_MODELS = [
+    { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B (Melhor desempenho)', contextWindow: 131072 },
+    { id: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B (Mais rapido)', contextWindow: 131072 },
     { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Versatile)', contextWindow: 128000 },
     { id: 'llama-3.1-8b-instant',    label: 'Llama 3.1 8B (Instant)', contextWindow: 131072 },
     { id: 'deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 (Contexto longo)', contextWindow: 32768 },
@@ -105,7 +107,7 @@ export const OLLAMA_MODELS = [
 
 // ── Estado de rastreamento em memória ─────────────────────────────────────────
 
-let activeProvider: LLMProvider = (process.env.LLM_DEFAULT_PROVIDER as LLMProvider) || 'cerebras'
+let activeProvider: LLMProvider = (process.env.LLM_DEFAULT_PROVIDER as LLMProvider) || 'groq'
 
 export interface LLMProviderStats {
     requestsTotal: number
@@ -182,7 +184,7 @@ interface ModelChoice {
 function getDefaultModelForProvider(provider: LLMProvider): string {
     if (provider === 'cerebras') return 'llama3.1-8b'
     if (provider === 'mistral') return 'mistral-large-latest'
-    if (provider === 'groq') return 'llama-3.3-70b-versatile'
+    if (provider === 'groq') return 'openai/gpt-oss-120b'
     if (provider === 'openrouter') return 'meta-llama/llama-3.3-70b-instruct:free'
     if (provider === 'kimi') return 'moonshot-v1-8k'
     if (provider === 'ollama') return process.env.OLLAMA_MODEL || 'qwen3:8b'
@@ -215,7 +217,7 @@ function chooseModel(options: LLMChatOptions): ModelChoice {
     const modelMap: Record<LLMProvider, { tools: string; fast: string; long: string; default: string }> = {
         cerebras:   { tools: 'llama3.3-70b', fast: 'llama3.1-8b', long: 'llama3.3-70b', default: 'llama3.1-8b' },
         mistral:    { tools: 'mistral-large-latest', fast: 'mistral-small-latest', long: 'mistral-large-latest', default: 'mistral-large-latest' },
-        groq:       { tools: 'llama-3.3-70b-versatile', fast: 'llama-3.1-8b-instant', long: 'deepseek-r1-distill-llama-70b', default: 'llama-3.3-70b-versatile' },
+        groq:       { tools: 'openai/gpt-oss-120b', fast: 'openai/gpt-oss-120b', long: 'openai/gpt-oss-120b', default: 'openai/gpt-oss-120b' },
         openrouter: { tools: 'meta-llama/llama-3.3-70b-instruct:free', fast: 'meta-llama/llama-3.3-70b-instruct:free', long: 'deepseek/deepseek-r1:free', default: 'meta-llama/llama-3.3-70b-instruct:free' },
         kimi:       { tools: 'moonshot-v1-8k', fast: 'moonshot-v1-8k', long: 'moonshot-v1-32k', default: 'moonshot-v1-8k' },
         ollama:     { tools: 'qwen3:8b', fast: 'qwen3:8b', long: 'llama3.1:8b', default: process.env.OLLAMA_MODEL || 'qwen3:8b' },
@@ -471,7 +473,7 @@ export async function llmChat(options: LLMChatOptions): Promise<LLMChatResult> {
         if (provider !== choice.provider) {
             if (provider === 'cerebras') modelToUse = 'llama3.1-8b'
             else if (provider === 'mistral') modelToUse = 'mistral-large-latest'
-            else if (provider === 'groq') modelToUse = 'llama-3.3-70b-versatile'
+            else if (provider === 'groq') modelToUse = 'openai/gpt-oss-120b'
             else if (provider === 'kimi') modelToUse = 'moonshot-v1-8k'
             else if (provider === 'ollama') modelToUse = process.env.OLLAMA_MODEL || 'qwen3:8b'
             else modelToUse = 'meta-llama/llama-3.3-70b-instruct:free'

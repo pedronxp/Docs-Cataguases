@@ -17,6 +17,8 @@ const MODEL_TO_PROVIDER: Record<string, LLMProvider> = {
     'mistral-small-latest':                     'mistral',
     'open-mistral-nemo':                        'mistral',
     // Groq
+    'openai/gpt-oss-120b':                      'groq',
+    'openai/gpt-oss-20b':                       'groq',
     'llama-3.3-70b-versatile':                  'groq',
     'llama-3.1-8b-instant':                     'groq',
     'qwen-2.5-32b':                             'groq',
@@ -149,7 +151,9 @@ export async function POST(req: NextRequest) {
 
 
     // Filtrar ferramentas pela role do usuário (defense in depth — V4.1 ASVS L1)
-    const filteredTools = filterToolsByRole(dbUser.role)
+    const filteredTools = mode === 'chat'
+        ? []
+        : filterToolsByRole(dbUser.role, { includeMutating: true })
 
     const hasSystemMsg = messages[0]?.role === 'system'
     const finalMessages: LLMMessage[] = useSystemPrompt && !hasSystemMsg
