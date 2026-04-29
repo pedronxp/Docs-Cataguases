@@ -28,6 +28,10 @@ const MODEL_TO_PROVIDER: Record<string, LLMProvider> = {
     // Kimi
     'moonshot-v1-8k':                           'kimi',
     'moonshot-v1-32k':                          'kimi',
+    // Ollama local
+    'qwen3:8b':                                 'ollama',
+    'llama3.1:8b':                              'ollama',
+    'mistral:7b':                               'ollama',
 }
 
 // Timeout para evitar que o request fique pendurado (30s)

@@ -25,7 +25,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const { provider } = body
-    if (!['groq', 'openrouter', 'cerebras'].includes(provider)) {
+    if (!['ollama', 'groq', 'openrouter', 'cerebras', 'mistral', 'kimi'].includes(provider)) {
         return NextResponse.json({ error: 'Provider inválido. Use "groq", "openrouter" ou "cerebras".' }, { status: 400 })
     }
 

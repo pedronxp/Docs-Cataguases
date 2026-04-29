@@ -1,7 +1,7 @@
 import { ok, err, type Result } from '../lib/result'
 import { BaseApiService, httpClient } from '@/services/base'
 
-export type LLMProvider = 'cerebras' | 'mistral' | 'groq' | 'openrouter'
+export type LLMProvider = 'ollama' | 'cerebras' | 'mistral' | 'groq' | 'openrouter' | 'kimi'
 
 export interface LLMMessage {
     role: 'system' | 'user' | 'assistant'
@@ -68,12 +68,16 @@ export interface LLMStatus {
     mistral: LLMProviderStats
     groq: LLMProviderStats
     openrouter: LLMProviderStats
+    kimi: LLMProviderStats
+    ollama: LLMProviderStats
     recentRequests: LLMRequestLog[]
     models: {
         cerebras: Array<{ id: string; label: string; contextWindow?: number }>
         mistral: Array<{ id: string; label: string; contextWindow?: number }>
         groq: Array<{ id: string; label: string; contextWindow?: number }>
         openrouter: Array<{ id: string; label: string }>
+        kimi: Array<{ id: string; label: string; contextWindow?: number }>
+        ollama: Array<{ id: string; label: string; contextWindow?: number }>
     }
 }
 

@@ -11,7 +11,7 @@ import api from '@/lib/api'
 import {
     Bot, X, Send, RefreshCw, ChevronDown, Sparkles,
     Zap, Globe, AlertTriangle, Trash2, Copy, Check,
-    Paperclip, FileText, Loader2
+    Paperclip, FileText, Loader2, Cpu
 } from 'lucide-react'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -30,6 +30,8 @@ interface ChatMessage {
 
 // ── Modelos disponíveis para seleção manual (com mapeamento para provider) ───
 const MODELS = [
+    { value: 'qwen3:8b', provider: 'ollama', label: 'Ollama Local (Qwen 3 8B)', sub: 'Gratis e privado no servidor' },
+    { value: 'llama3.1:8b', provider: 'ollama', label: 'Ollama Local (Llama 3.1 8B)', sub: 'Gratis e privado no servidor' },
     { value: '', provider: '',          label: '⚡ Automático (Sistema escolhe)', sub: 'Cerebras por padrão' },
     { value: 'llama3.1-8b',    provider: 'cerebras', label: 'Llama 3.1 8B ⚡',     sub: 'Padrão e textos rápidos' },
     { value: 'llama3.3-70b',  provider: 'cerebras', label: 'Llama 3.3 70B ⚡',    sub: 'Tarefas complexas e longas' },
@@ -174,6 +176,11 @@ function ProviderBadge({ provider }: { provider: string }) {
             cls: 'text-teal-600 border-teal-200 bg-teal-50',
             icon: <Sparkles className="h-2.5 w-2.5 mr-0.5" />,
             label: 'kimi',
+        },
+        ollama: {
+            cls: 'text-emerald-700 border-emerald-200 bg-emerald-50',
+            icon: <Cpu className="h-2.5 w-2.5 mr-0.5" />,
+            label: 'ollama local',
         },
     }
     const c = config[provider] ?? {

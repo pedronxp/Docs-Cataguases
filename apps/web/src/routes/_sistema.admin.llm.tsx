@@ -26,7 +26,7 @@ import {
     type LLMStatus, type LLMProvider, type LLMRequestLog
 } from '@/services/llm.service'
 
-const API_BASE = (import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:3000'
+const API_BASE = (import.meta as any).env.VITE_API_BASE_URL || ''
 const apiUrl = (path: string) => `${API_BASE}${path}`
 
 export const Route = createFileRoute('/_sistema/admin/llm')({
@@ -42,6 +42,7 @@ function fmtTs(ts: string) {
 
 // ── Provider config ───────────────────────────────────────────────────────────
 const PROVIDERS: { name: LLMProvider; label: string; desc: string; icon: React.ElementType; accent: string; accentBg: string; accentBorder: string }[] = [
+    { name: 'ollama', label: 'Ollama Local', desc: 'Privado — sem custo por token', icon: Cpu, accent: 'text-[#008833]', accentBg: 'bg-[#e6f4eb]', accentBorder: 'border-[#008833]' },
     { name: 'cerebras', label: 'Cerebras', desc: 'Wafer-scale — mais rápido', icon: Zap, accent: 'text-[#c55a00]', accentBg: 'bg-[#fff5eb]', accentBorder: 'border-[#c55a00]' },
     { name: 'mistral', label: 'Mistral', desc: 'Modelos de ponta', icon: Sparkles, accent: 'text-[#6730a3]', accentBg: 'bg-[#f3f0ff]', accentBorder: 'border-[#6730a3]' },
     { name: 'groq', label: 'Groq', desc: 'Ultra-rápido', icon: Cpu, accent: 'text-[#6730a3]', accentBg: 'bg-[#f3f0ff]', accentBorder: 'border-[#6730a3]' },
@@ -57,7 +58,7 @@ function ProviderCard({
     name: LLMProvider; label: string; desc: string; icon: React.ElementType
     accent: string; accentBg: string; accentBorder: string
     isActive: boolean; onSwitch: () => void; switching: boolean
-    stats: LLMStatus['groq'] | LLMStatus['openrouter'] | LLMStatus['cerebras'] | LLMStatus['mistral']
+    stats: LLMStatus['groq'] | LLMStatus['openrouter'] | LLMStatus['cerebras'] | LLMStatus['mistral'] | LLMStatus['kimi'] | LLMStatus['ollama']
 }) {
     return (
         <div className={`bg-white border rounded p-4 transition-all ${isActive ? `border-2 ${accentBorder}` : 'border-[#e6e6e6]'}`}>
@@ -223,6 +224,7 @@ const PROVIDER_BADGE_COLOR: Record<string, string> = {
     groq: 'text-[#6730a3] border-[#6730a3] bg-[#f3f0ff]',
     openrouter: 'text-[#1351b4] border-[#1351b4] bg-[#edf5ff]',
     kimi: 'text-[#1d9e74] border-[#1d9e74] bg-[#e6f4f1]',
+    ollama: 'text-[#008833] border-[#008833] bg-[#e6f4eb]',
 }
 
 // ── Keys Tab ──────────────────────────────────────────────────────────────────
@@ -532,6 +534,8 @@ function LLMDashboard() {
         ...(status?.models?.mistral ?? []).map(m => ({ ...m, provider: 'mistral' as LLMProvider })),
         ...(status?.models?.groq ?? []).map(m => ({ ...m, provider: 'groq' as LLMProvider })),
         ...(status?.models?.openrouter ?? []).map(m => ({ ...m, provider: 'openrouter' as LLMProvider })),
+        ...(status?.models?.kimi ?? []).map(m => ({ ...m, provider: 'kimi' as LLMProvider })),
+        ...(status?.models?.ollama ?? []).map(m => ({ ...m, provider: 'ollama' as LLMProvider })),
     ]
 
     const activeProviderConfig = PROVIDERS.find(p => p.name === status?.activeProvider) ?? PROVIDERS[0]

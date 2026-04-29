@@ -17,7 +17,7 @@
 import prisma from '@/lib/prisma'
 import { decrypt, isEncrypted } from '@/lib/encryption'
 
-export type LLMProvider = 'cerebras' | 'mistral' | 'groq' | 'openrouter' | 'kimi'
+export type LLMProvider = 'cerebras' | 'mistral' | 'groq' | 'openrouter' | 'kimi' | 'ollama'
 
 export interface LLMMessage {
     role: 'system' | 'user' | 'assistant' | 'tool'
@@ -59,6 +59,7 @@ const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
 const CEREBRAS_BASE = 'https://api.cerebras.ai/v1'
 const MISTRAL_BASE = 'https://api.mistral.ai/v1'
 const KIMI_BASE = 'https://api.moonshot.cn/v1'
+const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1'
 
 // ── Catálogo de Modelos ────────────────────────────────────────────────────────
 
@@ -93,6 +94,13 @@ export const OPENROUTER_FREE_MODELS = [
 export const KIMI_MODELS = [
     { id: 'moonshot-v1-8k', label: 'Moonshot v1 8K', contextWindow: 8192 },
     { id: 'moonshot-v1-32k', label: 'Moonshot v1 32K', contextWindow: 32768 },
+]
+
+// OLLAMA — Execução local/self-hosted (privacidade máxima, sem custo por token)
+export const OLLAMA_MODELS = [
+    { id: 'qwen3:8b', label: 'Qwen 3 8B Local (Ollama)', contextWindow: 40960 },
+    { id: 'llama3.1:8b', label: 'Llama 3.1 8B Local (Ollama)', contextWindow: 131072 },
+    { id: 'mistral:7b', label: 'Mistral 7B Local (Ollama)', contextWindow: 32768 },
 ]
 
 // ── Estado de rastreamento em memória ─────────────────────────────────────────
@@ -145,6 +153,7 @@ const stats: Record<LLMProvider, LLMProviderStats> = {
     groq:       emptyStats(),
     openrouter: emptyStats(),
     kimi:       emptyStats(),
+    ollama:     emptyStats(),
 }
 
 const requestLog: LLMRequestLog[] = []
@@ -176,6 +185,7 @@ function getDefaultModelForProvider(provider: LLMProvider): string {
     if (provider === 'groq') return 'llama-3.3-70b-versatile'
     if (provider === 'openrouter') return 'meta-llama/llama-3.3-70b-instruct:free'
     if (provider === 'kimi') return 'moonshot-v1-8k'
+    if (provider === 'ollama') return process.env.OLLAMA_MODEL || 'qwen3:8b'
     return 'llama3.1-8b'
 }
 
@@ -208,6 +218,7 @@ function chooseModel(options: LLMChatOptions): ModelChoice {
         groq:       { tools: 'llama-3.3-70b-versatile', fast: 'llama-3.1-8b-instant', long: 'deepseek-r1-distill-llama-70b', default: 'llama-3.3-70b-versatile' },
         openrouter: { tools: 'meta-llama/llama-3.3-70b-instruct:free', fast: 'meta-llama/llama-3.3-70b-instruct:free', long: 'deepseek/deepseek-r1:free', default: 'meta-llama/llama-3.3-70b-instruct:free' },
         kimi:       { tools: 'moonshot-v1-8k', fast: 'moonshot-v1-8k', long: 'moonshot-v1-32k', default: 'moonshot-v1-8k' },
+        ollama:     { tools: 'qwen3:8b', fast: 'qwen3:8b', long: 'llama3.1:8b', default: process.env.OLLAMA_MODEL || 'qwen3:8b' },
     }
 
     const models = modelMap[preferred]
@@ -307,7 +318,9 @@ async function callWithCircuitBreaker(
 
         // Se não há chave no banco, tentar via variável de ambiente (fallback legacy)
         if (!key) {
-            const envKey = provider === 'groq'
+            const envKey = provider === 'ollama'
+                ? (process.env.OLLAMA_API_KEY || 'ollama')
+                : provider === 'groq'
                 ? process.env.GROQ_API_KEY
                 : provider === 'cerebras'
                 ? process.env.CEREBRAS_API_KEY
@@ -402,6 +415,7 @@ function hasEnvKey(p: LLMProvider): boolean {
         : p === 'mistral'        ? process.env.MISTRAL_API_KEY
         : p === 'groq'           ? process.env.GROQ_API_KEY
         : p === 'kimi'           ? process.env.KIMI_API_KEY
+        : p === 'ollama'         ? (process.env.OLLAMA_ENABLED === 'true' || activeProvider === 'ollama' ? 'ollama' : undefined)
         : process.env.OPENROUTER_API_KEY
     return !!k
 }
@@ -430,7 +444,14 @@ export async function llmChat(options: LLMChatOptions): Promise<LLMChatResult> {
         console.log(`[LLM Router] Modo manual: usando APENAS ${choice.provider}/${choice.model} (sem fallback)`)
     } else {
         // Modo automático: tentar em ordem de disponibilidade
-        const allProviders: LLMProvider[] = ['cerebras', 'mistral', 'kimi', 'groq', 'openrouter']
+        const allProviders: LLMProvider[] = [
+            ...(process.env.OLLAMA_ENABLED === 'true' ? ['ollama' as LLMProvider] : []),
+            'cerebras',
+            'mistral',
+            'kimi',
+            'groq',
+            'openrouter',
+        ]
         const base = Array.from(new Set([choice.provider, ...allProviders]))
         providerOrder = [
             ...base.filter(p => hasEnvKey(p)),   // providers com chave ENV primeiro
@@ -452,6 +473,7 @@ export async function llmChat(options: LLMChatOptions): Promise<LLMChatResult> {
             else if (provider === 'mistral') modelToUse = 'mistral-large-latest'
             else if (provider === 'groq') modelToUse = 'llama-3.3-70b-versatile'
             else if (provider === 'kimi') modelToUse = 'moonshot-v1-8k'
+            else if (provider === 'ollama') modelToUse = process.env.OLLAMA_MODEL || 'qwen3:8b'
             else modelToUse = 'meta-llama/llama-3.3-70b-instruct:free'
         }
 
@@ -553,6 +575,7 @@ async function callProviderRaw(
         : provider === 'mistral' ? MISTRAL_BASE
         : provider === 'groq' ? GROQ_BASE
         : provider === 'kimi' ? KIMI_BASE
+        : provider === 'ollama' ? OLLAMA_BASE
         : OPENROUTER_BASE
 
     const headers: Record<string, string> = {
@@ -820,6 +843,7 @@ export function getLLMStats() {
         groq:       stats.groq,
         openrouter: stats.openrouter,
         kimi:       stats.kimi,
+        ollama:     stats.ollama,
         recentRequests: requestLog.slice(0, 20),
         models: {
             cerebras:   CEREBRAS_MODELS,
@@ -827,6 +851,7 @@ export function getLLMStats() {
             groq:       GROQ_MODELS,
             openrouter: OPENROUTER_FREE_MODELS,
             kimi:       KIMI_MODELS,
+            ollama:     OLLAMA_MODELS,
         },
     }
 }
