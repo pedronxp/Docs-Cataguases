@@ -27,7 +27,7 @@ interface ChatMessage {
     fallbackUsed?: boolean           // true quando usou provider diferente do selecionado
     requestedProvider?: string       // provider originalmente solicitado
     searchMode?: boolean
-    searchSources?: Array<{ title: string; url: string }>
+    searchSources?: Array<{ title: string; url: string; snippet?: string; content?: string }>
 }
 
 // ── Modelos disponíveis para seleção manual (com mapeamento para provider) ───
@@ -251,7 +251,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
             <div className="flex flex-col items-end gap-1">
                 {msg.searchMode && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
-                        <Globe className="h-3 w-3" /> Pesquisa web
+                        <Globe className="h-3 w-3" /> Pesquisa Google
                     </span>
                 )}
                 <div className="max-w-[82%] whitespace-pre-wrap rounded-3xl bg-[#f4f4f4] px-4 py-2.5 text-sm leading-relaxed text-slate-900">
@@ -301,23 +301,26 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
                         {msg.searchSources && msg.searchSources.length > 0 && (
                             <span className="text-[9px] text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-1.5 py-0 font-semibold flex items-center gap-0.5">
                                 <Globe className="h-2.5 w-2.5" />
-                                {msg.searchSources.length} fonte{msg.searchSources.length > 1 ? 's' : ''}
+                                {msg.searchSources.length} fonte{msg.searchSources.length > 1 ? 's' : ''} Google
                             </span>
                         )}
                     </div>
                 )}
                 {msg.searchSources && msg.searchSources.length > 0 && (
-                    <div className="ml-1 mt-1 flex flex-wrap gap-1.5">
+                    <div className="ml-1 mt-2 space-y-1.5">
                         {msg.searchSources.slice(0, 3).map((source, index) => (
                             <a
                                 key={`${source.url}-${index}`}
                                 href={source.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="max-w-[10rem] truncate rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 hover:bg-blue-100"
+                                className="block rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] text-blue-900 hover:bg-blue-100"
                                 title={source.title}
                             >
-                                {index + 1}. {source.title}
+                                <span className="block truncate font-semibold">{index + 1}. {source.title}</span>
+                                <span className="mt-0.5 line-clamp-2 block text-blue-700">
+                                    {source.content || source.snippet || source.url}
+                                </span>
                             </a>
                         ))}
                     </div>
@@ -557,7 +560,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                     provider: res.data.provider,
                     model: res.data.model,
                     tokens: res.data.usage?.totalTokens,
-                    searchSources: res.data.search?.results?.map(source => ({ title: source.title, url: source.url })),
+                    searchSources: res.data.search?.results?.map(source => ({ title: source.title, url: source.url, snippet: source.snippet, content: source.content })),
                 }])
                 if (!open) setUnread(u => u + 1)
             } else {
@@ -647,7 +650,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                     tokens: res.data.usage?.totalTokens,
                     fallbackUsed: (res.data as any).fallbackUsed ?? false,
                     requestedProvider: (res.data as any).requestedProvider ?? undefined,
-                    searchSources: res.data.search?.results?.map(source => ({ title: source.title, url: source.url })),
+                    searchSources: res.data.search?.results?.map(source => ({ title: source.title, url: source.url, snippet: source.snippet, content: source.content })),
                 }
                 setMessages(prev => [...prev, assistantMsg])
                 if (!open) setUnread(u => u + 1)
@@ -860,10 +863,10 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                                         ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
                                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                                 }`}
-                                title="Quando ligado, a pergunta tambem e consultada no DuckDuckGo antes da resposta."
+                                title="Quando ligado, a pergunta tambem e consultada no Google antes da resposta."
                             >
                                 <Globe className="h-3.5 w-3.5" />
-                                Pesquisa web
+                                Pesquisa Google
                             </button>
                             <button
                                 type="button"
@@ -938,7 +941,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                placeholder={searchMode ? 'Pergunte com pesquisa web...' : 'Digite sua dúvida... (Enter para enviar)'}
+                                placeholder={searchMode ? 'Pergunte com pesquisa Google...' : 'Digite sua dúvida... (Enter para enviar)'}
                                 className="min-h-[40px] flex-1 resize-none border-none bg-transparent p-1 text-sm leading-6 shadow-none focus-visible:ring-0"
                                 rows={1}
                                 disabled={loading || docxAnalisando || (rateLimited.until !== null && new Date() < rateLimited.until)}

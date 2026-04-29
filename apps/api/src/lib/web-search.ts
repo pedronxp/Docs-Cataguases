@@ -2,22 +2,29 @@ export interface WebSearchResult {
     title: string
     url: string
     snippet: string
-    source: 'duckduckgo'
+    content: string
+    source: 'google'
 }
 
 export interface WebSearchResponse {
     query: string
     results: WebSearchResult[]
-    provider: 'duckduckgo'
+    provider: 'google'
+    configured: boolean
+    error?: string
 }
 
-const DDG_INSTANT_URL = 'https://api.duckduckgo.com/'
-const DDG_HTML_URL = 'https://duckduckgo.com/html/'
-const SEARCH_TIMEOUT_MS = 7_000
+const GOOGLE_SEARCH_URL = 'https://www.googleapis.com/customsearch/v1'
+const SEARCH_TIMEOUT_MS = 8_000
+const CONTENT_TIMEOUT_MS = 5_000
 const MAX_QUERY_CHARS = 280
+const MAX_CONTENT_BYTES = 350_000
 
 function cleanText(value: string): string {
     return value
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
         .replace(/<[^>]*>/g, ' ')
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
@@ -30,29 +37,6 @@ function cleanText(value: string): string {
         .trim()
 }
 
-function normalizeUrl(url: string): string {
-    const decoded = cleanText(url)
-    if (decoded.startsWith('//duckduckgo.com/l/?')) {
-        try {
-            const parsed = new URL(`https:${decoded}`)
-            const target = parsed.searchParams.get('uddg')
-            if (target) return target
-        } catch {
-            return decoded
-        }
-    }
-    if (decoded.startsWith('/l/?')) {
-        try {
-            const parsed = new URL(`https://duckduckgo.com${decoded}`)
-            const target = parsed.searchParams.get('uddg')
-            if (target) return target
-        } catch {
-            return decoded
-        }
-    }
-    return decoded
-}
-
 function uniqueResults(results: WebSearchResult[]): WebSearchResult[] {
     const seen = new Set<string>()
     return results.filter((item) => {
@@ -63,14 +47,14 @@ function uniqueResults(results: WebSearchResult[]): WebSearchResult[] {
     })
 }
 
-async function fetchWithTimeout(url: string): Promise<Response> {
+async function fetchWithTimeout(url: string, timeoutMs: number, accept: string): Promise<Response> {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS)
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
     try {
         return await fetch(url, {
             signal: controller.signal,
             headers: {
-                'accept': 'text/html,application/json;q=0.9,*/*;q=0.8',
+                accept,
                 'user-agent': "Docs Cataguases Assistant/1.0",
             },
         })
@@ -79,100 +63,164 @@ async function fetchWithTimeout(url: string): Promise<Response> {
     }
 }
 
-function flattenRelatedTopics(topics: any[]): any[] {
-    return topics.flatMap((topic) => Array.isArray(topic?.Topics) ? flattenRelatedTopics(topic.Topics) : [topic])
+async function readLimitedText(response: Response): Promise<string> {
+    const reader = response.body?.getReader()
+    if (!reader) return response.text()
+
+    const chunks: Uint8Array[] = []
+    let total = 0
+    while (total < MAX_CONTENT_BYTES) {
+        const { done, value } = await reader.read()
+        if (done || !value) break
+        chunks.push(value)
+        total += value.byteLength
+    }
+
+    try {
+        await reader.cancel()
+    } catch {
+        // noop
+    }
+
+    const merged = new Uint8Array(total)
+    let offset = 0
+    for (const chunk of chunks) {
+        merged.set(chunk.slice(0, Math.max(0, Math.min(chunk.byteLength, total - offset))), offset)
+        offset += chunk.byteLength
+        if (offset >= total) break
+    }
+    return new TextDecoder('utf-8', { fatal: false }).decode(merged)
 }
 
-async function searchInstantAnswer(query: string): Promise<WebSearchResult[]> {
-    const url = `${DDG_INSTANT_URL}?q=${encodeURIComponent(query)}&format=json&no_html=1&no_redirect=1&skip_disambig=1`
-    const response = await fetchWithTimeout(url)
-    if (!response.ok) return []
+function extractReadableContent(html: string): string {
+    const meta = html.match(/<meta[^>]+(?:name|property)=["'](?:description|og:description)["'][^>]+content=["']([^"']+)["'][^>]*>/i)
+        || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:name|property)=["'](?:description|og:description)["'][^>]*>/i)
 
-    const data: any = await response.json()
-    const results: WebSearchResult[] = []
+    const paragraphs = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+        .map(match => cleanText(match[1]))
+        .filter(text => text.length >= 80)
+        .slice(0, 4)
 
-    if (data?.AbstractText && data?.AbstractURL) {
-        results.push({
-            title: cleanText(data.Heading || 'Resposta instantanea'),
-            url: normalizeUrl(data.AbstractURL),
-            snippet: cleanText(data.AbstractText),
-            source: 'duckduckgo',
-        })
-    }
+    const parts = [
+        meta?.[1] ? cleanText(meta[1]) : '',
+        ...paragraphs,
+    ].filter(Boolean)
 
-    const related = flattenRelatedTopics(data?.RelatedTopics || [])
-    for (const item of related.slice(0, 6)) {
-        if (!item?.Text || !item?.FirstURL) continue
-        results.push({
-            title: cleanText(item.Text).split(' - ')[0].slice(0, 120),
-            url: normalizeUrl(item.FirstURL),
-            snippet: cleanText(item.Text),
-            source: 'duckduckgo',
-        })
-    }
-
-    return uniqueResults(results).slice(0, 5)
+    return cleanText(parts.join(' ')).slice(0, 1_200)
 }
 
-async function searchHtml(query: string): Promise<WebSearchResult[]> {
-    const url = `${DDG_HTML_URL}?q=${encodeURIComponent(query)}`
-    const response = await fetchWithTimeout(url)
-    if (!response.ok) return []
+async function fetchSourceContent(url: string): Promise<string> {
+    if (!/^https?:\/\//i.test(url)) return ''
 
-    const html = await response.text()
-    const results: WebSearchResult[] = []
-    const itemRegex = /<div class="result[\s\S]*?<\/div>\s*<\/div>/g
-    const items = html.match(itemRegex) || []
+    try {
+        const response = await fetchWithTimeout(url, CONTENT_TIMEOUT_MS, 'text/html,application/xhtml+xml;q=0.9,text/plain;q=0.8,*/*;q=0.5')
+        const contentType = response.headers.get('content-type') || ''
+        if (!response.ok || !/(text\/html|application\/xhtml\+xml|text\/plain)/i.test(contentType)) return ''
 
-    for (const item of items) {
-        const link = item.match(/<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/)
-        if (!link) continue
-
-        const snippet = item.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/)
-            || item.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/div>/)
-
-        results.push({
-            title: cleanText(link[2]),
-            url: normalizeUrl(link[1]),
-            snippet: cleanText(snippet?.[1] || ''),
-            source: 'duckduckgo',
-        })
+        const text = await readLimitedText(response)
+        return contentType.includes('text/plain')
+            ? cleanText(text).slice(0, 1_200)
+            : extractReadableContent(text)
+    } catch (error) {
+        console.warn('[WebSearch] Falha ao ler fonte Google:', { url, error })
+        return ''
     }
+}
 
-    return uniqueResults(results).slice(0, 5)
+function googleConfig() {
+    const key = process.env.GOOGLE_SEARCH_API_KEY || process.env.GOOGLE_CUSTOM_SEARCH_API_KEY
+    const cx = process.env.GOOGLE_SEARCH_ENGINE_ID || process.env.GOOGLE_SEARCH_CX || process.env.GOOGLE_CUSTOM_SEARCH_CX
+    return { key, cx }
 }
 
 export async function searchWeb(rawQuery: string): Promise<WebSearchResponse> {
     const query = cleanText(rawQuery).slice(0, MAX_QUERY_CHARS)
-    if (!query) return { query: '', results: [], provider: 'duckduckgo' }
+    const { key, cx } = googleConfig()
 
-    let results: WebSearchResult[] = []
-    try {
-        results = await searchInstantAnswer(query)
-    } catch (error) {
-        console.warn('[WebSearch] DuckDuckGo instant answer falhou:', error)
+    if (!query) {
+        return { query: '', results: [], provider: 'google', configured: Boolean(key && cx) }
     }
 
-    if (results.length < 3) {
-        try {
-            const htmlResults = await searchHtml(query)
-            results = uniqueResults([...results, ...htmlResults]).slice(0, 5)
-        } catch (error) {
-            console.warn('[WebSearch] DuckDuckGo HTML falhou:', error)
+    if (!key || !cx) {
+        return {
+            query,
+            results: [],
+            provider: 'google',
+            configured: false,
+            error: 'Pesquisa Google nao configurada. Defina GOOGLE_SEARCH_API_KEY e GOOGLE_SEARCH_ENGINE_ID no backend.',
         }
     }
 
-    return { query, results, provider: 'duckduckgo' }
+    try {
+        const params = new URLSearchParams({
+            key,
+            cx,
+            q: query,
+            num: '5',
+            safe: 'active',
+            hl: 'pt-BR',
+            gl: 'br',
+        })
+        const response = await fetchWithTimeout(`${GOOGLE_SEARCH_URL}?${params.toString()}`, SEARCH_TIMEOUT_MS, 'application/json')
+        const data: any = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+            return {
+                query,
+                results: [],
+                provider: 'google',
+                configured: true,
+                error: data?.error?.message || `Google Search retornou HTTP ${response.status}.`,
+            }
+        }
+
+        const baseResults: WebSearchResult[] = (data?.items || []).map((item: any) => ({
+            title: cleanText(item.title || 'Resultado Google'),
+            url: cleanText(item.link || ''),
+            snippet: cleanText(item.snippet || item.htmlSnippet || ''),
+            content: '',
+            source: 'google' as const,
+        }))
+
+        const unique = uniqueResults(baseResults).slice(0, 5)
+        const enriched = await Promise.all(unique.map(async (item) => ({
+            ...item,
+            content: await fetchSourceContent(item.url),
+        })))
+
+        return {
+            query,
+            provider: 'google',
+            configured: true,
+            results: enriched,
+        }
+    } catch (error: any) {
+        console.warn('[WebSearch] Google Search falhou:', error)
+        return {
+            query,
+            results: [],
+            provider: 'google',
+            configured: true,
+            error: error?.message || 'Falha ao consultar Google Search.',
+        }
+    }
 }
 
 export function formatWebSearchContext(search: WebSearchResponse): string {
+    if (!search.configured) {
+        return `[PESQUISA GOOGLE]\nConsulta: ${search.query}\nStatus: Google Search nao configurado no backend.\nOriente o usuario a configurar GOOGLE_SEARCH_API_KEY e GOOGLE_SEARCH_ENGINE_ID para ativar o modo pesquisa.`
+    }
+
     if (search.results.length === 0) {
-        return `[PESQUISA NA INTERNET]\nConsulta: ${search.query}\nNenhum resultado confiavel retornado pelo provedor gratuito. Responda deixando claro que nao foi possivel confirmar na web agora.`
+        return `[PESQUISA GOOGLE]\nConsulta: ${search.query}\nErro/observacao: ${search.error || 'Nenhum resultado retornado pelo Google.'}\nResponda deixando claro que nao foi possivel confirmar na web agora.`
     }
 
     const sources = search.results
-        .map((item, index) => `${index + 1}. ${item.title}\nURL: ${item.url}\nResumo: ${item.snippet || 'Sem resumo disponivel.'}`)
+        .map((item, index) => {
+            const content = item.content || item.snippet || 'Sem trecho de conteudo disponivel.'
+            return `${index + 1}. ${item.title}\nURL: ${item.url}\nResumo Google: ${item.snippet || 'Sem resumo.'}\nConteudo extraido da fonte: ${content}`
+        })
         .join('\n\n')
 
-    return `[PESQUISA NA INTERNET]\nConsulta: ${search.query}\nProvedor: DuckDuckGo sem chave de API.\nUse somente as fontes abaixo para informacoes atuais. Cite links quando usar dados da pesquisa. Se as fontes nao responderem diretamente, diga isso.\n\n${sources}`
+    return `[PESQUISA GOOGLE]\nConsulta: ${search.query}\nProvedor: Google Programmable Search JSON API.\nUse as fontes abaixo para responder com explicacao mais completa. Cite os links usados. Se as fontes nao sustentarem uma afirmacao, diga isso claramente.\n\n${sources}`
 }

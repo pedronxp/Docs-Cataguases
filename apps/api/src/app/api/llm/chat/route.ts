@@ -315,6 +315,8 @@ export async function POST(req: NextRequest) {
                 search: webSearchResult ? {
                     provider: webSearchResult.provider,
                     query: webSearchResult.query,
+                    configured: webSearchResult.configured,
+                    error: webSearchResult.error,
                     results: webSearchResult.results,
                 } : null,
                 // Transparência: informa se houve fallback e qual provider foi solicitado

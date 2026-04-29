@@ -25,7 +25,8 @@ export interface LLMSearchResult {
     title: string
     url: string
     snippet: string
-    source: 'duckduckgo'
+    content?: string
+    source: 'google'
 }
 
 export interface LLMChatResponse {
@@ -38,8 +39,10 @@ export interface LLMChatResponse {
         totalTokens: number
     }
     search?: {
-        provider: 'duckduckgo'
+        provider: 'google'
         query: string
+        configured?: boolean
+        error?: string
         results: LLMSearchResult[]
     } | null
 }
