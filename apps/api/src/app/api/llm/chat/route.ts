@@ -5,6 +5,7 @@ import { DOCS_SYSTEM_PROMPT, DOCS_SYSTEM_PROMPT_CHAT } from '@/lib/llm-system-pr
 import { executeToolCall, filterToolsByRole } from '@/lib/llm-tools'
 import { sanitizeMessages } from '@/lib/llm-sanitizer'
 import { RateLimitService, rateLimitHeaders } from '@/services/rate-limit.service'
+import { formatWebSearchContext, searchWeb } from '@/lib/web-search'
 import prisma from '@/lib/prisma'
 
 // Mapa modelo → provider (para determinar o provider correto quando o usuário escolhe um modelo específico)
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
         maxTokens,
         temperature,
         provider,
+        searchMode = false,
         useSystemPrompt = true,
         // modo 'chat' usa prompt compacto; qualquer outro usa o completo
         mode = 'chat',
@@ -156,9 +158,20 @@ export async function POST(req: NextRequest) {
         : filterToolsByRole(dbUser.role, { includeMutating: true })
 
     const hasSystemMsg = messages[0]?.role === 'system'
-    const finalMessages: LLMMessage[] = useSystemPrompt && !hasSystemMsg
+    const finalMessagesBase: LLMMessage[] = useSystemPrompt && !hasSystemMsg
         ? [{ role: 'system', content: systemPrompt }, ...messages]
         : messages
+    const finalMessages: LLMMessage[] = [...finalMessagesBase]
+    const lastUserMessage = [...messages].reverse().find((msg: LLMMessage) => msg.role === 'user')
+    let webSearchResult: Awaited<ReturnType<typeof searchWeb>> | null = null
+
+    if (searchMode && lastUserMessage?.content) {
+        webSearchResult = await searchWeb(lastUserMessage.content)
+        finalMessages.splice(1, 0, {
+            role: 'system',
+            content: formatWebSearchContext(webSearchResult),
+        })
+    }
 
     // Se o usuário escolheu um modelo específico no seletor do chat, respeitar.
     // Caso contrário, NÃO passar model — deixar o Smart Router escolher
@@ -299,6 +312,11 @@ export async function POST(req: NextRequest) {
                 provider: finalResult.provider,
                 model: finalResult.model,
                 usage: finalResult.usage,
+                search: webSearchResult ? {
+                    provider: webSearchResult.provider,
+                    query: webSearchResult.query,
+                    results: webSearchResult.results,
+                } : null,
                 // Transparência: informa se houve fallback e qual provider foi solicitado
                 fallbackUsed: finalResult.fallbackUsed ?? false,
                 requestedProvider: finalResult.requestedProvider ?? null,

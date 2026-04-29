@@ -15,9 +15,17 @@ export interface LLMChatRequest {
     maxTokens?: number
     temperature?: number
     provider?: LLMProvider
+    searchMode?: boolean
     mode?: 'chat' | 'analysis'
     useSystemPrompt?: boolean
     userAuth?: { nome: string; email: string; role?: string }
+}
+
+export interface LLMSearchResult {
+    title: string
+    url: string
+    snippet: string
+    source: 'duckduckgo'
 }
 
 export interface LLMChatResponse {
@@ -29,6 +37,11 @@ export interface LLMChatResponse {
         outputTokens: number
         totalTokens: number
     }
+    search?: {
+        provider: 'duckduckgo'
+        query: string
+        results: LLMSearchResult[]
+    } | null
 }
 
 export interface LLMProviderStats {
@@ -96,6 +109,7 @@ class LLMApiService extends BaseApiService {
                 provider: body.provider,
                 model: body.model,
                 usage: body.usage,
+                search: body.search ?? null,
             })
         } catch (e: any) {
             return err(e.response?.data?.error || e.message || 'Erro ao chamar LLM')

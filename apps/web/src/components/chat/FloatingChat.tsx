@@ -9,9 +9,9 @@ import { useChatSession } from '@/hooks/use-chat-session'
 import { usePageContext } from '@/hooks/use-page-context'
 import api from '@/lib/api'
 import {
-    Bot, X, Send, RefreshCw, ChevronDown, Sparkles,
+    X, Send, RefreshCw, Sparkles,
     Zap, Globe, AlertTriangle, Trash2, Copy, Check,
-    Paperclip, FileText, Loader2, Cpu
+    Paperclip, FileText, Loader2, MessageSquare, Plus, Settings2, Cpu, Wand2
 } from 'lucide-react'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -26,6 +26,8 @@ interface ChatMessage {
     docxAnexo?: { nome: string }    // indica mensagem com documento anexado
     fallbackUsed?: boolean           // true quando usou provider diferente do selecionado
     requestedProvider?: string       // provider originalmente solicitado
+    searchMode?: boolean
+    searchSources?: Array<{ title: string; url: string }>
 }
 
 // ── Modelos disponíveis para seleção manual (com mapeamento para provider) ───
@@ -198,6 +200,35 @@ function ProviderBadge({ provider }: { provider: string }) {
 }
 
 // ── Bolha de mensagem ─────────────────────────────────────────────────────────
+function improveDraftText(value: string): string {
+    let text = value
+        .trim()
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\s+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+
+    const replacements: Array<[RegExp, string]> = [
+        [/\bvc\b/gi, 'você'],
+        [/\bpq\b/gi, 'por que'],
+        [/\bq\b/gi, 'que'],
+        [/\btb\b/gi, 'também'],
+        [/\bobs\b/gi, 'observação'],
+        [/\bpfv\b/gi, 'por favor'],
+    ]
+    for (const [pattern, replacement] of replacements) {
+        text = text.replace(pattern, replacement)
+    }
+
+    text = text.replace(/(^|[.!?]\s+)([a-z])/g, (_, prefix, letter) => `${prefix}${letter.toUpperCase()}`)
+
+    if (text && !/[.!?]$/.test(text)) {
+        const questionStart = /^(como|qual|quais|quando|onde|por que|porque|quem|o que|me diga|explique|pode|consegue)\b/i
+        text += questionStart.test(text) ? '?' : '.'
+    }
+
+    return text
+}
+
 function MessageBubble({ msg }: { msg: ChatMessage }) {
     const [copied, setCopied] = useState(false)
     const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -227,8 +258,13 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 
     if (msg.role === 'user') {
         return (
-            <div className="flex justify-end">
-                <div className="max-w-[85%] bg-gradient-to-br from-primary to-[#0D3F8F] text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm shadow-md shadow-primary/20">
+            <div className="flex flex-col items-end gap-1">
+                {msg.searchMode && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                        <Globe className="h-3 w-3" /> Pesquisa web
+                    </span>
+                )}
+                <div className="max-w-[82%] whitespace-pre-wrap rounded-3xl bg-[#f4f4f4] px-4 py-2.5 text-sm leading-relaxed text-slate-900">
                     {msg.content}
                 </div>
             </div>
@@ -236,26 +272,27 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
     }
 
     return (
-        <div className="flex gap-2 items-start group">
-            <div className="shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mt-0.5 shadow-sm">
-                <Bot className="h-4 w-4 text-primary" />
+        <div className="group flex gap-3 items-start">
+            <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm">
+                <Sparkles className="h-3.5 w-3.5" />
             </div>
             <div className="flex-1 space-y-1">
-                <div className={`relative max-w-[95%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm shadow-sm ${msg.error
+                <div className={`relative max-w-[96%] rounded-2xl px-4 py-3 text-sm ${msg.error
                     ? 'bg-red-50 border border-red-200 text-red-700'
-                    : 'bg-white border border-slate-200/80 text-slate-800'
+                    : 'text-slate-900'
                     }`}>
                     {msg.error
                         ? <span className="flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 shrink-0" />{msg.content}</span>
                         : <div
-                            className="leading-relaxed"
+                            className="leading-6"
                             dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
                         />
                     }
                     {!msg.error && (
                         <button
                             onClick={handleCopy}
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-slate-400 hover:text-slate-600"
+                            className="absolute -right-1 top-2 rounded-lg p-1 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-700 group-hover:opacity-100"
+                            title="Copiar resposta"
                         >
                             {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
                         </button>
@@ -271,6 +308,28 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
                             </span>
                         )}
                         {msg.tokens && <span className="text-[9px] text-slate-400">{msg.tokens.toLocaleString('pt-BR')} tokens</span>}
+                        {msg.searchSources && msg.searchSources.length > 0 && (
+                            <span className="text-[9px] text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-1.5 py-0 font-semibold flex items-center gap-0.5">
+                                <Globe className="h-2.5 w-2.5" />
+                                {msg.searchSources.length} fonte{msg.searchSources.length > 1 ? 's' : ''}
+                            </span>
+                        )}
+                    </div>
+                )}
+                {msg.searchSources && msg.searchSources.length > 0 && (
+                    <div className="ml-1 mt-1 flex flex-wrap gap-1.5">
+                        {msg.searchSources.slice(0, 3).map((source, index) => (
+                            <a
+                                key={`${source.url}-${index}`}
+                                href={source.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="max-w-[10rem] truncate rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 hover:bg-blue-100"
+                                title={source.title}
+                            >
+                                {index + 1}. {source.title}
+                            </a>
+                        ))}
                     </div>
                 )}
             </div>
@@ -340,6 +399,7 @@ export function FloatingChat() {
     const [loading, setLoading] = useState(false)
     const [unread, setUnread] = useState(0)
     const [selectedModel, setSelectedModel] = useState('')
+    const [searchMode, setSearchMode] = useState(false)
     const [docxAnalisando, setDocxAnalisando] = useState(false)
     const [docxAnexado, setDocxAnexado] = useState<{ nome: string; contexto: string; contextInjected?: boolean } | null>(null)
     const [rateLimited, setRateLimited] = useState<{ until: Date | null }>({ until: null })
@@ -358,6 +418,7 @@ export function FloatingChat() {
             } else if (savedModel) {
                 localStorage.removeItem('chatSelectedModel')
             }
+            setSearchMode(localStorage.getItem('chatSearchMode') === 'true')
         } catch { /* silencioso */ }
     }, [])
 
@@ -403,6 +464,11 @@ export function FloatingChat() {
             }
         }
     }, [open, scrollToBottom, createSession, selectedModel, usuario?.id])
+
+    useEffect(() => {
+        document.body.classList.toggle('assistant-chat-open', open)
+        return () => document.body.classList.remove('assistant-chat-open')
+    }, [open])
 
     useEffect(() => {
         if (open) scrollToBottom()
@@ -489,6 +555,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                 messages: history,
                 mode: 'chat',
                 selectedModel: selectedModel || undefined,
+                searchMode,
                 userAuth: { nome: usuario.name, email: usuario.email, role: usuario.role },
             })
 
@@ -500,6 +567,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                     provider: res.data.provider,
                     model: res.data.model,
                     tokens: res.data.usage?.totalTokens,
+                    searchSources: res.data.search?.results?.map(source => ({ title: source.title, url: source.url })),
                 }])
                 if (!open) setUnread(u => u + 1)
             } else {
@@ -520,7 +588,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
         } finally {
             setLoading(false)
         }
-    }, [open, selectedModel, usuario])
+    }, [open, selectedModel, searchMode, usuario])
 
     // Atualiza a ref para o handleDocxUpload poder usar sendMessageWithContext
     useEffect(() => {
@@ -535,6 +603,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
             id: Math.random().toString(36).slice(2),
             role: 'user',
             content,
+            searchMode,
         }
 
         setMessages(prev => [...prev, userMsg])
@@ -570,6 +639,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                 messages: history,
                 mode: 'chat',
                 selectedModel: selectedModel || undefined,
+                searchMode,
                 userAuth: {
                     nome: usuario.name,
                     email: usuario.email,
@@ -587,6 +657,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                     tokens: res.data.usage?.totalTokens,
                     fallbackUsed: (res.data as any).fallbackUsed ?? false,
                     requestedProvider: (res.data as any).requestedProvider ?? undefined,
+                    searchSources: res.data.search?.results?.map(source => ({ title: source.title, url: source.url })),
                 }
                 setMessages(prev => [...prev, assistantMsg])
                 if (!open) setUnread(u => u + 1)
@@ -628,7 +699,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
         } finally {
             setLoading(false)
         }
-    }, [loading, open, selectedModel, usuario, docxAnexado, rateLimited, systemContext, saveSessionMessages])
+    }, [loading, open, selectedModel, searchMode, usuario, docxAnexado, rateLimited, systemContext, saveSessionMessages])
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -654,50 +725,42 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
 
     return (
         <>
-            {/* Botão flutuante */}
-            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2.5">
-                {!open && (
-                    <div className="bg-white border border-slate-200 shadow-lg shadow-slate-200/60 rounded-full px-3.5 py-1.5 text-xs text-slate-600 font-semibold animate-in fade-in slide-in-from-bottom-2 duration-300 backdrop-blur-sm">
-                        Assistente Doc's ✨
-                    </div>
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-[8px] border transition-all duration-200 ${
+                    open
+                        ? 'border-slate-900 bg-slate-950 text-white shadow-sm'
+                        : 'border-[#e0e2e6] bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+                }`}
+                aria-label={open ? "Fechar Assistente Doc's" : "Abrir Assistente Doc's"}
+                title="Assistente Doc's"
+            >
+                <Sparkles className="h-5 w-5" />
+                {!open && unread > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                        {unread > 9 ? '9+' : unread}
+                    </span>
                 )}
-                <button
-                    onClick={() => setOpen(o => !o)}
-                    className={`w-14 h-14 rounded-full shadow-xl relative transition-all duration-300 flex items-center justify-center ${open
-                        ? 'bg-slate-700 hover:bg-slate-800 shadow-slate-400/30'
-                        : 'bg-gradient-to-br from-primary to-[#0D3F8F] hover:from-primary/95 hover:to-[#0D3F8F]/95 chat-pulse shadow-primary/30'
-                        }`}
-                >
-                    {open
-                        ? <ChevronDown className="h-6 w-6 text-white" />
-                        : <Bot className="h-6 w-6 text-white drop-shadow-sm" />
-                    }
-                    {!open && unread > 0 && (
-                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-[10px] font-black flex items-center justify-center shadow-sm">
-                            {unread}
-                        </span>
-                    )}
-                </button>
-            </div>
+            </button>
 
             {/* Janela do chat */}
             {open && (
-                <div className="fixed bottom-24 right-6 z-50 w-[390px] max-w-[calc(100vw-2rem)] h-[580px] max-h-[calc(100vh-8rem)] flex flex-col bg-white rounded-2xl shadow-2xl shadow-slate-900/15 border border-slate-200/80 animate-in fade-in slide-in-from-bottom-4 duration-200 overflow-hidden">
+                <div className="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-full flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl shadow-slate-900/10 animate-in fade-in slide-in-from-right-4 duration-200 sm:w-[440px]">
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary to-[#0D3F8F] text-white shrink-0">
+                    <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 text-slate-950">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner border border-white/20">
-                                <Sparkles className="h-4.5 w-4.5 text-white drop-shadow" />
+                            <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-950 text-white shadow-sm">
+                                <Sparkles className="h-4 w-4" />
                             </div>
-                            <div>
-                                <p className="text-sm font-bold leading-tight">Assistente Doc's</p>
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold leading-tight">Assistente Doc's</p>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                     <span className="relative flex h-1.5 w-1.5">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
+                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                                     </span>
                                     {/* Mostra o role do usuário logado no header */}
-                                    <p className="text-[10px] text-white/75 leading-tight">{nomeUsuario} · {roleLabel}</p>
+                                    <p className="truncate text-[11px] leading-tight text-slate-500">{nomeUsuario} · {roleLabel}</p>
                                 </div>
                             </div>
                         </div>
@@ -705,43 +768,43 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                             {messages.length > 0 && (
                                 <button
                                     onClick={handleClear}
-                                    className="p-1.5 rounded-lg hover:bg-white/15 transition-colors"
+                                    className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
                                     title="Limpar conversa"
                                 >
-                                    <Trash2 className="h-4 w-4 text-white/80" />
+                                    <Trash2 className="h-4 w-4" />
                                 </button>
                             )}
                             <button
                                 onClick={() => setOpen(false)}
-                                className="p-1.5 rounded-lg hover:bg-white/15 transition-colors"
+                                className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                                title="Fechar"
                             >
-                                <X className="h-4 w-4 text-white" />
+                                <X className="h-4 w-4" />
                             </button>
                         </div>
                     </div>
 
                     {/* Mensagens */}
-                    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 custom-scrollbar bg-slate-50/40">
+                    <div className="custom-scrollbar flex-1 space-y-5 overflow-y-auto bg-white px-4 py-5">
                         {isEmpty ? (
-                            <div className="space-y-4">
+                            <div className="flex min-h-full flex-col justify-center space-y-6 pb-10">
                                 {/* Mensagem de boas-vindas personalizada com nome e role */}
-                                <div className="flex gap-2 items-start">
-                                    <div className="shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-sm">
-                                        <Bot className="h-4 w-4 text-primary" />
+                                <div className="mx-auto max-w-sm text-center">
+                                    <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-full bg-slate-950 text-white shadow-sm">
+                                        <MessageSquare className="h-5 w-5" />
                                     </div>
-                                    <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-slate-800 shadow-sm">
-                                        Olá, <strong>{nomeUsuario}</strong>! Sou o assistente do <strong>Doc's Cataguases</strong>.
-                                        {' '}Estou ciente de que você é <strong>{roleLabel}</strong> e vou considerar suas permissões em todas as respostas.
-                                    </div>
+                                    <h2 className="text-lg font-semibold tracking-normal text-slate-950">Como posso ajudar?</h2>
+                                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                                        Olá, <strong className="font-semibold text-slate-800">{nomeUsuario}</strong>. Vou responder considerando seu perfil de <strong className="font-semibold text-slate-800">{roleLabel}</strong> no Doc's Cataguases.
+                                    </p>
                                 </div>
                                 <div className="space-y-2.5">
-                                    <p className="text-[10px] text-slate-400 text-center font-semibold uppercase tracking-wider">Sugestões</p>
-                                    <div className="flex flex-wrap gap-1.5 justify-center">
+                                    <div className="grid gap-2">
                                         {getSugestoes(usuario.role).map(s => (
                                             <button
                                                 key={s}
                                                 onClick={() => sendMessage(s)}
-                                                className="text-[11px] px-3 py-1.5 bg-white hover:bg-primary/5 hover:text-primary border border-slate-200 hover:border-primary/30 rounded-full text-slate-600 transition-all font-medium text-left shadow-sm hover:shadow-md hover:shadow-primary/10 hover:-translate-y-0.5"
+                                                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950"
                                             >
                                                 {s}
                                             </button>
@@ -754,15 +817,15 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                         )}
 
                         {loading && (
-                            <div className="flex gap-2 items-start">
-                                <div className="shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-sm">
-                                    <Bot className="h-4 w-4 text-primary" />
+                            <div className="flex gap-3 items-start">
+                                <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm">
+                                    <Sparkles className="h-3.5 w-3.5" />
                                 </div>
-                                <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                                <div className="rounded-2xl px-4 py-3">
                                     <div className="flex gap-1.5 items-center">
-                                        <span className="w-2 h-2 bg-primary/50 rounded-full animate-bounce [animation-delay:0ms]" />
-                                        <span className="w-2 h-2 bg-primary/50 rounded-full animate-bounce [animation-delay:150ms]" />
-                                        <span className="w-2 h-2 bg-primary/50 rounded-full animate-bounce [animation-delay:300ms]" />
+                                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
+                                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
+                                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
                                     </div>
                                 </div>
                             </div>
@@ -771,17 +834,17 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                     </div>
 
                     {/* Input */}
-                    <div className="px-3 py-3 border-t border-slate-100 bg-white shrink-0">
+                    <div className="shrink-0 border-t border-slate-100 bg-white px-3 pb-3 pt-2">
                         {/* Seletor de modelo */}
-                        <div className="mb-2 flex items-center gap-1.5">
-                            <Zap className="h-3 w-3 text-orange-400 shrink-0" />
+                        <div className="mb-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+                            <Settings2 className="h-3.5 w-3.5 shrink-0 text-slate-500" />
                             <select
                                 value={selectedModel}
                                 onChange={e => {
                                     setSelectedModel(e.target.value)
                                     try { localStorage.setItem('chatSelectedModel', e.target.value) } catch { /* noop */ }
                                 }}
-                                className="flex-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
+                                className="min-w-0 flex-1 cursor-pointer bg-transparent text-[12px] text-slate-700 outline-none"
                             >
                                 {MODELS.map(m => (
                                     <option key={m.value} value={m.value}>
@@ -792,45 +855,80 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                         </div>
 
                         {/* Ações rápidas de portaria (visível apenas quando em /portarias/:id) */}
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchMode(prev => {
+                                        const next = !prev
+                                        try { localStorage.setItem('chatSearchMode', String(next)) } catch { /* noop */ }
+                                        return next
+                                    })
+                                }}
+                                className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
+                                    searchMode
+                                        ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                }`}
+                                title="Quando ligado, a pergunta tambem e consultada no DuckDuckGo antes da resposta."
+                            >
+                                <Globe className="h-3.5 w-3.5" />
+                                Pesquisa web
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setInput(prev => improveDraftText(prev))
+                                    setTimeout(() => textareaRef.current?.focus(), 0)
+                                }}
+                                disabled={!input.trim() || loading || docxAnalisando}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-45"
+                                title="Aprimorar pontuacao e clareza do texto digitado localmente."
+                            >
+                                <Wand2 className="h-3.5 w-3.5" />
+                                Aprimorar
+                            </button>
+                        </div>
+
                         {portariaId && (
                             <div className="flex gap-2 mb-2 flex-wrap">
                                 <button
                                     onClick={() => navigate({ to: '/administrativo/portarias/$id', params: { id: portariaId } })}
-                                    className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded px-2 py-1 transition-colors"
+                                    className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
                                 >
                                     Ver esta portaria →
                                 </button>
                                 <button
                                     onClick={() => navigate({ to: '/administrativo/portarias/novo' })}
-                                    className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded px-2 py-1 transition-colors"
+                                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
                                 >
-                                    + Nova portaria
+                                    <Plus className="h-3 w-3" /> Nova portaria
                                 </button>
                             </div>
                         )}
 
                         {/* Preview de documento anexado */}
                         {docxAnexado && (
-                            <div className="mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5 text-xs text-blue-700">
+                            <div className="mb-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
                                 <FileText className="h-3.5 w-3.5 shrink-0" />
                                 <span className="truncate flex-1">{docxAnexado.nome}</span>
-                                <button onClick={() => setDocxAnexado(null)} className="text-blue-400 hover:text-blue-600">
+                                <button onClick={() => setDocxAnexado(null)} className="text-slate-400 hover:text-slate-700">
                                     <X className="h-3 w-3" />
                                 </button>
                             </div>
                         )}
 
-                        <div className="flex gap-2 items-end bg-slate-50 rounded-xl border border-slate-200 px-3 py-2 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 focus-within:bg-white transition-all shadow-sm">
+                        <div className="flex items-end gap-2 rounded-3xl border border-slate-300 bg-white px-3 py-2 shadow-[0_2px_12px_rgba(15,23,42,0.08)] transition-all focus-within:border-slate-400 focus-within:shadow-[0_6px_24px_rgba(15,23,42,0.12)]">
                             {/* Botão de anexar DOCX */}
                             <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={loading || docxAnalisando}
                                 title="Anexar documento DOCX para criar modelo"
-                                className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 text-slate-400 hover:text-primary hover:bg-primary/10 transition-all disabled:opacity-40"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-950 disabled:opacity-40"
                             >
                                 {docxAnalisando
-                                    ? <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                    ? <Loader2 className="h-4 w-4 animate-spin text-slate-900" />
                                     : <Paperclip className="h-4 w-4" />
                                 }
                             </button>
@@ -850,19 +948,20 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                placeholder="Digite sua dúvida... (Enter para enviar)"
-                                className="flex-1 resize-none border-none shadow-none focus-visible:ring-0 bg-transparent text-sm p-0 min-h-[36px] max-h-[120px]"
+                                placeholder={searchMode ? 'Pergunte com pesquisa web...' : 'Digite sua dúvida... (Enter para enviar)'}
+                                className="min-h-[40px] flex-1 resize-none border-none bg-transparent p-1 text-sm leading-6 shadow-none focus-visible:ring-0"
                                 rows={1}
                                 disabled={loading || docxAnalisando || (rateLimited.until !== null && new Date() < rateLimited.until)}
                             />
                             <button
                                 onClick={() => sendMessage(input)}
                                 disabled={!input.trim() || loading || docxAnalisando || (rateLimited.until !== null && new Date() < rateLimited.until)}
-                                className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-[#0D3F8F] hover:from-primary/90 hover:to-[#0D3F8F]/90 flex items-center justify-center shrink-0 mb-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-primary/20 disabled:shadow-none"
+                                className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-950 text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                                title="Enviar"
                             >
                                 {loading
-                                    ? <RefreshCw className="h-3.5 w-3.5 text-white animate-spin" />
-                                    : <Send className="h-3.5 w-3.5 text-white" />
+                                    ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                    : <Send className="h-3.5 w-3.5" />
                                 }
                             </button>
                         </div>
@@ -871,7 +970,7 @@ INSTRUÇÕES IMPORTANTES: O usuário acabou de anexar este documento e está env
                                 Limite atingido. Liberado em {rateLimited.until.toLocaleTimeString('pt-BR')}.
                             </p>
                         )}
-                        <p className="text-[9px] text-slate-400 text-center mt-1.5">Shift+Enter para nova linha · 📎 para anexar DOCX</p>
+                        <p className="mt-1.5 text-center text-[10px] text-slate-400">Shift+Enter para nova linha · use o clipe para anexar DOCX</p>
                     </div>
                 </div>
             )}
