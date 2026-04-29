@@ -352,7 +352,12 @@ export function FloatingChat() {
     useEffect(() => {
         try {
             const savedModel = localStorage.getItem('chatSelectedModel')
-            if (savedModel) setSelectedModel(savedModel)
+            const saved = MODELS.find(m => m.value === savedModel)
+            if (savedModel && saved && saved.provider !== 'ollama') {
+                setSelectedModel(savedModel)
+            } else if (savedModel) {
+                localStorage.removeItem('chatSelectedModel')
+            }
         } catch { /* silencioso */ }
     }, [])
 
