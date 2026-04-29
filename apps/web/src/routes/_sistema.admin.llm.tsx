@@ -32,10 +32,9 @@ function getDashboardApiBase(): string {
 
     try {
         const configuredUrl = new URL(configured, window.location.origin)
-        const currentHost = window.location.hostname
         const localHosts = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
 
-        if (localHosts.has(configuredUrl.hostname) && !localHosts.has(currentHost)) {
+        if (localHosts.has(configuredUrl.hostname)) {
             return ''
         }
     } catch {

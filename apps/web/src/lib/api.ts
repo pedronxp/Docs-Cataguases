@@ -9,9 +9,8 @@ function getApiBaseUrl(): string {
         const configuredUrl = new URL(configured, window.location.origin)
         const localHosts = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
         const isLocalTarget = localHosts.has(configuredUrl.hostname)
-        const isLocalPage = localHosts.has(window.location.hostname)
 
-        if (isLocalTarget && !isLocalPage) return ''
+        if (isLocalTarget) return ''
     } catch {
         return configured
     }
