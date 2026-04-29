@@ -42,6 +42,7 @@ export interface LLMChatResponse {
         provider: 'google'
         query: string
         configured?: boolean
+        method?: 'api' | 'public' | 'news'
         error?: string
         results: LLMSearchResult[]
     } | null

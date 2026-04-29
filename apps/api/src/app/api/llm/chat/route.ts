@@ -316,6 +316,7 @@ export async function POST(req: NextRequest) {
                     provider: webSearchResult.provider,
                     query: webSearchResult.query,
                     configured: webSearchResult.configured,
+                    method: webSearchResult.method,
                     error: webSearchResult.error,
                     results: webSearchResult.results,
                 } : null,
